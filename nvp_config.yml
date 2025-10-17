@@ -1,0 +1,25 @@
+scripts:
+  nvk_build:
+    notify: false
+    help: Build NervSDK project (in debug mode by default)
+    script: cmake build nervsdk -t Debug
+    cwd: ${PROJECT_ROOT_DIR}
+  # nvl_setup:
+  #   notify: false
+  #   help: Setup NervLand project
+  #   script: cmake setup nervland -g
+  #   cwd: ${PROJECT_ROOT_DIR}
+
+cmake_projects:
+  - name: NervSDK
+    root_dir: ${PROJECT_ROOT_DIR}
+    install_dir: ${PROJECT_ROOT_DIR}/dist
+    version: "22.7"
+    prefix: nv
+
+    # defs:
+    #   NV_DAWN_VERSION: 250901
+    #   NV_USE_FFMPEG: 1
+
+    # dependencies:
+    #   FMT_DIR: fmt

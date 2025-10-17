@@ -1,0 +1,15 @@
+{
+  // "editor.quickSuggestions": {
+  //   "other": "off",
+  //   "comments": "off",
+  //   "strings": "off"
+  // },
+  // "editor.hover.enabled": false,
+  "editor.formatOnSave": true,
+  "C_Cpp.clang_format_path": "D:/Projects/NervProj/tools/windows/clang-20.1.6/bin/clang-format.exe",
+  "C_Cpp.clang_format_style": "file",
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "[cmake]": {
+    "editor.defaultFormatter": "cheshirekow.cmake-format"
+  }
+}

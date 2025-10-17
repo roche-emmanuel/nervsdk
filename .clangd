@@ -1,0 +1,10 @@
+---
+CompileFlags:
+  Compiler: clang++
+  Add: -ferror-limit=0
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+Hover:
+  ShowAKA: Yes

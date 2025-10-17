@@ -1,0 +1,8 @@
+# Ignore visual studio code actual settings file:
+.vscode/settings.json
+
+# Ignore log files:
+*.log
+
+# Ignore compile_commands.json:
+compile_commands.json
