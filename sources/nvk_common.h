@@ -32,5 +32,6 @@
 
 #include <nvk_macros.h>
 #include <nvk_math.h>
+#include <nvk_types.h>
 
 #endif
