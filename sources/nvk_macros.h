@@ -87,4 +87,35 @@ class LogManager;
     cname(cname&&) noexcept = default;                                         \
     auto operator=(cname&&) noexcept -> cname& = default;
 
+#define NV_DECLARE_RAW_INSTANCE(cname)                                         \
+    NV_DECLARE_NO_COPY(cname)                                                  \
+    NV_DECLARE_NO_MOVE(cname)                                                  \
+  protected:                                                                   \
+    cname();                                                                   \
+    void init_instance();                                                      \
+    void uninit_instance();                                                    \
+                                                                               \
+  public:                                                                      \
+    static auto instance() -> cname&;                                          \
+    static void destroy();
+
+#define NV_IMPLEMENT_RAW_INSTANCE(cname)                                       \
+    static auto get_singleton() -> std::unique_ptr<cname>& {                   \
+        static std::unique_ptr<cname> singleton;                               \
+        return singleton;                                                      \
+    }                                                                          \
+    auto cname::instance() -> cname& {                                         \
+        if (get_singleton() == nullptr) {                                      \
+            get_singleton().reset(new cname);                                  \
+            get_singleton()->init_instance();                                  \
+        }                                                                      \
+        return *get_singleton();                                               \
+    }                                                                          \
+    void cname::destroy() {                                                    \
+        if (get_singleton() != nullptr) {                                      \
+            get_singleton()->uninit_instance();                                \
+            get_singleton().reset();                                           \
+        }                                                                      \
+    }
+
 #endif
