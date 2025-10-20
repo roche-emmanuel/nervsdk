@@ -23,3 +23,5 @@ cmake_projects:
 
     dependencies:
       FMT_DIR: fmt
+      OPENSSL_DIR: openssl
+      ZLIB_DIR: zlib

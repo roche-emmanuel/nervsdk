@@ -72,6 +72,24 @@ template <typename T, typename MemAlloc = DefaultRootAllocator>
 using Deque = std::deque<T, STLAllocator<T, MemAlloc>>;
 #endif
 
+#define DEFINE_VECTOR(tname) using tname##Vector = Vector<nv::tname>;
+
+DEFINE_VECTOR(VoidPtr)
+DEFINE_VECTOR(Bool);
+DEFINE_VECTOR(I8);
+DEFINE_VECTOR(U8);
+DEFINE_VECTOR(I16);
+DEFINE_VECTOR(U16);
+DEFINE_VECTOR(I32);
+DEFINE_VECTOR(U32);
+DEFINE_VECTOR(I64);
+DEFINE_VECTOR(U64);
+DEFINE_VECTOR(F32);
+DEFINE_VECTOR(F64);
+DEFINE_VECTOR(String);
+
+#undef DEFINE_VECTOR
+
 } // namespace nv
 
 namespace std {

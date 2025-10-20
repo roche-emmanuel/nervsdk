@@ -39,4 +39,10 @@
 #include <nvk_math.h>
 #include <nvk_types.h>
 
+#include <nvk/base/RefObject.h>
+#include <nvk/base/RefPtr.h>
+#include <nvk/base/std_containers.h>
+
+#include <nvk/log/LogManager.h>
+
 #endif

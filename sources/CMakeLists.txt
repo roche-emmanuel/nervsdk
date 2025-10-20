@@ -1,6 +1,8 @@
 set(TARGET_NAME "nervsdk")
 
 include_directories(${FMT_DIR}/include)
+include_directories(${OPENSSL_DIR}/include)
+include_directories(${ZLIB_DIR}/include)
 
 include_directories(.)
 
