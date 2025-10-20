@@ -30,4 +30,6 @@
 
 #include <algorithm> // for std::min and std::max
 
+#include <nvk_macros.h>
+
 #endif
