@@ -3,9 +3,9 @@
 
 #include <nvk_common.h>
 
-#include <base/RefObject.h>
-#include <base/RefPtr.h>
-#include <base/std_containers.h>
+#include <nvk/base/RefObject.h>
+#include <nvk/base/RefPtr.h>
+#include <nvk/base/std_containers.h>
 
 namespace nv {
 

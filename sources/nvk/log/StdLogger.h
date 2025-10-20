@@ -1,7 +1,7 @@
 #ifndef NV_STDLOGGER_H
 #define NV_STDLOGGER_H
 
-#include <log/LogSink.h>
+#include <nvk/log/LogSink.h>
 
 namespace nv {
 

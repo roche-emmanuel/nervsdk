@@ -1,12 +1,12 @@
 // Implementation for RefObject
 
 #if !NV_USE_STD_MEMORY
-#include <base/memory/Allocator.h>
+#include <nvk/base/memory/Allocator.h>
 #endif
 
-#include <base/RefObject.h>
-#include <base/SpinLock.h>
-#include <base/string_id.h>
+#include <nvk/base/RefObject.h>
+#include <nvk/base/SpinLock.h>
+#include <nvk/base/string_id.h>
 
 namespace nv {
 

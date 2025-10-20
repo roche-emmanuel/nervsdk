@@ -1,6 +1,6 @@
 
-#include <log/FileLogger.h>
-#include <log/LogManager.h>
+#include <nvk/log/FileLogger.h>
+#include <nvk/log/LogManager.h>
 
 namespace nv {
 

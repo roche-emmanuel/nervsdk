@@ -3,14 +3,14 @@
 
 #include <nvk_common.h>
 
-#include <base/RefObject.h>
-#include <base/RefPtr.h>
-#include <base/SpinLock.h>
-#include <base/std_containers.h>
 #include <external/blockingconcurrentqueue.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
-#include <log/LogSink.h>
+#include <nvk/base/RefObject.h>
+#include <nvk/base/RefPtr.h>
+#include <nvk/base/SpinLock.h>
+#include <nvk/base/std_containers.h>
+#include <nvk/log/LogSink.h>
 
 #define NV_LOG_MSG_QUEUE_CAPACITY 1024
 

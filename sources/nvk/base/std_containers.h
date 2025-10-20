@@ -4,11 +4,10 @@
 #include <nvk_common.h>
 
 #if !NV_USE_STD_MEMORY
-#include <base/memory/MemoryManager.h>
-#include <base/memory/STLAllocator.h>
+#include <nvk/base/memory/MemoryManager.h>
+#include <nvk/base/memory/STLAllocator.h>
 #endif
 
-// #include <log/LogManager.h>
 namespace nv {
 
 #if NV_USE_STD_MEMORY

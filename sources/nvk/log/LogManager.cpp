@@ -1,7 +1,7 @@
 // Implementation for LogManager
 
-#include <log/LogManager.h>
-#include <log/StdLogger.h>
+#include <nvk/log/LogManager.h>
+#include <nvk/log/StdLogger.h>
 #include <nvk_utils.h>
 
 #ifdef __EMSCRIPTEN__
