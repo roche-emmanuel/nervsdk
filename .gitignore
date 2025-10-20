@@ -8,4 +8,5 @@
 compile_commands.json
 
 dist/
-.cache
+.cache/
+

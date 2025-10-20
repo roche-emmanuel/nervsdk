@@ -5,6 +5,7 @@
 #include <atomic>
 #include <concepts>
 #include <condition_variable>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -16,8 +17,10 @@
 #include <regex>
 #include <set>
 #include <sstream>
+#include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #ifdef _WIN32
@@ -29,6 +32,8 @@
 #endif
 
 #include <algorithm> // for std::min and std::max
+
+#include <nvk_config.h>
 
 #include <nvk_macros.h>
 #include <nvk_math.h>

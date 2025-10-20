@@ -1,0 +1,88 @@
+#ifndef NV_STD_CONTAINERS_
+#define NV_STD_CONTAINERS_
+
+#include <nvk_common.h>
+
+#if !NV_USE_STD_MEMORY
+#include <base/memory/MemoryManager.h>
+#include <base/memory/STLAllocator.h>
+#endif
+
+// #include <log/LogManager.h>
+namespace nv {
+
+#if NV_USE_STD_MEMORY
+using String = std::string;
+
+using OStringStream = std::ostringstream;
+using IStringStream = std::istringstream;
+
+template <typename T> using List = std::list<T>;
+
+template <typename T> using Set = std::set<T>;
+template <typename T> using UnorderedSet = std::unordered_set<T>;
+
+template <typename Key, typename T> using Map = std::map<Key, T>;
+
+template <typename Key, typename T>
+using UnorderedMap = std::unordered_map<Key, T>;
+
+// Note: our vector should by default use the DefaultRootAllocator, because it
+// could get significantly big:
+template <typename T> using Vector = std::vector<T>;
+
+template <typename T> using Deque = std::deque<T>;
+#else
+// template <typename T=char, typename MemAlloc=DefaultPoolAllocator>
+using String = std::basic_string<char, std::char_traits<char>,
+                                 STLAllocator<char, DefaultPoolAllocator>>;
+
+using OStringStream =
+    std::basic_ostringstream<char, std::char_traits<char>,
+                             STLAllocator<char, DefaultPoolAllocator>>;
+using IStringStream =
+    std::basic_istringstream<char, std::char_traits<char>,
+                             STLAllocator<char, DefaultPoolAllocator>>;
+
+template <typename T, typename MemAlloc = DefaultPoolAllocator>
+using List = std::list<T, STLAllocator<T, MemAlloc>>;
+
+template <typename T, typename MemAlloc = DefaultPoolAllocator>
+using Set = std::set<T, std::less<T>, STLAllocator<T, MemAlloc>>;
+
+template <typename T, typename MemAlloc = DefaultPoolAllocator>
+using UnorderedSet =
+    std::unordered_set<T, std::less<T>, STLAllocator<T, MemAlloc>>;
+
+template <typename Key, typename T, typename MemAlloc = DefaultPoolAllocator>
+using Map = std::map<Key, T, std::less<Key>,
+                     STLAllocator<std::pair<const Key, T>, MemAlloc>>;
+
+template <typename Key, typename T, typename MemAlloc = DefaultPoolAllocator,
+          typename Hash = std::hash<Key>>
+using UnorderedMap =
+    std::unordered_map<Key, T, Hash, std::equal_to<Key>,
+                       STLAllocator<std::pair<const Key, T>, MemAlloc>>;
+
+// Note: our vector should by default use the DefaultRootAllocator, because it
+// could get significantly big:
+template <typename T, typename MemAlloc = DefaultRootAllocator>
+using Vector = std::vector<T, STLAllocator<T, MemAlloc>>;
+
+template <typename T, typename MemAlloc = DefaultRootAllocator>
+using Deque = std::deque<T, STLAllocator<T, MemAlloc>>;
+#endif
+
+} // namespace nv
+
+namespace std {
+#if !NV_USE_STD_MEMORY
+template <> struct hash<nv::String> {
+    auto operator()(const nv::String& s) const -> std::size_t {
+        return std::hash<std::string>()(s.c_str());
+    }
+};
+#endif
+} // namespace std
+
+#endif
