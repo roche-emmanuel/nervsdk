@@ -31,5 +31,6 @@
 #include <algorithm> // for std::min and std::max
 
 #include <nvk_macros.h>
+#include <nvk_math.h>
 
 #endif
