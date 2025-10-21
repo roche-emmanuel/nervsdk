@@ -92,8 +92,8 @@ class LogManager;
     NV_DECLARE_NO_MOVE(cname)                                                  \
   protected:                                                                   \
     cname();                                                                   \
-    void init_instance();                                                      \
-    void uninit_instance();                                                    \
+    virtual void init_instance();                                              \
+    virtual void uninit_instance();                                            \
                                                                                \
   public:                                                                      \
     static auto instance() -> cname&;                                          \

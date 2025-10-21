@@ -36,10 +36,6 @@ install(
   RUNTIME DESTINATION bin)
 
 # Install headers preserving directory structure
-install(
-  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
-  PATTERN "dist" EXCLUDE
-  PATTERN "build" EXCLUDE)
+
+# install( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ DESTINATION include
+# FILES_MATCHING PATTERN "*.h" PATTERN "dist" EXCLUDE PATTERN "build" EXCLUDE)

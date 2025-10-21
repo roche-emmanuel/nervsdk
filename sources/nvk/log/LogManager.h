@@ -28,7 +28,7 @@ class LogManager {
     NV_DECLARE_RAW_INSTANCE(LogManager)
 
   public:
-    ~LogManager();
+    virtual ~LogManager();
 
     enum Level : int {
         L_FATAL,
