@@ -118,4 +118,41 @@ class LogManager;
         }                                                                      \
     }
 
+#define NV_DECLARE_CUSTOM_INSTANCE(cname)                                      \
+    NV_DECLARE_RAW_INSTANCE(cname)                                             \
+  public:                                                                      \
+    using FactoryFunc = std::function<std::unique_ptr<cname>()>;               \
+    static void set_instance_factory(FactoryFunc factory) {                    \
+        NVCHK(s_factory == nullptr, "instance factory already assigned.");     \
+        s_factory = factory;                                                   \
+    };                                                                         \
+    template <typename T> static void set_instance_class() {                   \
+        set_instance_factory(                                                  \
+            []() -> std::unique_ptr<cname> { return std::make_unique<T>(); }); \
+    }                                                                          \
+                                                                               \
+  private:                                                                     \
+    static FactoryFunc s_factory;
+
+#define NV_IMPLEMENT_CUSTOM_INSTANCE(cname)                                    \
+    cname::FactoryFunc cname::s_factory = nullptr;                             \
+    static auto get_singleton() -> std::unique_ptr<cname>& {                   \
+        static std::unique_ptr<cname> singleton;                               \
+        return singleton;                                                      \
+    }                                                                          \
+    auto cname::instance() -> cname& {                                         \
+        if (get_singleton() == nullptr) {                                      \
+            NVCHK(s_factory != nullptr, "No instance factory assigned.");      \
+            get_singleton() = s_factory();                                     \
+            get_singleton()->init_instance();                                  \
+        }                                                                      \
+        return *get_singleton();                                               \
+    }                                                                          \
+    void cname::destroy() {                                                    \
+        if (get_singleton() != nullptr) {                                      \
+            get_singleton()->uninit_instance();                                \
+            get_singleton().reset();                                           \
+        }                                                                      \
+    }
+
 #endif
