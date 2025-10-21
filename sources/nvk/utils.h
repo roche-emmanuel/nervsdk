@@ -9,6 +9,12 @@
 
 namespace nv {
 
+auto system_file_exists(const char* fname) -> bool;
+auto system_dir_exists(const char* path) -> bool;
+
+// Replace all instances of a given string inside another string:
+void replace_all(String& str, const String& old_value, const String& new_value);
+
 template <typename T>
 auto remove_vector_element(Vector<T>& vec, const T& val) -> bool {
     for (auto it = vec.begin(); it != vec.end(); ++it) {

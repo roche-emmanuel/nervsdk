@@ -2,6 +2,6 @@
 
 #include <nvk_common.h>
 
-#include <nvk_utils.h>
+#include <nvk/utils.h>
 
 #endif

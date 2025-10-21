@@ -42,6 +42,9 @@
 #include <nvk/base/RefObject.h>
 #include <nvk/base/RefPtr.h>
 #include <nvk/base/std_containers.h>
+#include <nvk/base/string_id.h>
+
+#include <nvk/utils.h>
 
 #include <nvk/log/LogManager.h>
 

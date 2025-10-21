@@ -2,7 +2,7 @@
 
 #include <nvk/log/LogManager.h>
 #include <nvk/log/StdLogger.h>
-#include <nvk_utils.h>
+#include <nvk/utils.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
