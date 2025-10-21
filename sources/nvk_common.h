@@ -37,6 +37,7 @@
 
 #include <nvk_macros.h>
 #include <nvk_math.h>
+#include <nvk_memory.h>
 #include <nvk_types.h>
 
 #include <nvk/base/RefObject.h>
