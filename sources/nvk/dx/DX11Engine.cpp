@@ -1,3 +1,5 @@
+#ifdef _WIN32
+
 #include <nvk/dx/DX11Engine.h>
 // #include <dxgi1_2.h>
 // #include <fstream>
@@ -1159,3 +1161,5 @@ auto DX11Engine::createReadOnlySharedTexture2D(HANDLE* sharedHandle, U32 width,
 }
 
 } // namespace nv
+
+#endif

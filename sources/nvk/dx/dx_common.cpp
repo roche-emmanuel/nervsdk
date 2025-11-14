@@ -1,3 +1,5 @@
+#ifdef _WIN32
+
 #include <nvk/dx/dx_common.h>
 
 namespace nv {
@@ -15,3 +17,5 @@ std::string WStringToString(const std::wstring& wstr) {
 }
 
 } // namespace nv
+
+#endif

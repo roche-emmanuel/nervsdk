@@ -1,3 +1,5 @@
+#ifdef _WIN32
+
 #include <nvk/dx/DX12Engine.h>
 // #include <dxgi1_6.h>
 // #include <fstream>
@@ -601,3 +603,5 @@ auto DX12Engine::getRequiredReadBufferSize(ID3D12Resource* tex) -> U32 {
 }
 
 } // namespace nv
+
+#endif
