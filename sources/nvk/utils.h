@@ -23,6 +23,9 @@ auto get_absolute_path(const String& path) -> String;
 auto read_system_file(const char* fname) -> String;
 auto read_system_binary_file(const char* fname) -> U8Vector;
 
+auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
+    -> String;
+
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
 

@@ -1,7 +1,6 @@
 #ifndef _NV_VEC2_H_
 #define _NV_VEC2_H_
 
-#include <core_exports.h>
 #include <nvk_math.h>
 
 namespace nv {

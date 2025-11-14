@@ -1,4 +1,5 @@
 
+#include <nvk/resource/ResourceManager.h>
 #include <nvk/utils.h>
 
 #define BUFSIZE 4096
@@ -15,6 +16,11 @@ auto system_file_exists(const char* fname) -> bool {
     // http://stackoverflow.com/questions/268023/what-s-the-best-way-to-check-if-a-file-exists-in-c-cross-platform
     return std::filesystem::exists(fname) &&
            std::filesystem::is_regular_file(fname);
+}
+
+auto read_virtual_file(const String& fname, bool forceAllowSystem) -> String {
+    return ResourceManager::instance().read_virtual_file(fname,
+                                                         forceAllowSystem);
 }
 
 void replace_all(String& str, const String& old_value,
