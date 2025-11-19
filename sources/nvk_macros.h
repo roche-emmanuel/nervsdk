@@ -142,8 +142,14 @@ class LogManager;
     }                                                                          \
     auto cname::instance() -> cname& {                                         \
         if (get_singleton() == nullptr) {                                      \
-            NVCHK(s_factory != nullptr, "No instance factory assigned.");      \
-            get_singleton() = s_factory();                                     \
+            if (s_factory == nullptr) {                                        \
+                logWARN(                                                       \
+                    "No factory provided for {}, creating default instance.",  \
+                    #cname);                                                   \
+                get_singleton().reset(new cname);                              \
+            } else {                                                           \
+                get_singleton() = s_factory();                                 \
+            }                                                                  \
             get_singleton()->init_instance();                                  \
         }                                                                      \
         return *get_singleton();                                               \

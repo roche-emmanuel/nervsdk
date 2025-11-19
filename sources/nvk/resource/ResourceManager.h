@@ -15,12 +15,13 @@ class ResourceManager {
     virtual ~ResourceManager() = default;
 
     /** Get the last update time from a set of files. */
-    virtual auto get_last_update_time(const Set<String>& files)
-        -> std::time_t = 0;
+    virtual auto get_last_update_time(const Set<String>& files) -> std::time_t {
+        return 0;
+    };
 
-    virtual auto check_live_reload() -> bool = 0;
+    virtual auto check_live_reload() -> bool { return false; };
 
-    virtual auto get_root_path() -> String = 0;
+    virtual auto get_root_path() -> String { return {}; };
 
     /** Check if we have a given resource pack */
     [[nodiscard]] auto has_resource_pack(const String& packFile) const -> bool;

@@ -9,6 +9,11 @@
 
 namespace nv {
 
+// Sleep functions
+void sleep_s(U32 secs);
+void sleep_ms(U32 msecs);
+void sleep_us(U32 usecs);
+
 auto system_file_exists(const char* fname) -> bool;
 
 inline auto system_file_exists(const String& fname) -> bool {

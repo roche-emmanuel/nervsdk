@@ -6,6 +6,18 @@
 
 namespace nv {
 
+void sleep_s(U32 secs) {
+    std::this_thread::sleep_for(std::chrono::seconds(secs));
+}
+
+void sleep_ms(U32 msecs) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(msecs));
+}
+
+void sleep_us(U32 usecs) {
+    std::this_thread::sleep_for(std::chrono::microseconds(usecs));
+}
+
 auto system_dir_exists(const char* path) -> bool {
     // Check if path exists and is a directory
     return std::filesystem::exists(path) && std::filesystem::is_directory(path);

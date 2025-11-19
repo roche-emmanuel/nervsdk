@@ -22,8 +22,6 @@ template <typename U> struct is_vector<Vector<U>> : std::true_type {};
 
 template <typename T> inline constexpr bool is_vector_v = is_vector<T>::value;
 
-void sleep_ms(U32 msecs);
-
 class LogManager {
     NV_DECLARE_RAW_INSTANCE(LogManager)
 
