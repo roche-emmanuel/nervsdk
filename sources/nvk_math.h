@@ -1,7 +1,7 @@
 #ifndef NV_NVK_MATH_
 #define NV_NVK_MATH_
 
-#include <cmath>
+#include <nvk_base.h>
 namespace nv {
 
 // define the standard trig values
