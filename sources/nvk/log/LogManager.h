@@ -28,6 +28,8 @@ class LogManager {
   public:
     virtual ~LogManager();
 
+    using RedirectFunc = void (*)(U32, const char*, size_t);
+
     enum Level : int {
         L_FATAL,
         L_ERROR,
@@ -144,6 +146,9 @@ class LogManager {
 #endif
     }
 
+    // Assign redirect function:
+    void set_redirect_func(RedirectFunc func) { _redirectFn = func; }
+
   protected:
     struct MsgTag {
         U32 index{0};
@@ -173,6 +178,8 @@ class LogManager {
 
   private:
     int _notifyLevel = L_INFO;
+
+    RedirectFunc _redirectFn{nullptr};
 
     SpinLock _logSP;
     std::mutex _logMutex;

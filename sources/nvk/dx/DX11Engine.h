@@ -109,6 +109,9 @@ class DX11Engine {
   public:
     static auto instance(ID3D11Device* device = nullptr) -> DX11Engine&;
 
+    // Explicit construction from existing device:
+    explicit DX11Engine(ID3D11Device* device);
+
     // Delete copy/move constructors and assignment operators
     DX11Engine(const DX11Engine&) = delete;
     auto operator=(const DX11Engine&) -> DX11Engine& = delete;
@@ -282,6 +285,9 @@ class DX11Engine {
     /** Create a texture 2D from a shared handle */
     auto createTexture2DFromSharedHandle(HANDLE handle) -> ID3D11Texture2D*;
 
+    auto createTexture2DFromSharedHandle(HANDLE handle, bool isNTHandle)
+        -> ID3D11Texture2D*;
+
     /** Setup the viewport from the render target texture. */
     void setViewportFromRenderTargetTexture(ID3D11Texture2D* tex);
 
@@ -302,9 +308,9 @@ class DX11Engine {
     auto saveTextureToFile(ID3D11Texture2D* sourceTexture, const char* filename)
         -> bool;
 
-  private:
-    explicit DX11Engine(ID3D11Device* device);
+    void unbindResources();
 
+  private:
     ID3D11Device* _device{nullptr};
     ID3D11DeviceContext* _context{nullptr};
 

@@ -207,6 +207,11 @@ auto LogManager::get_mem_buffer() -> fmt::memory_buffer& {
 
 void LogManager::do_log(U32 lvl, const char* data, size_t size) {
 
+    if (_redirectFn != nullptr) {
+        _redirectFn(lvl, data, size);
+        return;
+    }
+
     // Try to send that message to the logger thread:
 #if NV_USE_LOG_THREAD
     _numPendingMessages.fetch_add(1, std::memory_order_release);

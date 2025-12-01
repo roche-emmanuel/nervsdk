@@ -1,6 +1,9 @@
 #ifdef _WIN32
 
 #include <nvk/dx/DX11Engine.h>
+
+#include <d3d11_1.h> // For ID3D11Device1
+
 // #include <dxgi1_2.h>
 // #include <fstream>
 
@@ -1158,6 +1161,48 @@ auto DX11Engine::createReadOnlySharedTexture2D(HANDLE* sharedHandle, U32 width,
     return createSharedTexture2D(sharedHandle, width, height, bindFlags, format,
                                  nthandle, keyedMutex,
                                  DXGI_SHARED_RESOURCE_READ);
+}
+
+void DX11Engine::unbindResources() {
+    _context->OMSetRenderTargets(0, nullptr, nullptr);
+    // Unbind multiple shader resources at once
+    ID3D11ShaderResourceView* nullSRVs[8] = {nullptr};
+    _context->PSSetShaderResources(0, 8, nullSRVs);
+
+    // Unbind multiple constant buffers at once
+    ID3D11Buffer* nullBuffers[4] = {nullptr};
+    _context->PSSetConstantBuffers(0, 4, nullBuffers);
+}
+
+auto DX11Engine::createTexture2DFromSharedHandle(HANDLE handle, bool isNTHandle)
+    -> ID3D11Texture2D* {
+    NVCHK(handle != nullptr,
+          "createTexture2DFromSharedHandle: Invalid shared handle.");
+
+    ID3D11Texture2D* d3d11Texture = nullptr;
+    HRESULT hr;
+
+    if (isNTHandle) {
+        // For NT handles, use OpenSharedResource1
+        ID3D11Device1* device1 = nullptr;
+        hr = _device->QueryInterface(__uuidof(ID3D11Device1), (void**)&device1);
+        if (SUCCEEDED(hr) && (device1 != nullptr)) {
+            hr = device1->OpenSharedResource1(handle, __uuidof(ID3D11Texture2D),
+                                              (void**)&d3d11Texture);
+            SAFERELEASE(device1);
+            CHECK_RESULT(hr, "Cannot open shared NT handle resource in DX11.");
+        } else {
+            NVCHK(false,
+                  "ID3D11Device1 interface not available for NT handle.");
+        }
+    } else {
+        // For legacy handles, use OpenSharedResource
+        hr = _device->OpenSharedResource(handle, __uuidof(ID3D11Texture2D),
+                                         (void**)&d3d11Texture);
+        CHECK_RESULT(hr, "Cannot open shared legacy handle resource in DX11.");
+    }
+
+    return d3d11Texture;
 }
 
 } // namespace nv
