@@ -147,7 +147,7 @@ class LogManager {
     }
 
     // Assign redirect function:
-    void set_redirect_func(RedirectFunc func) { _redirectFn = func; }
+    void set_redirect_func(RedirectFunc func);
 
   protected:
     struct MsgTag {
@@ -304,7 +304,7 @@ template <typename... Args>
 inline void check_no_throw(bool cond, fmt::format_string<Args...> fmt,
                            Args&&... args) {
     if (!cond) {
-        logFATAL(fmt, std::forward<Args>(args)...);
+        nv::LogManager::fatal(fmt, std::forward<Args>(args)...);
     }
 }
 

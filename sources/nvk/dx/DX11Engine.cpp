@@ -71,6 +71,28 @@ auto DX11Engine::instance(ID3D11Device* device) -> DX11Engine& {
     return *singleton;
 }
 
+auto DX11Engine::get(ID3D11Device* device) -> DX11Engine& {
+    // Check if the device is the one used for the instance:
+    auto& inst = instance(device);
+    if (inst.device() == device) {
+        return inst;
+    }
+
+    // Otherwise check the auxiliary engines:
+    static std::unordered_map<ID3D11Device*, std::unique_ptr<DX11Engine>>
+        engineMap;
+
+    auto it = engineMap.find(device);
+    if (it != engineMap.end()) {
+        return *it->second;
+    }
+
+    // Create a new device:
+    auto res = engineMap.insert(std::make_pair(device, new DX11Engine(device)));
+    NVCHK(res.second, "Could not insert new dx11 engine.");
+    return *res.first->second;
+}
+
 DX11Engine::DX11Engine(ID3D11Device* device) : _device(device) {
     if (_device == nullptr) {
         logDEBUG("DX11Engine: allocating dedicated DX11 device.");
@@ -819,7 +841,7 @@ void DX11Engine::applyState(DX11State& state) {
 }
 
 auto DX11Engine::createTexture2D(U32 width, U32 height, U32 bindFlags,
-                                 DXGI_FORMAT format, U32 miscFlags)
+                                 DXGI_FORMAT format, U32 miscFlags, U32 usage)
     -> ID3D11Texture2D* {
     D3D11_TEXTURE2D_DESC textureDesc = {};
     textureDesc.Width = width;
@@ -828,7 +850,7 @@ auto DX11Engine::createTexture2D(U32 width, U32 height, U32 bindFlags,
     textureDesc.ArraySize = 1;
     textureDesc.Format = format;
     textureDesc.SampleDesc.Count = 1;
-    textureDesc.Usage = D3D11_USAGE_DEFAULT;
+    textureDesc.Usage = (D3D11_USAGE)usage;
     textureDesc.BindFlags = bindFlags;
     textureDesc.MiscFlags = miscFlags;
     ID3D11Texture2D* tex = nullptr;
@@ -1203,6 +1225,47 @@ auto DX11Engine::createTexture2DFromSharedHandle(HANDLE handle, bool isNTHandle)
     }
 
     return d3d11Texture;
+}
+
+auto acquireKeyedMutex(ComPtr<IDXGIKeyedMutex>& keyedMutex, I32 key) -> bool {
+    if (keyedMutex == nullptr) {
+        logDEBUG("acquireKeyedMutex: mutex is null.");
+        return true;
+    }
+
+    // Use 0ms timeout - fail immediately if mutex not available
+    HRESULT hr = keyedMutex->AcquireSync(key, 0);
+    if (hr == WAIT_TIMEOUT) {
+        // Reader hasn't released yet - skip this frame
+        // This is normal when window is hidden or app is busy
+        // logDEBUG("Failed to acquire keyed mutex with key {} (timeout)", key);
+        return false;
+    }
+    if (FAILED(hr)) {
+        _com_error err(hr);
+        logWARN("Failed to acquire keyed mutex with key {} (error={})", key,
+                err.ErrorMessage());
+        return false;
+    }
+
+    return true;
+}
+
+auto releaseKeyedMutex(ComPtr<IDXGIKeyedMutex>& keyedMutex, I32 key) -> bool {
+    if (keyedMutex == nullptr) {
+        logDEBUG("releaseKeyedMutex: mutex is null.");
+        return true;
+    }
+
+    HRESULT hr = keyedMutex->ReleaseSync(key);
+    if (FAILED(hr)) {
+        _com_error err(hr);
+        logWARN("Failed to release keyed mutex with key {} (error={})", key,
+                err.ErrorMessage());
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace nv

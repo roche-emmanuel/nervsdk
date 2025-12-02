@@ -116,7 +116,7 @@ template <typename T> struct Box2 {
         case EDGE_BOTTOM: // bottom edge
             return {xmin, ymin, xmax, ymin};
         default:
-            THROW_MSG("Unsupported box edge index {}", i);
+            nv::throw_msg("Unsupported box edge index {}", i);
         }
     }
 
@@ -131,7 +131,7 @@ template <typename T> struct Box2 {
         case EDGE_BOTTOM: // bottom edge
             return {0, -1};
         default:
-            THROW_MSG("Invalid box edge index {}", i);
+            nv::throw_msg("Invalid box edge index {}", i);
         }
     }
 

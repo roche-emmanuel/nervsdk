@@ -355,4 +355,11 @@ auto LogManager::remove_sink(LogSink* sink) -> bool {
     return remove_vector_element(_sinks, sink);
 }
 
+void LogManager::set_redirect_func(RedirectFunc func) {
+    if (_redirectFn != nullptr) {
+        logWARN("Log redirect function already assigned.");
+        return;
+    }
+    _redirectFn = func;
+}
 } // namespace nv

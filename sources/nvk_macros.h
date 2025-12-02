@@ -8,6 +8,7 @@ namespace nv {
 class LogManager;
 }
 
+#ifndef NV_NO_LOG_MACROS
 #define logTRACE nv::LogManager::trace
 #define logDEBUG nv::LogManager::debug
 #define logDEBUG_1S nv::LogManager::debug_1s
@@ -16,9 +17,11 @@ class LogManager;
 #define logWARN nv::LogManager::warn
 #define logERROR nv::LogManager::error
 #define logFATAL nv::LogManager::fatal
-#define NVCHK nv::check
 #define CHECK_NO_THROW nv::check_no_throw
 #define THROW_MSG nv::throw_msg
+#endif
+
+#define NVCHK nv::check
 
 #ifdef assert
 #undef assert

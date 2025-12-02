@@ -112,6 +112,9 @@ class DX11Engine {
     // Explicit construction from existing device:
     explicit DX11Engine(ID3D11Device* device);
 
+    // Get the engine for a given device
+    static auto get(ID3D11Device* device = nullptr) -> DX11Engine&;
+
     // Delete copy/move constructors and assignment operators
     DX11Engine(const DX11Engine&) = delete;
     auto operator=(const DX11Engine&) -> DX11Engine& = delete;
@@ -262,7 +265,8 @@ class DX11Engine {
                          U32 bindFlags = D3D11_BIND_RENDER_TARGET |
                                          D3D11_BIND_SHADER_RESOURCE,
                          DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM,
-                         U32 miscFlags = 0) -> ID3D11Texture2D*;
+                         U32 miscFlags = 0, U32 usage = D3D11_USAGE_DEFAULT)
+        -> ID3D11Texture2D*;
 
     auto createSharedTexture2D(HANDLE* sharedHandle, U32 width, U32 height,
                                U32 bindFlags = D3D11_BIND_RENDER_TARGET |
@@ -333,6 +337,9 @@ class DX11Engine {
     /** Perform actual program loading. */
     auto updateProgram(DX11Program& prog) -> bool;
 };
+
+auto acquireKeyedMutex(ComPtr<IDXGIKeyedMutex>& keyedMutex, I32 key) -> bool;
+auto releaseKeyedMutex(ComPtr<IDXGIKeyedMutex>& keyedMutex, I32 key) -> bool;
 
 } // namespace nv
 
