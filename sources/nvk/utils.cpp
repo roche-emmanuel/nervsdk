@@ -214,22 +214,15 @@ static auto expand_single_wildcard(const String& pattern) -> Set<String> {
     // Determine if we should use recursive search
     bool recursive = (normalized_pattern.find("**") != String::npos);
 
-    // Split pattern into base directory and pattern part
-    size_t last_separator = normalized_pattern.find_last_of('/');
+    // Find base directory - the last static path before any wildcard
     String base_dir = ".";
-    String file_pattern = normalized_pattern;
+    size_t first_wildcard = normalized_pattern.find_first_of("*?");
 
-    if (last_separator != String::npos) {
-        // Find the first wildcard position
-        size_t first_wildcard = normalized_pattern.find_first_of("*?");
-
-        // Find the last directory separator before the first wildcard
+    if (first_wildcard != String::npos) {
         size_t dir_separator =
             normalized_pattern.find_last_of('/', first_wildcard);
-
         if (dir_separator != String::npos) {
             base_dir = normalized_pattern.substr(0, dir_separator);
-            file_pattern = normalized_pattern.substr(dir_separator + 1);
         }
     }
 
@@ -258,13 +251,33 @@ static auto expand_single_wildcard(const String& pattern) -> Set<String> {
             return matched_files;
         }
 
-        // Iterate through directory based on recursive flag
+        // For recursive patterns, we need to also check files in the base
+        // directory
         if (recursive) {
-            for (const auto& entry :
-                 fs::recursive_directory_iterator(base_dir)) {
-                process_entry(entry);
+            // First check files directly in base_dir
+            try {
+                for (const auto& entry : fs::directory_iterator(base_dir)) {
+                    process_entry(entry);
+                }
+            } catch (const fs::filesystem_error& e) {
+                // Continue even if we can't read base directory
+            }
+
+            // Then check subdirectories recursively
+            try {
+                for (const auto& entry :
+                     fs::recursive_directory_iterator(base_dir)) {
+                    // Skip the base directory itself as we already processed it
+                    if (entry.path() != fs::path(base_dir)) {
+                        process_entry(entry);
+                    }
+                }
+            } catch (const fs::filesystem_error& e) {
+                logERROR("Filesystem error while expanding pattern {}: {}",
+                         pattern, e.what());
             }
         } else {
+            // Non-recursive: just iterate the base directory
             for (const auto& entry : fs::directory_iterator(base_dir)) {
                 process_entry(entry);
             }
