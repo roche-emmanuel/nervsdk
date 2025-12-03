@@ -161,8 +161,26 @@ auto glob_to_regex(const String& pattern) -> String {
         case '*':
             // Check if it's ** (for recursive matching)
             if (i + 1 < pattern.size() && pattern[i + 1] == '*') {
-                regex_pattern += ".*";
-                ++i; // Skip the second *
+                // Check if ** is surrounded by path separators or boundaries
+                // Pattern like "/**/file" or "dir/**/*.ext"
+                bool prev_is_sep = (i > 0 && (pattern[i - 1] == '/' ||
+                                              pattern[i - 1] == '\\'));
+                bool next_is_sep =
+                    (i + 2 < pattern.size() &&
+                     (pattern[i + 2] == '/' || pattern[i + 2] == '\\'));
+
+                if (prev_is_sep && next_is_sep) {
+                    // /**/ should match zero or more directories
+                    // Use (|.*/) to match either nothing or any path with
+                    // trailing /
+                    regex_pattern += "(|.*/?)";
+                    ++i; // Skip the second *
+                    ++i; // Skip the separator after **
+                } else {
+                    // Just ** without proper separators, treat as .*
+                    regex_pattern += ".*";
+                    ++i; // Skip the second *
+                }
             } else {
                 regex_pattern +=
                     "[^/\\\\]*"; // Match anything except path separators
