@@ -271,11 +271,12 @@ static auto expand_single_wildcard(const String& pattern) -> Set<String> {
         }
 
         if (matched_files.empty()) {
-            logWARN("No files matched pattern: {}", pattern);
-        } else {
-            logDEBUG("Pattern {} matched {} files", pattern,
-                     matched_files.size());
+            logDEBUG("No files matched pattern: {}", pattern);
         }
+        // else {
+        //     logDEBUG("Pattern {} matched {} files", pattern,
+        //              matched_files.size());
+        // }
 
     } catch (const fs::filesystem_error& e) {
         logERROR("Filesystem error while expanding pattern {}: {}", pattern,
