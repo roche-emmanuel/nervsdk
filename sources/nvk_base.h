@@ -1,6 +1,7 @@
 #ifndef NV_NVK_BASE_
 #define NV_NVK_BASE_
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <concepts>

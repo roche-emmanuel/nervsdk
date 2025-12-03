@@ -9,6 +9,12 @@
 
 namespace nv {
 
+// Helper function to convert glob pattern to regex
+auto glob_to_regex(const String& pattern) -> String;
+
+// Helper function to expand file wildcards
+auto expand_files_wildcard(const std::string& pattern) -> Set<String>;
+
 // Sleep functions
 void sleep_s(U32 secs);
 void sleep_ms(U32 msecs);

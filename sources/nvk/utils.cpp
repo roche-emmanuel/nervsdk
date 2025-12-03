@@ -2,6 +2,8 @@
 #include <nvk/resource/ResourceManager.h>
 #include <nvk/utils.h>
 
+namespace fs = std::filesystem;
+
 #define BUFSIZE 4096
 
 namespace nv {
@@ -38,7 +40,7 @@ auto read_virtual_file(const String& fname, bool forceAllowSystem) -> String {
 void replace_all(String& str, const String& old_value,
                  const String& new_value) {
     size_t pos = 0;
-    while ((pos = str.find(old_value, pos)) != std::string::npos) {
+    while ((pos = str.find(old_value, pos)) != String::npos) {
         str.replace(pos, old_value.length(), new_value);
         pos += new_value.length();
     }
@@ -97,6 +99,140 @@ auto read_system_binary_file(const char* fname) -> U8Vector {
     // logDEBUG("Reading file "<<fname<<", size: "<<size);
     t.read(reinterpret_cast<char*>(res.data()), size);
     return res;
+}
+
+auto glob_to_regex(const String& pattern) -> String {
+    String regex_pattern;
+    regex_pattern.reserve(pattern.size() * 2);
+
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        char c = pattern[i];
+        switch (c) {
+        case '*':
+            // Check if it's ** (for recursive matching)
+            if (i + 1 < pattern.size() && pattern[i + 1] == '*') {
+                regex_pattern += ".*";
+                ++i; // Skip the second *
+            } else {
+                regex_pattern +=
+                    "[^/\\\\]*"; // Match anything except path separators
+            }
+            break;
+        case '?':
+            regex_pattern +=
+                "[^/\\\\]"; // Match single char except path separators
+            break;
+        case '.':
+        case '+':
+        case '^':
+        case '$':
+        case '(':
+        case ')':
+        case '[':
+        case ']':
+        case '{':
+        case '}':
+        case '|':
+        case '\\':
+            regex_pattern += '\\';
+            regex_pattern += c;
+            break;
+        default:
+            regex_pattern += c;
+            break;
+        }
+    }
+
+    return regex_pattern;
+}
+
+auto expand_files_wildcard(const String& pattern) -> Set<String> {
+    Set<String> matched_files;
+
+    // Normalize path separators to forward slashes
+    String normalized_pattern = pattern;
+    std::ranges::replace(normalized_pattern, '\\', '/');
+
+    // Check if pattern contains wildcards
+    if (normalized_pattern.find('*') == String::npos &&
+        normalized_pattern.find('?') == String::npos) {
+        // No wildcards, return as-is
+        matched_files.insert(pattern);
+        return matched_files;
+    }
+
+    // Determine if we should use recursive search
+    bool recursive = (normalized_pattern.find("**") != String::npos);
+
+    // Split pattern into base directory and pattern part
+    size_t last_separator = normalized_pattern.find_last_of('/');
+    String base_dir = ".";
+    String file_pattern = normalized_pattern;
+
+    if (last_separator != String::npos) {
+        // Find the first wildcard position
+        size_t first_wildcard = normalized_pattern.find_first_of("*?");
+
+        // Find the last directory separator before the first wildcard
+        size_t dir_separator =
+            normalized_pattern.find_last_of('/', first_wildcard);
+
+        if (dir_separator != String::npos) {
+            base_dir = normalized_pattern.substr(0, dir_separator);
+            file_pattern = normalized_pattern.substr(dir_separator + 1);
+        }
+    }
+
+    // Convert the full pattern to regex for matching
+    String regex_str = glob_to_regex(normalized_pattern);
+    std::regex pattern_regex(regex_str);
+
+    auto process_entry = [&](const fs::directory_entry& entry) {
+        if (entry.is_regular_file()) {
+            String file_path = entry.path().string();
+            // Normalize path separators
+            std::ranges::replace(file_path, '\\', '/');
+
+            // Match against the pattern
+            if (std::regex_match(file_path, pattern_regex)) {
+                matched_files.insert(file_path);
+            }
+        }
+    };
+
+    try {
+        // Check if base directory exists
+        if (!fs::exists(base_dir)) {
+            logWARN("Directory {} does not exist for pattern {}", base_dir,
+                    pattern);
+            return matched_files;
+        }
+
+        // Iterate through directory based on recursive flag
+        if (recursive) {
+            for (const auto& entry :
+                 fs::recursive_directory_iterator(base_dir)) {
+                process_entry(entry);
+            }
+        } else {
+            for (const auto& entry : fs::directory_iterator(base_dir)) {
+                process_entry(entry);
+            }
+        }
+
+        if (matched_files.empty()) {
+            logWARN("No files matched pattern: {}", pattern);
+        } else {
+            logDEBUG("Pattern {} matched {} files", pattern,
+                     matched_files.size());
+        }
+
+    } catch (const fs::filesystem_error& e) {
+        logERROR("Filesystem error while expanding pattern {}: {}", pattern,
+                 e.what());
+    }
+
+    return matched_files;
 }
 
 } // namespace nv
