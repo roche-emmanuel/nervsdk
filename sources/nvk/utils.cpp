@@ -101,6 +101,56 @@ auto read_system_binary_file(const char* fname) -> U8Vector {
     return res;
 }
 
+// Expand brace patterns like {yml,json} into multiple patterns
+static auto expand_braces(const String& pattern) -> Vector<String> {
+    Vector<String> results;
+
+    // Find first opening brace
+    size_t brace_start = pattern.find('{');
+    if (brace_start == String::npos) {
+        // No braces, return pattern as-is
+        results.push_back(pattern);
+        return results;
+    }
+
+    // Find matching closing brace
+    size_t brace_end = pattern.find('}', brace_start);
+    if (brace_end == String::npos) {
+        // Unmatched brace, return pattern as-is
+        logWARN("Unmatched brace in pattern: {}", pattern);
+        results.push_back(pattern);
+        return results;
+    }
+
+    // Extract the parts
+    String prefix = pattern.substr(0, brace_start);
+    String suffix = pattern.substr(brace_end + 1);
+    String options =
+        pattern.substr(brace_start + 1, brace_end - brace_start - 1);
+
+    // Split options by comma
+    Vector<String> parts;
+    size_t start = 0;
+    size_t pos = 0;
+
+    while ((pos = options.find(',', start)) != String::npos) {
+        parts.push_back(options.substr(start, pos - start));
+        start = pos + 1;
+    }
+    parts.push_back(options.substr(start));
+
+    // Generate all combinations
+    for (const auto& part : parts) {
+        String expanded = prefix + part + suffix;
+
+        // Recursively expand in case there are more braces
+        auto sub_results = expand_braces(expanded);
+        results.insert(results.end(), sub_results.begin(), sub_results.end());
+    }
+
+    return results;
+}
+
 auto glob_to_regex(const String& pattern) -> String {
     String regex_pattern;
     regex_pattern.reserve(pattern.size() * 2);
@@ -146,7 +196,7 @@ auto glob_to_regex(const String& pattern) -> String {
     return regex_pattern;
 }
 
-auto expand_files_wildcard(const String& pattern) -> Set<String> {
+static auto expand_single_wildcard(const String& pattern) -> Set<String> {
     Set<String> matched_files;
 
     // Normalize path separators to forward slashes
@@ -233,6 +283,22 @@ auto expand_files_wildcard(const String& pattern) -> Set<String> {
     }
 
     return matched_files;
+}
+
+// Main entry point that handles brace expansion first
+auto expand_files_wildcard(const String& pattern) -> Set<String> {
+    Set<String> all_matched_files;
+
+    // First expand braces
+    auto expanded_patterns = expand_braces(pattern);
+
+    // Then expand wildcards for each pattern
+    for (const auto& expanded_pattern : expanded_patterns) {
+        auto matched = expand_single_wildcard(expanded_pattern);
+        all_matched_files.insert(matched.begin(), matched.end());
+    }
+
+    return all_matched_files;
 }
 
 } // namespace nv
