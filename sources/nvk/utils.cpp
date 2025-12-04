@@ -446,4 +446,55 @@ auto read_yaml_file(const String& fname, bool forceAllowSystem) -> Json {
     return read_yaml_string(content);
 };
 
+auto get_file_extension(const char* filename) -> String {
+    // Returns the file extension with the "." included, like ".jpg" or ".png"
+    if (filename == nullptr)
+        return "";
+
+    String name_str(filename);
+    size_t last_dot = name_str.find_last_of('.');
+    size_t last_sep = name_str.find_last_of("/\\"); // Handle Windows/Unix paths
+
+    // Make sure the dot is after the last slash (i.e., part of the filename,
+    // not the path)
+    if (last_dot != String::npos &&
+        (last_sep == String::npos || last_dot > last_sep)) {
+        return name_str.substr(last_dot);
+    }
+    return "";
+}
+
+auto is_json_file(const char* filename) -> bool {
+    // Check the extension of the file and returns true if this is ".json"
+    auto ext = to_lower(get_file_extension(filename));
+    return ext == ".json";
+}
+
+auto is_yaml_file(const char* filename) -> bool {
+    // Check the extension of the file and returns true if this is ".yaml" or
+    // ".yml"
+    auto ext = to_lower(get_file_extension(filename));
+    return ext == ".yaml" || ext == ".yml";
+}
+
+auto is_yaml_file(const String& filename) -> bool {
+    return is_yaml_file(filename.c_str());
+};
+
+auto is_json_file(const String& filename) -> bool {
+    return is_json_file(filename.c_str());
+};
+
+auto to_upper(const String& str) -> String {
+    String result = str;
+    std::ranges::transform(result, result.begin(), ::toupper);
+    return result;
+}
+
+auto to_lower(const String& str) -> String {
+    String result = str;
+    std::ranges::transform(result, result.begin(), ::tolower);
+    return result;
+}
+
 } // namespace nv

@@ -20,6 +20,12 @@ void sleep_s(U32 secs);
 void sleep_ms(U32 msecs);
 void sleep_us(U32 usecs);
 
+// Convert a string to upper characters:
+auto to_upper(const String& str) -> String;
+
+// Convert a string to lower characters:
+auto to_lower(const String& str) -> String;
+
 auto system_file_exists(const char* fname) -> bool;
 
 inline auto system_file_exists(const String& fname) -> bool {
@@ -46,6 +52,14 @@ void write_json_file(const char* fname, const Json& content, I32 indent = 2);
 auto read_yaml_string(const String& content) -> Json;
 
 auto read_yaml_file(const String& fname, bool forceAllowSystem = false) -> Json;
+
+auto get_file_extension(const char* filename) -> String;
+
+auto is_yaml_file(const char* filename) -> bool;
+auto is_yaml_file(const String& filename) -> bool;
+
+auto is_json_file(const char* filename) -> bool;
+auto is_json_file(const String& filename) -> bool;
 
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
