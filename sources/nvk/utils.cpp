@@ -2,6 +2,27 @@
 #include <nvk/resource/ResourceManager.h>
 #include <nvk/utils.h>
 
+#include <yaml-cpp/yaml.h>
+
+namespace YAML {
+#if !NV_USE_STD_MEMORY
+template <> struct convert<nv::String> {
+    static auto encode(const nv::String& rhs) -> Node {
+        Node node(rhs.c_str());
+        return node;
+    }
+
+    static auto decode(const Node& node, nv::String& rhs) -> bool {
+        if (!node.IsScalar()) {
+            return false;
+        }
+        rhs = node.as<std::string>().c_str();
+        return true;
+    }
+};
+#endif
+} // namespace YAML
+
 namespace fs = std::filesystem;
 
 #define BUFSIZE 4096
@@ -332,5 +353,97 @@ auto expand_files_wildcard(const String& pattern) -> Set<String> {
 
     return all_matched_files;
 }
+
+auto read_json_string(const String& content) -> Json {
+    Json data;
+
+    try {
+        // Parse with the JSON5 extension flag
+        data = Json::parse(content, nullptr, true, true);
+    } catch (Json::parse_error& e) {
+        THROW_MSG("JSON parse error: {}", e.what());
+    }
+
+    return data;
+};
+
+auto read_json_file(const String& fname, bool forceAllowSystem) -> Json {
+    auto content = read_virtual_file(fname, forceAllowSystem);
+    return read_json_string(content);
+};
+
+void write_json_file(const char* fname, const Json& content, I32 indent) {
+    // Write JSON to file
+    std::ofstream file(fname);
+    NVCHK(file.is_open(), "Cannot open file {} for writing", fname);
+    // The number 4 specifies indentation for pretty printing:
+    // file << content.dump(2);
+    // file << content.dump(2);
+    file << content.dump(indent);
+    file.close();
+
+    // Alternative for better performance (without pretty printing):
+    // file << content;
+};
+
+static auto yaml_to_json(const YAML::Node& node) -> Json {
+    switch (node.Type()) {
+    case YAML::NodeType::Null:
+        return nullptr;
+
+    case YAML::NodeType::Scalar: {
+        bool bool_val;
+        long long int_val;
+        double double_val;
+
+        // Try conversions in order
+        if (YAML::convert<bool>::decode(node, bool_val)) {
+            return bool_val;
+        } else if (YAML::convert<I64>::decode(node, int_val)) {
+            return int_val;
+        } else if (YAML::convert<F64>::decode(node, double_val)) {
+            return double_val;
+        } else {
+            // Default to string
+            return node.as<std::string>();
+        }
+    }
+
+    case YAML::NodeType::Sequence: {
+        Json result = Json::array();
+        result.get_ptr<Json::array_t*>()->reserve(node.size());
+        for (const auto& item : node) {
+            result.push_back(yaml_to_json(item));
+        }
+        return result;
+    }
+
+    case YAML::NodeType::Map: {
+        Json result = Json::object();
+        for (const auto& pair : node) {
+            result[pair.first.as<std::string>()] = yaml_to_json(pair.second);
+        }
+        return result;
+    }
+
+    case YAML::NodeType::Undefined:
+    default:
+        return nullptr;
+    }
+}
+
+auto read_yaml_string(const String& content) -> Json {
+    try {
+        return yaml_to_json(YAML::Load(content));
+    } catch (const std::exception& e) {
+        THROW_MSG("read_yaml_file: Failed to load YAML string: {}", e.what());
+    }
+    return {};
+}
+
+auto read_yaml_file(const String& fname, bool forceAllowSystem) -> Json {
+    auto content = read_virtual_file(fname, forceAllowSystem);
+    return read_yaml_string(content);
+};
 
 } // namespace nv

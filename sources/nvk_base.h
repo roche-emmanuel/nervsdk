@@ -1,7 +1,6 @@
 #ifndef NV_NVK_BASE_
 #define NV_NVK_BASE_
 
-#include <algorithm>
 #include <array>
 #include <atomic>
 #include <concepts>
@@ -23,6 +22,7 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #ifdef _WIN32
@@ -39,5 +39,11 @@
 #include <fmt/format.h>
 
 #include <cmath>
+
+#include <external/json.hpp>
+
+namespace nv {
+using Json = nlohmann::json;
+}
 
 #endif

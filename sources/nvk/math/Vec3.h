@@ -1,8 +1,6 @@
 #ifndef _NV_VEC3_H_
 #define _NV_VEC3_H_
 
-#include <external/json.hpp>
-
 #include <nvk/math/Vec2.h>
 #include <nvk_math.h>
 

@@ -3,8 +3,11 @@ set(TARGET_NAME "nervsdk")
 include_directories(${FMT_DIR}/include)
 include_directories(${OPENSSL_DIR}/include)
 include_directories(${ZLIB_DIR}/include)
+include_directories(${YAMLCPP_DIR}/include)
 
 include_directories(.)
+
+add_definitions(-DYAML_CPP_STATIC_DEFINE)
 
 file(GLOB_RECURSE PUBLIC_HEADERS "*.h")
 file(GLOB_RECURSE SOURCE_FILES "*.cpp")

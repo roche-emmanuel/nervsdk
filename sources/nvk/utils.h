@@ -37,6 +37,16 @@ auto read_system_binary_file(const char* fname) -> U8Vector;
 auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
     -> String;
 
+auto read_json_string(const String& content) -> Json;
+
+auto read_json_file(const String& fname, bool forceAllowSystem = false) -> Json;
+
+void write_json_file(const char* fname, const Json& content, I32 indent = 2);
+
+auto read_yaml_string(const String& content) -> Json;
+
+auto read_yaml_file(const String& fname, bool forceAllowSystem = false) -> Json;
+
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
 
