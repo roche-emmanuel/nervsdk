@@ -53,6 +53,9 @@ auto read_yaml_string(const String& content) -> Json;
 
 auto read_yaml_file(const String& fname, bool forceAllowSystem = false) -> Json;
 
+auto read_config_file(const String& fname, bool forceAllowSystem = false)
+    -> Json;
+
 auto get_file_extension(const char* filename) -> String;
 
 auto is_yaml_file(const char* filename) -> bool;

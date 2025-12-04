@@ -497,4 +497,17 @@ auto to_lower(const String& str) -> String {
     return result;
 }
 
+auto read_config_file(const String& fname, bool forceAllowSystem) -> Json {
+    if (is_json_file(fname)) {
+        return read_json_file(fname, forceAllowSystem);
+    }
+
+    if (is_yaml_file(fname)) {
+        return read_yaml_file(fname, forceAllowSystem);
+    }
+
+    THROW_MSG("Unsupport config file format: {}", fname);
+    return {};
+}
+
 } // namespace nv
