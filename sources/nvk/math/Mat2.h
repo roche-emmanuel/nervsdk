@@ -61,6 +61,16 @@ template <typename T> class Mat2 {
 
     ~Mat2() = default;
 
+    template <typename U>
+    static auto from_columns(const Vec2<U>& c1, const Vec2<U>& c2) -> Mat2 {
+        return {c1.x(), c2.x(), c1.y(), c2.y()};
+    }
+
+    template <typename U>
+    static auto from_rows(const Vec2<U>& r1, const Vec2<U>& r2) -> Mat2 {
+        return {r1.x(), r1.y(), r2.x(), r2.y()};
+    }
+
     [[nodiscard]] auto compare(const Mat2& m) const -> int {
         const auto* lhs = (const value_t*)(_mat);
         const value_t* end_lhs = lhs + num_elements;

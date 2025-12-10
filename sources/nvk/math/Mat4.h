@@ -92,6 +92,20 @@ template <typename T> class Mat4 {
 
     ~Mat4() = default;
 
+    template <typename U>
+    static auto from_columns(const Vec4<U>& c1, const Vec4<U>& c2,
+                             const Vec4<U>& c3, const Vec4<U>& c4) -> Mat4 {
+        return {c1.x(), c2.x(), c3.x(), c4.x(), c1.y(), c2.y(), c3.y(), c4.y(),
+                c1.z(), c2.z(), c3.z(), c4.z(), c1.w(), c2.w(), c3.w(), c4.w()};
+    }
+
+    template <typename U>
+    static auto from_rows(const Vec4<U>& r1, const Vec4<U>& r2,
+                          const Vec4<U>& r3, const Vec4<U>& r4) -> Mat4 {
+        return {r1.x(), r1.y(), r1.z(), r1.w(), r2.x(), r2.y(), r2.z(), r2.w(),
+                r3.x(), r3.y(), r3.z(), r3.w(), r4.x(), r4.y(), r4.z(), r4.w()};
+    }
+
     [[nodiscard]] auto compare(const Mat4& m) const -> int {
         const auto* lhs = (const value_t*)(_mat);
         const value_t* end_lhs = lhs + num_elements;

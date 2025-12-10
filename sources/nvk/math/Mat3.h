@@ -66,6 +66,20 @@ template <typename T> class Mat3 {
 
     ~Mat3() = default;
 
+    template <typename U>
+    static auto from_columns(const Vec3<U>& c1, const Vec3<U>& c2,
+                             const Vec3<U>& c3) -> Mat3 {
+        return {c1.x(), c2.x(), c3.x(), c1.y(), c2.y(),
+                c3.y(), c1.z(), c2.z(), c3.z()};
+    };
+
+    template <typename U>
+    static auto from_rows(const Vec3<U>& r1, const Vec3<U>& r2,
+                          const Vec3<U>& r3) -> Mat3 {
+        return {r1.x(), r1.y(), r1.z(), r2.x(), r2.y(),
+                r2.z(), r3.x(), r3.y(), r3.z()};
+    }
+
     [[nodiscard]] auto compare(const Mat3& m) const -> int {
         const auto* lhs = (const value_t*)(_mat);
         const value_t* end_lhs = lhs + num_elements;
