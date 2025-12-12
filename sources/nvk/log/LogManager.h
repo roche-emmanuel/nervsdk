@@ -294,7 +294,8 @@ inline void throw_msg(fmt::format_string<Args...> msg_format, Args&&... args) {
 }
 
 template <typename... Args>
-inline void check(bool cond, fmt::format_string<Args...> fmt, Args&&... args) {
+inline void check_cond(bool cond, fmt::format_string<Args...> fmt,
+                       Args&&... args) {
     if (!cond) {
         throw_msg(fmt, std::forward<Args>(args)...);
     }

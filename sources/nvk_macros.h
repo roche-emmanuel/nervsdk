@@ -21,7 +21,7 @@ class LogManager;
 #define THROW_MSG nv::throw_msg
 #endif
 
-#define NVCHK nv::check
+#define NVCHK nv::check_cond
 
 #ifdef assert
 #undef assert

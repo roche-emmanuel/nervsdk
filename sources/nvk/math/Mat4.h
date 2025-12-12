@@ -23,11 +23,6 @@ template <typename T> constexpr auto default_epsilon() -> T {
     }
 }
 
-// Need to declare this here to use NVCHK below (since we have not included the
-// LogManager yet)
-template <typename... Args>
-void check(bool cond, fmt::format_string<Args...> fmt, Args&&... args);
-
 #define MAT_RC(row, col) _mat[(col)][(row)]
 
 #define SET_ROW(row, v1, v2, v3, v4)                                           \
