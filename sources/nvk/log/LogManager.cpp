@@ -1,5 +1,6 @@
 // Implementation for LogManager
 
+#include <nvk/log/FileLogger.h>
 #include <nvk/log/LogManager.h>
 #include <nvk/log/StdLogger.h>
 #include <nvk/utils.h>
@@ -207,8 +208,8 @@ auto LogManager::get_mem_buffer() -> fmt::memory_buffer& {
 
 void LogManager::do_log(U32 lvl, const char* data, size_t size) {
 
-    if (_redirectFn != nullptr) {
-        _redirectFn(lvl, data, size);
+    // Stop processing only if redirect function returns true:
+    if (_redirectFn != nullptr && _redirectFn(lvl, data, size)) {
         return;
     }
 
@@ -362,4 +363,13 @@ void LogManager::set_redirect_func(RedirectFunc func) {
     }
     _redirectFn = func;
 }
+
+void LogManager::setup_log_file(const char* filename, bool withStdout,
+                                bool append) {
+    if (withStdout) {
+        add_sink(new StdLogger());
+    }
+    add_sink(new FileLogger(filename, append));
+}
+
 } // namespace nv

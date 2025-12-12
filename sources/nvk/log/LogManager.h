@@ -28,7 +28,7 @@ class LogManager {
   public:
     virtual ~LogManager();
 
-    using RedirectFunc = void (*)(U32, const char*, size_t);
+    using RedirectFunc = bool (*)(U32, const char*, size_t);
 
     enum Level : int {
         L_FATAL,
@@ -136,6 +136,9 @@ class LogManager {
 
     /** Remove a log sink */
     auto remove_sink(LogSink* sink) -> bool;
+
+    void setup_log_file(const char* filename, bool withStdout = true,
+                        bool append = false);
 
     auto is_idle() const -> bool {
 #if NV_USE_LOG_THREAD
