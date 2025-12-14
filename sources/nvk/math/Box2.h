@@ -161,6 +161,13 @@ template <typename T> struct Box2 {
 
     void resize_width(value_t newWidth) {
         newWidth = std::max(newWidth, (value_t)0.0);
+
+        // Check for invalid box:
+        if (!valid()) {
+            xmin = 0.0;
+            xmax = newWidth;
+        }
+
         auto c = (xmax + xmin) * 0.5;
         xmin = c - newWidth * 0.5;
         xmax = c + newWidth * 0.5;
@@ -168,6 +175,13 @@ template <typename T> struct Box2 {
 
     void resize_height(value_t newHeight) {
         newHeight = std::max(newHeight, (value_t)0.0);
+
+        // Check for invalid box:
+        if (!valid()) {
+            ymin = 0.0;
+            ymax = newHeight;
+        }
+
         auto c = (ymax + ymin) * 0.5;
         ymin = c - newHeight * 0.5;
         ymax = c + newHeight * 0.5;
@@ -176,6 +190,10 @@ template <typename T> struct Box2 {
     void resize(value_t newWidth, value_t newHeight) {
         resize_width(newWidth);
         resize_height(newHeight);
+    }
+
+    static auto from_size(value_t width, value_t height) -> Box2 {
+        return {0.0, width, 0.0, height};
     }
 
     /**
