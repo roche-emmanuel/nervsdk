@@ -1,12 +1,7 @@
 #ifndef IPCHANDLER_H_
 #define IPCHANDLER_H_
 
-#include <nvk_base.h>
-
-#include <atomic>
-#include <functional>
-#include <thread>
-#include <vector>
+#include <nvk_common.h>
 
 namespace nv {
 
