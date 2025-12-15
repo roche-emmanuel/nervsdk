@@ -2,95 +2,181 @@
 
 namespace nv {
 
-IPCHandler::IPCHandler(const String& pipeName)
-    : _pipeName(pipeName), _pipeHandle(INVALID_HANDLE_VALUE), _connected(false),
-      _timeout(DEFAULT_TIMEOUT) {
+IPCHandler::IPCHandler(const String& pipeName) : _pipeName(pipeName) {}
 
-    if (!connect()) {
-        THROW_MSG("Failed to connect to pipe {}", pipeName);
-    }
+IPCHandler::~IPCHandler() { stop(); }
+
+void IPCHandler::start() {
+    _running = true;
+    _readerThread = std::thread(&IPCHandler::run, this);
 }
 
-IPCHandler::~IPCHandler() { disconnect(); }
+void IPCHandler::stop() {
+    _running = false;
+    CancelIoEx(_pipeHandle, nullptr);
+    disconnect();
+}
 
-auto IPCHandler::connect() -> bool {
-    // Wait for the pipe to become available
-    if (!WaitNamedPipeA(_pipeName.c_str(), _timeout)) {
-        return false;
-    }
+auto IPCHandler::create_pipe() -> bool {
+    auto fullPipeName = format_string(R"(\\.\pipe\{})", _pipeName.c_str());
 
-    // Open the pipe
-    _pipeHandle = CreateFileA(_pipeName.c_str(), GENERIC_READ | GENERIC_WRITE,
-                              0, nullptr, OPEN_EXISTING, 0, nullptr);
+    _pipeHandle = CreateNamedPipe(
+        fullPipeName.c_str(),                      // Use TCHAR directly
+        PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, // Read/write access
+        PIPE_TYPE_MESSAGE |                        // Message-type pipe
+            PIPE_READMODE_MESSAGE |                // Message-read mode
+            PIPE_WAIT,                             // Blocking mode
+        1,           // Max instances (1 client at a time)
+        BUFFER_SIZE, // Output buffer size
+        BUFFER_SIZE, // Input buffer size
+        0,           // Default timeout
+        nullptr      // Default security
+    );
 
     if (_pipeHandle == INVALID_HANDLE_VALUE) {
+        logERROR("Failed to create named pipe: {} (Error: {})", fullPipeName,
+                 GetLastError());
         return false;
     }
 
-    // Set pipe to message mode
-    DWORD mode = PIPE_READMODE_MESSAGE;
-    if (!SetNamedPipeHandleState(_pipeHandle, &mode, nullptr, nullptr)) {
-        CloseHandle(_pipeHandle);
-        _pipeHandle = INVALID_HANDLE_VALUE;
-        return false;
-    }
-
-    _connected = true;
+    logDEBUG("Named pipe created: {}", fullPipeName);
     return true;
 }
 
+auto IPCHandler::connect() -> bool {
+    logDEBUG("Waiting for IPC connection...");
+
+    // Wait for client to connect
+    OVERLAPPED Overlap = {};
+    Overlap.hEvent = CreateEvent(nullptr, 1, 0, nullptr);
+
+    _connected = ConnectNamedPipe(_pipeHandle, &Overlap);
+
+    if (!_connected) {
+        DWORD Err = GetLastError();
+        if (Err == ERROR_IO_PENDING) // async wait
+        {
+            while (_running) {
+                DWORD Res = WaitForSingleObject(Overlap.hEvent, 100);
+                if (Res == WAIT_OBJECT_0) {
+                    break;
+                }
+            }
+        } else if (Err == ERROR_PIPE_CONNECTED) {
+            // client connected before ConnectNamedPipe call
+            SetEvent(Overlap.hEvent);
+        } else {
+            // error
+            logERROR("ConnectNamedPipe failed: {}", GetLastError());
+            CloseHandle(Overlap.hEvent);
+            return false;
+        }
+    }
+
+    if (_running) {
+        _connected = true;
+        logNOTE("IPC connected!");
+    }
+
+    return _connected;
+}
+
 void IPCHandler::disconnect() {
+    if (_connected && _pipeHandle != INVALID_HANDLE_VALUE) {
+        DisconnectNamedPipe(_pipeHandle);
+        _connected = false;
+        logNOTE("Client disconnected.");
+    }
+}
+
+void IPCHandler::set_on_data_received(DataCallback cb) {
+    _onDataReceived = std::move(cb);
+}
+
+auto IPCHandler::send(const String& data) -> bool {
+    if (!_connected || _pipeHandle == INVALID_HANDLE_VALUE) {
+        logWARN("No client connected to send message to.");
+        return false;
+    }
+
+    DWORD bytesWritten = 0;
+    BOOL ok =
+        WriteFile(_pipeHandle, data.data(), static_cast<DWORD>(data.size()),
+                  &bytesWritten, nullptr);
+
+    if ((ok == 0) || bytesWritten != data.size()) {
+        int code = GetLastError();
+        if (code == ERROR_NO_DATA) {
+            logERROR("WriteFile failed: pipe closed at the other end.");
+        } else {
+            logERROR("WriteFile failed, error code: {}", code);
+        }
+        return false;
+    }
+
+    // Flush to ensure message is sent immediately
+    FlushFileBuffers(_pipeHandle);
+
+    logDEBUG("Sent {} bytes via IPC.", bytesWritten);
+    return true;
+}
+
+void IPCHandler::run() {
+    logDEBUG("Entering IPChandler thread.");
+    if (!create_pipe()) {
+        logERROR("Cannot create pipe instance.");
+        return;
+    }
+
+    char buffer[BUFFER_SIZE];
+
+    while (!_running) {
+        // Wait for client connection
+        if (!connect()) {
+            sleep_s(1);
+            continue;
+        }
+
+        // Read messages from connected client
+        while (_running && _connected && _pipeHandle != INVALID_HANDLE_VALUE) {
+
+            DWORD bytesRead = 0;
+
+            BOOL success =
+                ReadFile(_pipeHandle, buffer,
+                         sizeof(buffer) - 1, // Leave room for null terminator
+                         &bytesRead, nullptr);
+
+            if (!success || bytesRead == 0) {
+                if (GetLastError() == ERROR_BROKEN_PIPE) {
+                    logNOTE("Client disconnected.");
+                } else {
+                    logERROR("ReadFile failed: {}", GetLastError());
+                }
+
+                disconnect();
+                continue;
+            }
+
+            buffer[bytesRead] = '\0';
+
+            logDEBUG("IPC received {} bytes", bytesRead);
+
+            NVCHK(_onDataReceived != nullptr,
+                  "No IPC data received callback assigned.");
+            // Call callback directly on IPC thread:
+            _onDataReceived(buffer);
+        }
+    }
+
+    // Cleanup
+    logDEBUG("IPC Server thread cleaning up...");
     if (_pipeHandle != INVALID_HANDLE_VALUE) {
         CloseHandle(_pipeHandle);
         _pipeHandle = INVALID_HANDLE_VALUE;
     }
-    _connected = false;
-}
 
-auto IPCHandler::send_request(const String& request) -> String {
-    if (!_connected || _pipeHandle == INVALID_HANDLE_VALUE) {
-        THROW_MSG("IPC client not connected");
-    }
-
-    // Send the request
-    DWORD bytesWritten = 0;
-    BOOL writeSuccess =
-        WriteFile(_pipeHandle, request.c_str(),
-                  static_cast<DWORD>(request.length()), &bytesWritten, nullptr);
-
-    if ((writeSuccess == 0) || bytesWritten != request.length()) {
-        THROW_MSG("Failed to send IPC request");
-    }
-
-    // Read the response
-    std::vector<char> buffer(BUFFER_SIZE);
-    String response;
-    DWORD bytesRead = 0;
-    BOOL readSuccess = 0;
-
-    do {
-        readSuccess =
-            ReadFile(_pipeHandle, buffer.data(),
-                     static_cast<DWORD>(buffer.size()), &bytesRead, nullptr);
-
-        if ((readSuccess != 0) && bytesRead > 0) {
-            response.append(buffer.data(), bytesRead);
-        }
-
-        // Check if there's more data
-        if (readSuccess == 0) {
-            DWORD error = GetLastError();
-            if (error == ERROR_MORE_DATA) {
-                // Continue reading
-                continue;
-            }
-
-            THROW_MSG("Failed to read IPC response");
-        }
-
-    } while (readSuccess == 0);
-
-    return response;
+    logDEBUG("Exiting IPCHandler::run()");
 }
 
 } // namespace nv
