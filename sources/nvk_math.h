@@ -2,6 +2,14 @@
 #define NV_NVK_MATH_
 
 #include <nvk_base.h>
+
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+
 namespace nv {
 
 // define the standard trig values

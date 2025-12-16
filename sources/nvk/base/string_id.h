@@ -3,8 +3,6 @@
 
 #include <nvk_types.h>
 
-#include <nvk/base/std_containers.h>
-
 namespace nv {
 
 // FNV-1a hashing support:

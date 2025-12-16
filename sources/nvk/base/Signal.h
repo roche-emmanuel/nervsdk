@@ -1,7 +1,23 @@
 #ifndef _NV_SIGNAL_H_
 #define _NV_SIGNAL_H_
 
+#ifdef NV_SIGNAL_NO_STD_CONTAINERS
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace nv {
+template <typename K, typename V> using Map = std::map<K, V>;
+template <typename V> using Vector = std::vector<V>;
+using String = std::string;
+} // namespace nv
+#else
 #include <nvk/base/std_containers.h>
+#endif
+
+#include <nvk/base/string_id.h>
 
 namespace nv {
 
@@ -37,10 +53,10 @@ template <typename T> struct function_traits {
 
 // Helper to generate compile-time type IDs without RTTI
 template <typename... Args> struct type_id_generator {
-    static void id_function() {}
-
-    // Use inline variable (C++17) to avoid redefinition errors
-    static inline void (*id)() = &id_function;
+    static auto get_id() -> void* {
+        static char id;
+        return &id;
+    }
 };
 
 } // namespace detail
@@ -152,7 +168,7 @@ template <typename... Args> class Signal {
 // Base class for type erasure with manual type tracking
 class SignalHolderBase {
   protected:
-    using TypeIDPtr = void (*)();
+    using TypeIDPtr = void*;
     TypeIDPtr type_id;
 
     explicit SignalHolderBase(TypeIDPtr id) : type_id(id) {}
@@ -163,7 +179,7 @@ class SignalHolderBase {
     [[nodiscard]] auto get_type_id() const -> TypeIDPtr { return type_id; }
 
     template <typename... Args> [[nodiscard]] auto is_type() const -> bool {
-        return type_id == detail::type_id_generator<Args...>::id;
+        return type_id == detail::type_id_generator<Args...>::get_id();
     }
 };
 
@@ -172,7 +188,8 @@ template <typename... Args> class SignalHolder : public SignalHolderBase {
   public:
     Signal<Args...> signal;
 
-    SignalHolder() : SignalHolderBase(detail::type_id_generator<Args...>::id) {}
+    SignalHolder()
+        : SignalHolderBase(detail::type_id_generator<Args...>::get_id()) {}
 };
 
 class SignalMap {
@@ -184,12 +201,14 @@ class SignalMap {
     template <typename Tuple> struct expand_tuple;
 
     template <typename... Args> struct expand_tuple<std::tuple<Args...>> {
-        static auto connect(SignalMap& signals, StringID id, auto&& f) -> I32 {
+        template <typename F>
+        static auto connect(SignalMap& signals, StringID id, F&& f) -> I32 {
             return signals.get_signal<Args...>(id).connect(
                 std::forward<decltype(f)>(f));
         }
 
-        static auto connect_once(SignalMap& signals, StringID id, auto&& f)
+        template <typename F>
+        static auto connect_once(SignalMap& signals, StringID id, F&& f)
             -> I32 {
             return signals.get_signal<Args...>(id).connect_once(
                 std::forward<decltype(f)>(f));
