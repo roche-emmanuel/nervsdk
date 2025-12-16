@@ -1,18 +1,18 @@
-#ifndef IPCHANDLER_H_
-#define IPCHANDLER_H_
+#ifndef IPCBASE_H_
+#define IPCBASE_H_
 
 #include <nvk_common.h>
 
+#include <nvk/base/Signal.h>
 namespace nv {
 
-class IPCHandler : public RefObject {
+// Base class with shared IPC functionality
+class IPCBase : public RefObject {
   public:
-    using DataCallback = std::function<void(const String&)>;
+    explicit IPCBase(const String& pipeName);
+    ~IPCBase() override;
 
-    explicit IPCHandler(const String& pipeName);
-    ~IPCHandler() override;
-
-    // Send data (fire-and-forget or request/response)
+    // Send data
     auto send(const String& data) -> bool;
 
     // Connection state
@@ -21,18 +21,21 @@ class IPCHandler : public RefObject {
     // Timeout (milliseconds)
     void set_timeout(DWORD timeout) { _timeout = timeout; }
 
-    // Event: called from reader thread
-    void set_on_data_received(DataCallback cb);
+    Signal<> connected;
+    Signal<> disconnected;
+    Signal<const String&> dataReceived;
 
     void start();
     void stop();
 
-  private:
-    auto connect() -> bool;
-    void disconnect();
+  protected:
+    // Virtual methods for subclasses to implement
+    virtual auto establish_connection() -> bool = 0;
+    virtual void cleanup_connection() = 0;
 
+    // Shared helper methods
+    void disconnect();
     void run();
-    auto create_pipe() -> bool;
 
     String _pipeName;
     HANDLE _pipeHandle{INVALID_HANDLE_VALUE};
@@ -42,11 +45,41 @@ class IPCHandler : public RefObject {
     std::atomic<bool> _running{false};
 
     std::thread _readerThread;
-    DataCallback _onDataReceived;
 
     static constexpr size_t BUFFER_SIZE = 65536;
 };
 
+// Server implementation
+class IPCServer : public IPCBase {
+  public:
+    explicit IPCServer(const String& pipeName);
+
+  protected:
+    auto establish_connection() -> bool override;
+    void cleanup_connection() override;
+
+  private:
+    auto create_pipe() -> bool;
+    auto wait_for_connection() -> bool;
+};
+
+// Client implementation
+class IPCClient : public IPCBase {
+  public:
+    explicit IPCClient(const String& pipeName);
+
+    // Reconnection interval (seconds)
+    void set_reconnect_interval(int seconds) { _reconnectInterval = seconds; }
+
+  protected:
+    auto establish_connection() -> bool override;
+    void cleanup_connection() override;
+
+  private:
+    auto connect_to_server() -> bool;
+    int _reconnectInterval{1}; // seconds
+};
+
 } // namespace nv
 
-#endif // IPCHANDLER_H_
+#endif // IPCBASE_H_
