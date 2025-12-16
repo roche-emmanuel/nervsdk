@@ -35,6 +35,14 @@ template <typename T> struct function_traits {
     using args_tuple = typename callable_traits::args_tuple;
 };
 
+// Helper to generate compile-time type IDs without RTTI
+template <typename... Args> struct type_id_generator {
+    static void id_function() {}
+
+    // Use inline variable (C++17) to avoid redefinition errors
+    static inline void (*id)() = &id_function;
+};
+
 } // namespace detail
 
 template <typename... Args> class Signal {
@@ -141,16 +149,30 @@ template <typename... Args> class Signal {
     [[nodiscard]] auto size() const -> size_t { return slots.size(); }
 };
 
-// Base class for type erasure
+// Base class for type erasure with manual type tracking
 class SignalHolderBase {
+  protected:
+    using TypeIDPtr = void (*)();
+    TypeIDPtr type_id;
+
+    explicit SignalHolderBase(TypeIDPtr id) : type_id(id) {}
+
   public:
     virtual ~SignalHolderBase() = default;
+
+    [[nodiscard]] auto get_type_id() const -> TypeIDPtr { return type_id; }
+
+    template <typename... Args> [[nodiscard]] auto is_type() const -> bool {
+        return type_id == detail::type_id_generator<Args...>::id;
+    }
 };
 
 // Derived class that holds the actual Signal
 template <typename... Args> class SignalHolder : public SignalHolderBase {
   public:
     Signal<Args...> signal;
+
+    SignalHolder() : SignalHolderBase(detail::type_id_generator<Args...>::id) {}
 };
 
 class SignalMap {
@@ -186,11 +208,14 @@ class SignalMap {
             return signal;
         }
 
-        // Downcast to the correct type
-        auto* holder = dynamic_cast<SignalHolder<Args...>*>(it->second.get());
-        if (!holder) {
+        // Manual type checking without RTTI
+        auto* holder_base = it->second.get();
+        if (!holder_base->template is_type<Args...>()) {
             throw std::runtime_error("Signal type mismatch");
         }
+
+        // Safe to use static_cast after type verification
+        auto* holder = static_cast<SignalHolder<Args...>*>(holder_base);
         return holder->signal;
     }
 

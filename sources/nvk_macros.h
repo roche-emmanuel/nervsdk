@@ -9,16 +9,45 @@ class LogManager;
 }
 
 #ifndef NV_NO_LOG_MACROS
+#ifndef logTRACE
 #define logTRACE nv::LogManager::trace
+#endif
+
+#ifndef logDEBUG
 #define logDEBUG nv::LogManager::debug
+#endif
+
+#ifndef logDEBUG_1S
 #define logDEBUG_1S nv::LogManager::debug_1s
+#endif
+
+#ifndef logINFO
 #define logINFO nv::LogManager::info
+#endif
+
+#ifndef logNOTE
 #define logNOTE nv::LogManager::note
+#endif
+
+#ifndef logWARN
 #define logWARN nv::LogManager::warn
+#endif
+
+#ifndef logERROR
 #define logERROR nv::LogManager::error
+#endif
+
+#ifndef logFATAL
 #define logFATAL nv::LogManager::fatal
+#endif
+
+#ifndef CHECK_NO_THROW
 #define CHECK_NO_THROW nv::check_no_throw
+#endif
+
+#ifndef THROW_MSG
 #define THROW_MSG nv::throw_msg
+#endif
 #endif
 
 #define NVCHK nv::check_cond
@@ -43,12 +72,14 @@ class LogManager;
                                  << msg);                                      \
     }
 
+#ifndef NO_IMPL
 #define NO_IMPL(msg)                                                           \
     {                                                                          \
         auto msg_str__ = format_msg(msg);                                      \
         THROW_MSG("[NO_IMPL] ({}:{}) {}", __FILE__, __LINE__,                  \
                   msg_str__.c_str());                                          \
     }
+#endif
 
 #ifndef NV_PRODUCTION_MODE
 #define assert_error_report_helper(cond) "assertion failed: " #cond
