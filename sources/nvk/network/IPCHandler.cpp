@@ -128,7 +128,7 @@ auto IPCBase::send(const String& data) -> bool {
     }
 
     FlushFileBuffers(_pipeHandle);
-    logDEBUG("Sent {} bytes via IPC.", bytesWritten);
+    // logDEBUG("Sent {} bytes via IPC.", bytesWritten);
     return true;
 }
 
@@ -213,7 +213,7 @@ void IPCBase::run() {
 
             if (bytesRead > 0) {
                 buffer[bytesRead] = '\0';
-                logDEBUG("IPC received {} bytes", bytesRead);
+                // logDEBUG("IPC received {} bytes", bytesRead);
                 dataReceived.emit(buffer);
             } else if (bytesRead == 0 && (success != 0)) {
                 // Connection closed gracefully

@@ -303,6 +303,70 @@ template <typename T> class Quaternion {
         return conj() / length2();
     }
 
+    // Static constructor from yaw-pitch-roll for WebGPU convention
+    // Coordinate system: X=right, Y=up, Z=forward (right-handed)
+    // Convention: yaw around Y (up), pitch around X (right), roll around Z
+    // (forward) Applied in order: Y (yaw) -> X (pitch) -> Z (roll)
+    [[nodiscard]] static auto from_ypr(value_t yaw, value_t pitch, value_t roll)
+        -> Quaternion {
+        // Convert degrees → radians
+        value_t y = toRad(-yaw);   // NEGATE yaw
+        value_t p = toRad(-pitch); // NEGATE pitch
+        value_t r = toRad(roll);   // roll unchanged
+
+        value_t hy = y * value_t(0.5);
+        value_t hp = p * value_t(0.5);
+        value_t hr = r * value_t(0.5);
+
+        value_t cy = cos(hy);
+        value_t sy = sin(hy);
+        value_t cp = cos(hp);
+        value_t sp = sin(hp);
+        value_t cr = cos(hr);
+        value_t sr = sin(hr);
+
+        Quaternion q;
+        // Y (yaw) → X (pitch) → Z (roll)  (YXZ)
+        q._v[0] = cy * sp * cr + sy * cp * sr; // x
+        q._v[1] = sy * cp * cr - cy * sp * sr; // y
+        q._v[2] = cy * cp * sr - sy * sp * cr; // z
+        q._v[3] = cy * cp * cr + sy * sp * sr; // w
+
+        return q;
+    }
+
+    // Convert quaternion to yaw-pitch-roll for WebGPU convention
+    // Coordinate system: X=right, Y=up, Z=forward (right-handed)
+    // Convention: yaw around Y (up), pitch around X (right), roll around Z
+    // (forward) YXZ Euler order
+    [[nodiscard]] auto to_ypr() const -> Vec3<value_t> {
+        const value_t x = _v[0];
+        const value_t y = _v[1];
+        const value_t z = _v[2];
+        const value_t w = _v[3];
+
+        // Pitch (X)
+        value_t sinp = value_t(2) * (w * x - y * z);
+
+        value_t pitchRad;
+        if (fabs(sinp) >= value_t(1)) {
+            pitchRad = copysign(value_t(PI) / value_t(2), sinp);
+        } else {
+            pitchRad = asin(sinp);
+        }
+
+        // Yaw (Y)
+        value_t yawRad = atan2(value_t(2) * (w * y + x * z),
+                               value_t(1) - value_t(2) * (x * x + y * y));
+
+        // Roll (Z)
+        value_t rollRad = atan2(value_t(2) * (w * z + x * y),
+                                value_t(1) - value_t(2) * (x * x + z * z));
+
+        // Convert back to degrees and undo sign flips
+        return {toDeg(-yawRad), toDeg(-pitchRad), toDeg(rollRad)};
+    }
+
     /* --------------------------------------------------------
              METHODS RELATED TO ROTATIONS
       Set a quaternion which will perform a rotation of an
