@@ -39,6 +39,8 @@ class IPCBase : public RefObject {
 
     String _pipeName;
     HANDLE _pipeHandle{INVALID_HANDLE_VALUE};
+    HANDLE _readEvent{INVALID_HANDLE_VALUE};  // Add this
+    HANDLE _writeEvent{INVALID_HANDLE_VALUE}; // Add this
     DWORD _timeout{5000};
 
     std::atomic<bool> _connected{false};

@@ -6,9 +6,35 @@ namespace nv {
 // IPCBase - Shared Implementation
 // ============================================================================
 
-IPCBase::IPCBase(const String& pipeName) : _pipeName(pipeName) {}
+IPCBase::IPCBase(const String& pipeName)
+    : _pipeName(pipeName),
+      _readEvent(CreateEvent(nullptr, TRUE, FALSE, nullptr)),
+      _writeEvent(CreateEvent(nullptr, TRUE, FALSE, nullptr)) {
+    // Create reusable events
 
-IPCBase::~IPCBase() { stop(); }
+    if (_readEvent == INVALID_HANDLE_VALUE ||
+        _writeEvent == INVALID_HANDLE_VALUE) {
+        logERROR("Failed to create IPC events");
+        if (_readEvent != INVALID_HANDLE_VALUE)
+            CloseHandle(_readEvent);
+        if (_writeEvent != INVALID_HANDLE_VALUE)
+            CloseHandle(_writeEvent);
+        THROW_MSG("Failed to create IPC events");
+    }
+}
+
+IPCBase::~IPCBase() {
+    stop();
+    // Clean up events
+    if (_readEvent != INVALID_HANDLE_VALUE) {
+        CloseHandle(_readEvent);
+        _readEvent = INVALID_HANDLE_VALUE;
+    }
+    if (_writeEvent != INVALID_HANDLE_VALUE) {
+        CloseHandle(_writeEvent);
+        _writeEvent = INVALID_HANDLE_VALUE;
+    }
+}
 
 void IPCBase::start() {
     _running = true;
@@ -41,18 +67,63 @@ auto IPCBase::send(const String& data) -> bool {
         return false;
     }
 
+    OVERLAPPED overlap = {};
+    overlap.hEvent = _writeEvent; // Use member variable
+    ResetEvent(_writeEvent);      // Reset before use
+
+    if (overlap.hEvent == nullptr) {
+        logERROR("Failed to create event for WriteFile");
+        return false;
+    }
+
     DWORD bytesWritten = 0;
     BOOL ok =
         WriteFile(_pipeHandle, data.data(), static_cast<DWORD>(data.size()),
-                  &bytesWritten, nullptr);
+                  &bytesWritten, &overlap);
 
-    if (!ok || bytesWritten != data.size()) {
-        DWORD code = GetLastError();
-        if (code == ERROR_NO_DATA || code == ERROR_BROKEN_PIPE) {
+    if (ok == 0) {
+        DWORD err = GetLastError();
+
+        if (err == ERROR_IO_PENDING) {
+            // Wait for write to complete with timeout
+            DWORD waitResult = WaitForSingleObject(overlap.hEvent, _timeout);
+
+            if (waitResult == WAIT_OBJECT_0) {
+                // Get the actual number of bytes written
+                if (!GetOverlappedResult(_pipeHandle, &overlap, &bytesWritten,
+                                         FALSE)) {
+                    err = GetLastError();
+                    if (err == ERROR_NO_DATA || err == ERROR_BROKEN_PIPE) {
+                        logERROR(
+                            "WriteFile failed: pipe closed at the other end.");
+                    } else {
+                        logERROR("GetOverlappedResult for WriteFile failed, "
+                                 "error code: {}",
+                                 err);
+                    }
+                    return false;
+                }
+            } else if (waitResult == WAIT_TIMEOUT) {
+                logERROR("WriteFile timed out after {}ms", _timeout);
+                CancelIoEx(_pipeHandle, &overlap);
+                return false;
+            } else {
+                logERROR("WaitForSingleObject failed for WriteFile");
+                CancelIoEx(_pipeHandle, &overlap);
+                return false;
+            }
+        } else if (err == ERROR_NO_DATA || err == ERROR_BROKEN_PIPE) {
             logERROR("WriteFile failed: pipe closed at the other end.");
+            return false;
         } else {
-            logERROR("WriteFile failed, error code: {}", code);
+            logERROR("WriteFile failed, error code: {}", err);
+            return false;
         }
+    }
+
+    if (bytesWritten != data.size()) {
+        logERROR("WriteFile incomplete: wrote {} of {} bytes", bytesWritten,
+                 data.size());
         return false;
     }
 
@@ -67,42 +138,94 @@ void IPCBase::run() {
     char buffer[BUFFER_SIZE];
 
     while (_running) {
-        // Establish connection (server creates/waits, client connects)
         if (!establish_connection()) {
             sleep_s(1);
             continue;
         }
 
-        // Read messages while connected
+        // Use member event instead of creating new one
+        OVERLAPPED overlap = {};
+        overlap.hEvent = _readEvent;
+
         while (_running && _connected && _pipeHandle != INVALID_HANDLE_VALUE) {
             DWORD bytesRead = 0;
+            ResetEvent(_readEvent); // Reset before each read
 
             BOOL success = ReadFile(_pipeHandle, buffer, sizeof(buffer) - 1,
-                                    &bytesRead, nullptr);
+                                    &bytesRead, &overlap);
 
-            if (!success || bytesRead == 0) {
+            if (success == 0) {
                 DWORD err = GetLastError();
-                if (err == ERROR_BROKEN_PIPE) {
+
+                if (err == ERROR_IO_PENDING) {
+                    // Wait with timeout so we can check _running
+                    while (_running) {
+                        DWORD waitResult = WaitForSingleObject(_readEvent, 100);
+                        if (waitResult == WAIT_OBJECT_0) {
+                            // Get the result
+                            if (!GetOverlappedResult(_pipeHandle, &overlap,
+                                                     &bytesRead, FALSE)) {
+                                err = GetLastError();
+                                if (err == ERROR_BROKEN_PIPE) {
+                                    logNOTE("Connection broken (broken pipe).");
+                                } else {
+                                    logERROR("GetOverlappedResult failed: {}",
+                                             err);
+                                }
+                                disconnect();
+                                break;
+                            }
+                            // Successfully read data
+                            break;
+                        }
+
+                        if (waitResult == WAIT_TIMEOUT) {
+                            continue; // Check _running again
+                        }
+
+                        logERROR("WaitForSingleObject failed");
+                        disconnect();
+                        break;
+                    }
+
+                    if (!_running) {
+                        CancelIoEx(_pipeHandle, &overlap);
+                        break;
+                    }
+
+                    if (!_connected) {
+                        break;
+                    }
+                } else if (err == ERROR_BROKEN_PIPE) {
                     logNOTE("Connection broken (broken pipe).");
+                    disconnect();
+                    break;
                 } else if (err == ERROR_OPERATION_ABORTED) {
                     logDEBUG("Read operation cancelled.");
+                    disconnect();
+                    break;
                 } else {
                     logERROR("ReadFile failed: {}", err);
+                    disconnect();
+                    break;
                 }
+            }
 
+            if (bytesRead > 0) {
+                buffer[bytesRead] = '\0';
+                logDEBUG("IPC received {} bytes", bytesRead);
+                dataReceived.emit(buffer);
+            } else if (bytesRead == 0 && (success != 0)) {
+                // Connection closed gracefully
+                logNOTE("Connection closed (0 bytes read).");
                 disconnect();
                 break;
             }
-
-            buffer[bytesRead] = '\0';
-            logDEBUG("IPC received {} bytes", bytesRead);
-            dataReceived.emit(buffer);
         }
 
-        // Cleanup for reconnection
+        // Don't close the event - it's reused
         cleanup_connection();
 
-        // Brief pause before reconnecting
         if (_running) {
             sleep_ms(100);
         }
@@ -157,7 +280,7 @@ auto IPCServer::wait_for_connection() -> bool {
 
     BOOL result = ConnectNamedPipe(_pipeHandle, &overlap);
 
-    if (!result) {
+    if (result == 0) {
         DWORD err = GetLastError();
 
         if (err == ERROR_IO_PENDING) {
