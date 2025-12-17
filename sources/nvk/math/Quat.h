@@ -335,6 +335,11 @@ template <typename T> class Quaternion {
         return q;
     }
 
+    template <typename U>
+    [[nodiscard]] static auto from_ypr(Vec3<U> ypr) -> Quaternion {
+        return from_ypr(ypr.x(), ypr.y(), ypr.z());
+    }
+
     // Convert quaternion to yaw-pitch-roll for WebGPU convention
     // Coordinate system: X=right, Y=up, Z=forward (right-handed)
     // Convention: yaw around Y (up), pitch around X (right), roll around Z
@@ -345,25 +350,33 @@ template <typename T> class Quaternion {
         const value_t z = _v[2];
         const value_t w = _v[3];
 
-        // Pitch (X)
+        value_t yawRad, pitchRad, rollRad;
+
+        // Pitch (X axis)
         value_t sinp = value_t(2) * (w * x - y * z);
 
-        value_t pitchRad;
         if (fabs(sinp) >= value_t(1)) {
+            // ===== GIMBAL LOCK =====
             pitchRad = copysign(value_t(PI) / value_t(2), sinp);
+            rollRad = value_t(0);
+
+            // Compute yaw from forward vector
+            Vec3<value_t> forward = (*this) * Vec3<value_t>(0, 0, 1);
+
+            // Project onto XZ plane
+            yawRad = atan2(forward.x(), forward.z());
         } else {
+            // ===== NORMAL CASE =====
             pitchRad = asin(sinp);
+
+            yawRad = atan2(value_t(2) * (w * y + x * z),
+                           value_t(1) - value_t(2) * (x * x + y * y));
+
+            rollRad = atan2(value_t(2) * (w * z + x * y),
+                            value_t(1) - value_t(2) * (x * x + z * z));
         }
 
-        // Yaw (Y)
-        value_t yawRad = atan2(value_t(2) * (w * y + x * z),
-                               value_t(1) - value_t(2) * (x * x + y * y));
-
-        // Roll (Z)
-        value_t rollRad = atan2(value_t(2) * (w * z + x * y),
-                                value_t(1) - value_t(2) * (x * x + z * z));
-
-        // Convert back to degrees and undo sign flips
+        // Convert to degrees and apply camera conventions
         return {toDeg(-yawRad), toDeg(-pitchRad), toDeg(rollRad)};
     }
 
