@@ -360,11 +360,21 @@ template <typename T> class Quaternion {
             pitchRad = copysign(value_t(PI) / value_t(2), sinp);
             rollRad = value_t(0);
 
-            // Compute yaw from forward vector
-            Vec3<value_t> forward = (*this) * Vec3<value_t>(0, 0, 1);
+            // At gimbal lock, we need to find the effective yaw that represents
+            // the combined yaw-roll rotation. We use atan2 on the appropriate
+            // matrix elements.
 
-            // Project onto XZ plane
-            yawRad = atan2(forward.x(), forward.z());
+            if (sinp > 0) {
+                // Pitch = +90° (looking straight up)
+                // In this case, yaw - roll is recoverable
+                yawRad = atan2(value_t(2) * (x * y - w * z),
+                               value_t(1) - value_t(2) * (y * y + z * z));
+            } else {
+                // Pitch = -90° (looking straight down)
+                // In this case, yaw + roll is recoverable
+                yawRad = atan2(value_t(2) * (x * y + w * z),
+                               value_t(1) - value_t(2) * (y * y + z * z));
+            }
         } else {
             // ===== NORMAL CASE =====
             pitchRad = asin(sinp);
