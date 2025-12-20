@@ -3,6 +3,8 @@
 
 #include <nvk/dx/dx_common.h>
 
+#include <d3d11.h>
+
 namespace nv {
 
 class DX11InputLayoutDesc {

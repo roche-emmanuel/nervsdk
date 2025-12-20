@@ -1242,9 +1242,9 @@ auto acquireKeyedMutex(ComPtr<IDXGIKeyedMutex>& keyedMutex, I32 key) -> bool {
         return false;
     }
     if (FAILED(hr)) {
-        _com_error err(hr);
+        auto err = get_hresult_error_message(hr);
         logWARN("Failed to acquire keyed mutex with key {} (error={})", key,
-                err.ErrorMessage());
+                err);
         return false;
     }
 
@@ -1259,9 +1259,9 @@ auto releaseKeyedMutex(ComPtr<IDXGIKeyedMutex>& keyedMutex, I32 key) -> bool {
 
     HRESULT hr = keyedMutex->ReleaseSync(key);
     if (FAILED(hr)) {
-        _com_error err(hr);
+        auto err = get_hresult_error_message(hr);
         logWARN("Failed to release keyed mutex with key {} (error={})", key,
-                err.ErrorMessage());
+                err);
         return false;
     }
 

@@ -448,7 +448,7 @@ void DX12Engine::saveTextureToFile(ID3D12Resource* tex, const char* filename) {
 
     if (_readbackBufferSize < reqSize) {
         logDEBUG("Reallocating readback buffer with size {}", reqSize);
-        createReadbackBuffer(reqSize);
+        getReadbackBuffer(reqSize);
     }
 
     clearCommands();
@@ -557,7 +557,7 @@ void DX12Engine::saveTextureToFile(ID3D12Resource* tex, const char* filename) {
     _readbackBuffer->Unmap(0, &writeRange);
 }
 
-void DX12Engine::createReadbackBuffer(U32 size) {
+auto DX12Engine::getReadbackBuffer(U32 size) -> ComPtr<ID3D12Resource> {
     // Create readback buffer
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = D3D12_HEAP_TYPE_READBACK;
@@ -587,6 +587,8 @@ void DX12Engine::createReadbackBuffer(U32 size) {
 
     setCopyDstState(_readbackBuffer.Get());
     _readbackBufferSize = size;
+
+    return _readbackBuffer;
 }
 
 auto DX12Engine::getRequiredReadBufferSize(ID3D12Resource* tex) -> U32 {
@@ -1027,6 +1029,170 @@ auto DX12Engine::updateProgram(DX12Program& prog) -> bool {
         logERROR("Failed to reload shader {}: {}", prog.filename, e.what());
         return false;
     }
+}
+
+void DX12Engine::clearRenderTarget(ID3D12DescriptorHeap* descHeap, F32 r, F32 g,
+                                   F32 b, F32 a, U32 slotIndex) {
+// Verify it's actually an RTV heap:
+#ifdef _DEBUG
+    NVCHK(descHeap != nullptr, "Invalid desc heap.");
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = descHeap->GetDesc();
+    if (heapDesc.Type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV) {
+        THROW_MSG(
+            "clearRenderTarget requires an RTV descriptor heap, got type {}",
+            static_cast<int>(heapDesc.Type));
+    }
+    if (slotIndex >= heapDesc.NumDescriptors) {
+        THROW_MSG("slotIndex {} out of bounds for heap with {} descriptors",
+                  slotIndex, heapDesc.NumDescriptors);
+    }
+#endif
+
+    // Clear with the specified color
+    const F32 clearColor[4] = {r, g, b, a};
+
+    D3D12_CPU_DESCRIPTOR_HANDLE descHandle =
+        descHeap->GetCPUDescriptorHandleForHeapStart();
+    auto stride = _device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    descHandle.ptr += (size_t)slotIndex * stride;
+
+    _cmdList->ClearRenderTargetView(descHandle, clearColor, 0, nullptr);
+}
+
+void DX12Engine::clearRenderTarget(ID3D12Resource* texture, F32 r, F32 g, F32 b,
+                                   F32 a) {
+    // Create RTV descriptor heap if you don't have one cached
+    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+    rtvHeapDesc.NumDescriptors = 1;
+    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    ComPtr<ID3D12DescriptorHeap> rtvHeap;
+    HRESULT hr =
+        _device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap));
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create RTV heap for clear: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    // Create RTV
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = texture->GetDesc().Format;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Texture2D.MipSlice = 0;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle =
+        rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    _device->CreateRenderTargetView(texture, &rtvDesc, rtvHandle);
+
+    // Clear with the specified color
+    const float clearColor[4] = {r, g, b, a};
+    _cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+}
+
+auto DX12Engine::createViewHeap(U32 numDescriptors, bool shaderVisible)
+    -> ComPtr<ID3D12DescriptorHeap> {
+    return createDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                                numDescriptors, shaderVisible);
+}
+
+auto DX12Engine::createRTVHeap(U32 numDescriptors)
+    -> ComPtr<ID3D12DescriptorHeap> {
+    // RTVs are never shader visible
+    return createDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numDescriptors,
+                                false);
+}
+
+auto DX12Engine::createDSVHeap(U32 numDescriptors)
+    -> ComPtr<ID3D12DescriptorHeap> {
+    return createDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, numDescriptors,
+                                false);
+}
+
+void DX12Engine::createRenderTargetView(ID3D12DescriptorHeap* descHeap,
+                                        ID3D12Resource* texture,
+                                        U32 slotIndex) {
+    D3D12_CPU_DESCRIPTOR_HANDLE descHandle =
+        descHeap->GetCPUDescriptorHandleForHeapStart();
+    auto stride = _device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    descHandle.ptr += (size_t)slotIndex * stride;
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = texture->GetDesc().Format;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Texture2D.MipSlice = 0;
+
+    _device->CreateRenderTargetView(texture, &rtvDesc, descHandle);
+}
+
+auto DX12Engine::createTexture2D(U32 width, U32 height,
+                                 D3D12_RESOURCE_FLAGS resourceFlags,
+                                 DXGI_FORMAT format,
+                                 D3D12_RESOURCE_STATES initialState,
+                                 D3D12_HEAP_TYPE heapType)
+    -> ComPtr<ID3D12Resource> {
+
+    // Setup heap properties
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = heapType;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 0;
+    heapProps.VisibleNodeMask = 0;
+
+    // Setup resource description
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Width = width;
+    resourceDesc.Height = height;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = format;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resourceDesc.Flags = resourceFlags;
+
+    // Setup clear value if it's a render target or depth stencil
+    D3D12_CLEAR_VALUE* pClearValue = nullptr;
+    D3D12_CLEAR_VALUE clearValue = {};
+
+    if (resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) {
+        clearValue.Format = format;
+        clearValue.Color[0] = 0.0f;
+        clearValue.Color[1] = 0.0f;
+        clearValue.Color[2] = 0.0f;
+        clearValue.Color[3] = 1.0f;
+        pClearValue = &clearValue;
+    } else if (resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) {
+        clearValue.Format = format;
+        clearValue.DepthStencil.Depth = 1.0f;
+        clearValue.DepthStencil.Stencil = 0;
+        pClearValue = &clearValue;
+    }
+
+    // Create the resource
+    ComPtr<ID3D12Resource> texture;
+    HRESULT hr = _device->CreateCommittedResource(
+        &heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc, initialState,
+        pClearValue, IID_PPV_ARGS(texture.GetAddressOf()));
+
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create Texture2D: width={}, height={}, format={}, "
+                  "hr=0x{:X}",
+                  width, height, static_cast<int>(format),
+                  static_cast<unsigned int>(hr));
+    }
+
+    // Track the initial state
+    setCurrentState(texture.Get(), initialState);
+
+    return texture;
 }
 
 } // namespace nv

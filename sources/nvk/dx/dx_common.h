@@ -5,8 +5,6 @@
 
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
-#include <comdef.h>
-#include <d3d11.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <windows.h>
@@ -31,20 +29,22 @@ using Microsoft::WRL::ComPtr;
 
 namespace nv {
 
+auto get_hresult_error_message(HRESULT hr) -> std::string;
+
 template <typename... Args>
 void check_result(HRESULT hr, fmt::format_string<Args...> fmt_str,
                   Args&&... args) {
     if (FAILED(hr)) {
         auto msg = format_msg(fmt_str, std::forward<Args>(args)...);
-        _com_error err(hr);
-        throw_msg("{} (err={})", msg.c_str(), err.ErrorMessage());
+        auto err = get_hresult_error_message(hr);
+        throw_msg("{} (err={})", msg.c_str(), err);
     }
 }
 
 inline void check_result(HRESULT hr, const char* fmt_str) {
     if (FAILED(hr)) {
-        _com_error err(hr);
-        throw_msg("{} (err={})", fmt_str, err.ErrorMessage());
+        auto err = get_hresult_error_message(hr);
+        throw_msg("{} (err={})", fmt_str, err);
     }
 }
 

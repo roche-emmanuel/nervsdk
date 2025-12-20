@@ -162,6 +162,16 @@ class DX12Engine {
                               U32 numDescriptors, bool shaderVisible = false)
         -> ComPtr<ID3D12DescriptorHeap>;
 
+    auto createViewHeap(U32 numDescriptors, bool shaderVisible = false)
+        -> ComPtr<ID3D12DescriptorHeap>;
+
+    auto createRTVHeap(U32 numDescriptors) -> ComPtr<ID3D12DescriptorHeap>;
+
+    auto createDSVHeap(U32 numDescriptors) -> ComPtr<ID3D12DescriptorHeap>;
+
+    void createRenderTargetView(ID3D12DescriptorHeap* descHeap,
+                                ID3D12Resource* texture, U32 slotIndex = 0);
+
     // UAV creation
     void createUnorderedAccessView(ID3D12Resource* resource,
                                    D3D12_CPU_DESCRIPTOR_HANDLE destDescriptor,
@@ -174,6 +184,23 @@ class DX12Engine {
 
     // Set shader include directory
     void setShaderIncludeDir(const std::string& dir);
+
+    auto getReadbackBuffer(U32 size) -> ComPtr<ID3D12Resource>;
+
+    void clearRenderTarget(ID3D12DescriptorHeap* descHeap, F32 r, F32 g, F32 b,
+                           F32 a, U32 slotIndex = 0);
+    void clearRenderTarget(ID3D12Resource* texture, F32 r, F32 g, F32 b, F32 a);
+
+    auto createTexture2D(
+        U32 width, U32 height,
+        D3D12_RESOURCE_FLAGS resourceFlags =
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+        DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON,
+        D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT)
+        -> ComPtr<ID3D12Resource>;
+
+    auto getRequiredReadBufferSize(ID3D12Resource* tex) -> U32;
 
   private:
     // Private constructor for singleton pattern
@@ -211,8 +238,6 @@ class DX12Engine {
     void createSyncObjects();
     void uploadToResource(ID3D12Resource* resource, const void* data, U32 size);
     void createUploadBuffer(U32 size);
-    void createReadbackBuffer(U32 size);
-    auto getRequiredReadBufferSize(ID3D12Resource* tex) -> U32;
     auto updateProgram(DX12Program& prog) -> bool;
 };
 
