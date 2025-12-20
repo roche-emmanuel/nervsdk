@@ -5,6 +5,40 @@
 
 namespace nv {
 
+class DX12Engine;
+struct DX12Program;
+
+struct CommandListContext {
+    U32 index;
+    ComPtr<ID3D12CommandAllocator> allocator;
+    ComPtr<ID3D12GraphicsCommandList> cmdList;
+    U64 fenceValue = 0;
+    bool isRecording = false;
+    DX12Engine& eng;
+
+    // Add a resource transition:
+    void addTransition(ID3D12Resource* res, D3D12_RESOURCE_STATES sBefore,
+                       D3D12_RESOURCE_STATES sAfter);
+
+    void addTransition(ID3D12Resource* res, D3D12_RESOURCE_STATES sAfter);
+    void addCopyDstTransition(ID3D12Resource* res);
+    void addCopySrcTransition(ID3D12Resource* res);
+    void addCommonTransition(ID3D12Resource* res);
+    void addRenderTgtTransition(ID3D12Resource* res);
+
+    void addCopyFullTextureToTexture(ID3D12Resource* src, ID3D12Resource* dst);
+    void addCopyFullTextureToBuffer(ID3D12Resource* src, ID3D12Resource* dst);
+
+    // Compute shader execution
+    void setComputeProgram(const DX12Program& prog);
+
+    void dispatch(U32 threadGroupCountX, U32 threadGroupCountY = 1,
+                  U32 threadGroupCountZ = 1);
+
+    void clearRenderTarget(ID3D12DescriptorHeap* descHeap, F32 r, F32 g, F32 b,
+                           F32 a, U32 slotIndex = 0);
+};
+
 class DX12InputLayoutDesc {
   public:
     DX12InputLayoutDesc() = default;
@@ -74,32 +108,13 @@ class DX12Engine {
 
     auto device() const -> ID3D12Device* { return _device.Get(); }
     auto cmdQueue() const -> ID3D12CommandQueue* { return _cmdQueue.Get(); }
-    auto cmdAllocator() const -> ID3D12CommandAllocator* {
-        return _cmdAllocator.Get();
-    }
-    auto cmdList() const -> ID3D12GraphicsCommandList* {
-        return _cmdList.Get();
-    }
-    void clearCommands();
-    void executeCommands();
+
+    void executeCommands(CommandListContext& ctx);
     void waitForGpu();
 
     void printGPUInfos();
 
     void saveTextureToFile(ID3D12Resource* tex, const char* filename);
-
-    // Add a resource transition:
-    void addTransition(ID3D12Resource* res, D3D12_RESOURCE_STATES sBefore,
-                       D3D12_RESOURCE_STATES sAfter);
-
-    void addTransition(ID3D12Resource* res, D3D12_RESOURCE_STATES sAfter);
-    void addCopyDstTransition(ID3D12Resource* res);
-    void addCopySrcTransition(ID3D12Resource* res);
-    void addCommonTransition(ID3D12Resource* res);
-    void addRenderTgtTransition(ID3D12Resource* res);
-
-    void addCopyFullTextureToTexture(ID3D12Resource* src, ID3D12Resource* dst);
-    void addCopyFullTextureToBuffer(ID3D12Resource* src, ID3D12Resource* dst);
 
     //    Get the current resource state:
     auto
@@ -139,12 +154,6 @@ class DX12Engine {
     auto createComputePipelineState(ID3D12RootSignature* rootSig,
                                     ID3DBlob* computeShader)
         -> ComPtr<ID3D12PipelineState>;
-
-    // Compute shader execution
-    void setComputeProgram(const DX12Program& prog);
-
-    void dispatch(U32 threadGroupCountX, U32 threadGroupCountY = 1,
-                  U32 threadGroupCountZ = 1);
 
     // Shader hot-reload support
     void check_live_reload(DX12Program& prog);
@@ -187,10 +196,6 @@ class DX12Engine {
 
     auto getReadbackBuffer(U32 size) -> ComPtr<ID3D12Resource>;
 
-    void clearRenderTarget(ID3D12DescriptorHeap* descHeap, F32 r, F32 g, F32 b,
-                           F32 a, U32 slotIndex = 0);
-    void clearRenderTarget(ID3D12Resource* texture, F32 r, F32 g, F32 b, F32 a);
-
     auto createTexture2D(
         U32 width, U32 height,
         D3D12_RESOURCE_FLAGS resourceFlags =
@@ -202,6 +207,10 @@ class DX12Engine {
 
     auto getRequiredReadBufferSize(ID3D12Resource* tex) -> U32;
 
+    auto beginCmdList() -> CommandListContext&;
+
+    auto getCmdList(I32 idx = -1) -> CommandListContext&;
+
   private:
     // Private constructor for singleton pattern
     explicit DX12Engine(ID3D12Device* device);
@@ -209,9 +218,11 @@ class DX12Engine {
     // Core DX12 objects
     ComPtr<ID3D12Device> _device;
     ComPtr<ID3D12CommandQueue> _cmdQueue;
-    ComPtr<ID3D12CommandAllocator> _cmdAllocator;
-    ComPtr<ID3D12GraphicsCommandList> _cmdList;
     ComPtr<ID3D12Fence> _fence;
+
+    // Replace existing command objects with pool
+    Vector<CommandListContext> _cmdListPool;
+    U32 _currentCmdListIndex = 0;
 
     // Synchronization
     HANDLE _fenceEvent;
@@ -231,6 +242,9 @@ class DX12Engine {
     std::string _shaderIncludeDir;
 
     mutable std::mt19937 _gen;
+
+    void createCommandListContext(CommandListContext& ctx);
+    void retireCommandList(U32 index);
 
     // Helper method to create device if none provided
     void createDevice();

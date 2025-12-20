@@ -86,8 +86,6 @@ DX12Engine::DX12Engine(ID3D12Device* device) {
     createSyncObjects();
 
     NVCHK(_cmdQueue != nullptr, "Cannot create DX12 command queue.");
-    NVCHK(_cmdAllocator != nullptr, "Cannot create DX12 command allocator.");
-    NVCHK(_cmdList != nullptr, "Cannot create DX12 command list.");
     NVCHK(_fence != nullptr, "Cannot create DX12 fence.");
 }
 
@@ -150,20 +148,6 @@ void DX12Engine::createCommandObjects() {
     HRESULT hr =
         _device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&_cmdQueue));
     NVCHK(SUCCEEDED(hr), "Failed to create command queue.");
-
-    // Create command allocator
-    hr = _device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                         IID_PPV_ARGS(&_cmdAllocator));
-    NVCHK(SUCCEEDED(hr), "Failed to create command allocator.");
-
-    // Create command list
-    hr = _device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                    _cmdAllocator.Get(), nullptr,
-                                    IID_PPV_ARGS(&_cmdList));
-    NVCHK(SUCCEEDED(hr), "Failed to create command list.");
-
-    // Command lists are created in recording state, close it for now
-    _cmdList->Close();
 }
 
 void DX12Engine::createSyncObjects() {
@@ -175,21 +159,27 @@ void DX12Engine::createSyncObjects() {
     NVCHK(_fenceEvent != nullptr, "Failed to create fence event.");
 }
 
-// Command list management
-void DX12Engine::clearCommands() {
-    HRESULT hr = _cmdAllocator->Reset();
-    NVCHK(SUCCEEDED(hr), "Failed to reset command allocator.");
+void DX12Engine::executeCommands(CommandListContext& ctx) {
 
-    hr = _cmdList->Reset(_cmdAllocator.Get(), nullptr);
-    NVCHK(SUCCEEDED(hr), "Failed to reset command list.");
-}
+    // Close the command list:
+    NVCHK(ctx.isRecording, "Command list was not recording!");
 
-void DX12Engine::executeCommands() {
-    HRESULT hr = _cmdList->Close();
+    HRESULT hr = ctx.cmdList->Close();
     NVCHK(SUCCEEDED(hr), "Failed to close command list.");
 
-    ID3D12CommandList* commandLists[] = {_cmdList.Get()};
+    ID3D12CommandList* commandLists[] = {ctx.cmdList.Get()};
     _cmdQueue->ExecuteCommandLists(1, commandLists);
+
+    // Signal fence with new value
+    _fenceValue++;
+    hr = _cmdQueue->Signal(_fence.Get(), _fenceValue);
+    NVCHK(SUCCEEDED(hr), "Failed to signal fence.");
+
+    // Store fence value for this command list
+    ctx.fenceValue = _fenceValue;
+
+    // Mark the command context as not recording anymore:
+    ctx.isRecording = false;
 }
 
 void DX12Engine::waitForGpu() {
@@ -237,9 +227,9 @@ auto DX12Engine::createVertexBuffer(const void* data, U32 size)
     barrier.Transition.StateAfter =
         D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 
-    clearCommands();
-    _cmdList->ResourceBarrier(1, &barrier);
-    executeCommands();
+    auto& ctx = beginCmdList();
+    ctx.cmdList->ResourceBarrier(1, &barrier);
+    executeCommands(ctx);
 
     return vertexBuffer;
 }
@@ -286,10 +276,10 @@ void DX12Engine::uploadToResource(ID3D12Resource* resource, const void* data,
     _uploadBuffer->Unmap(0, nullptr);
 
     // Copy from upload buffer to resource
-    clearCommands();
-    _cmdList->CopyBufferRegion(resource, 0, _uploadBuffer.Get(),
-                               _uploadBufferOffset, size);
-    executeCommands();
+    auto& ctx = beginCmdList();
+    ctx.cmdList->CopyBufferRegion(resource, 0, _uploadBuffer.Get(),
+                                  _uploadBufferOffset, size);
+    executeCommands(ctx);
 
     // Update offset (simple linear allocator)
     _uploadBufferOffset += (size + 255) & ~255; // Align to 256 bytes
@@ -329,9 +319,9 @@ void DX12Engine::printGPUInfos() {
     logDEBUG(" - Device ID: 0x{:X}", desc.DeviceId);
 }
 
-void DX12Engine::addTransition(ID3D12Resource* res,
-                               D3D12_RESOURCE_STATES sBefore,
-                               D3D12_RESOURCE_STATES sAfter) {
+void CommandListContext::addTransition(ID3D12Resource* res,
+                                       D3D12_RESOURCE_STATES sBefore,
+                                       D3D12_RESOURCE_STATES sAfter) {
     if (sBefore == sAfter) {
         // No transition to perform.
         return;
@@ -347,14 +337,14 @@ void DX12Engine::addTransition(ID3D12Resource* res,
             .StateAfter = sAfter,
         }};
 
-    _cmdList->ResourceBarrier(1, &barrier);
+    cmdList->ResourceBarrier(1, &barrier);
 }
 
-void DX12Engine::addTransition(ID3D12Resource* res,
-                               D3D12_RESOURCE_STATES sAfter) {
-    auto sBefore = getCurrentState(res);
+void CommandListContext::addTransition(ID3D12Resource* res,
+                                       D3D12_RESOURCE_STATES sAfter) {
+    auto sBefore = eng.getCurrentState(res);
     addTransition(res, sBefore, sAfter);
-    setCurrentState(res, sAfter);
+    eng.setCurrentState(res, sAfter);
 }
 
 auto DX12Engine::getCurrentState(ID3D12Resource* res,
@@ -371,16 +361,16 @@ void DX12Engine::setCurrentState(ID3D12Resource* res,
     _stateMap[res] = state;
 }
 
-void DX12Engine::addCopyDstTransition(ID3D12Resource* res) {
+void CommandListContext::addCopyDstTransition(ID3D12Resource* res) {
     addTransition(res, D3D12_RESOURCE_STATE_COPY_DEST);
 };
-void DX12Engine::addCopySrcTransition(ID3D12Resource* res) {
+void CommandListContext::addCopySrcTransition(ID3D12Resource* res) {
     addTransition(res, D3D12_RESOURCE_STATE_COPY_SOURCE);
 };
-void DX12Engine::addCommonTransition(ID3D12Resource* res) {
+void CommandListContext::addCommonTransition(ID3D12Resource* res) {
     addTransition(res, D3D12_RESOURCE_STATE_COMMON);
 };
-void DX12Engine::addRenderTgtTransition(ID3D12Resource* res) {
+void CommandListContext::addRenderTgtTransition(ID3D12Resource* res) {
     addTransition(res, D3D12_RESOURCE_STATE_RENDER_TARGET);
 };
 void DX12Engine::setCopyDstState(ID3D12Resource* res) {
@@ -396,8 +386,8 @@ void DX12Engine::setRenderTgtState(ID3D12Resource* res) {
     setCurrentState(res, D3D12_RESOURCE_STATE_RENDER_TARGET);
 }
 
-void DX12Engine::addCopyFullTextureToTexture(ID3D12Resource* src,
-                                             ID3D12Resource* dst) {
+void CommandListContext::addCopyFullTextureToTexture(ID3D12Resource* src,
+                                                     ID3D12Resource* dst) {
     NVCHK(src != nullptr, "Invalid source resource.");
     NVCHK(dst != nullptr, "Invalid dest resource.");
 
@@ -411,11 +401,11 @@ void DX12Engine::addCopyFullTextureToTexture(ID3D12Resource* src,
     dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
     dstLocation.SubresourceIndex = 0;
 
-    _cmdList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
+    cmdList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
 }
 
-void DX12Engine::addCopyFullTextureToBuffer(ID3D12Resource* src,
-                                            ID3D12Resource* dst) {
+void CommandListContext::addCopyFullTextureToBuffer(ID3D12Resource* src,
+                                                    ID3D12Resource* dst) {
     NVCHK(src != nullptr, "Invalid source resource.");
     NVCHK(dst != nullptr, "Invalid dest resource.");
 
@@ -433,11 +423,11 @@ void DX12Engine::addCopyFullTextureToBuffer(ID3D12Resource* src,
     UINT64 rowSizeInBytes = 0;
     D3D12_RESOURCE_DESC sourceDesc = src->GetDesc();
 
-    _device->GetCopyableFootprints(&sourceDesc, 0, 1, 0, &footprint, &numRows,
-                                   &rowSizeInBytes, nullptr);
+    eng.device()->GetCopyableFootprints(&sourceDesc, 0, 1, 0, &footprint,
+                                        &numRows, &rowSizeInBytes, nullptr);
     dstLocation.PlacedFootprint = footprint;
 
-    _cmdList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
+    cmdList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
 }
 
 void DX12Engine::saveTextureToFile(ID3D12Resource* tex, const char* filename) {
@@ -451,11 +441,11 @@ void DX12Engine::saveTextureToFile(ID3D12Resource* tex, const char* filename) {
         getReadbackBuffer(reqSize);
     }
 
-    clearCommands();
-    addCopyDstTransition(_readbackBuffer.Get());
-    addCopySrcTransition(tex);
-    addCopyFullTextureToBuffer(tex, _readbackBuffer.Get());
-    executeCommands();
+    auto& ctx = beginCmdList();
+    ctx.addCopyDstTransition(_readbackBuffer.Get());
+    ctx.addCopySrcTransition(tex);
+    ctx.addCopyFullTextureToBuffer(tex, _readbackBuffer.Get());
+    executeCommands(ctx);
 
     // Wait for GPU to complete
     waitForGpu();
@@ -815,18 +805,18 @@ auto DX12Engine::createComputeProgram(const std::string& filename)
     return prog;
 }
 
-void DX12Engine::setComputeProgram(const DX12Program& prog) {
+void CommandListContext::setComputeProgram(const DX12Program& prog) {
     if (!prog.isCompute) {
         THROW_MSG("Attempting to set non-compute program as compute program");
     }
 
-    _cmdList->SetPipelineState(prog.pipelineState.Get());
-    _cmdList->SetComputeRootSignature(prog.rootSignature.Get());
+    cmdList->SetPipelineState(prog.pipelineState.Get());
+    cmdList->SetComputeRootSignature(prog.rootSignature.Get());
 }
 
-void DX12Engine::dispatch(U32 threadGroupCountX, U32 threadGroupCountY,
-                          U32 threadGroupCountZ) {
-    _cmdList->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+void CommandListContext::dispatch(U32 threadGroupCountX, U32 threadGroupCountY,
+                                  U32 threadGroupCountZ) {
+    cmdList->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
 }
 
 auto DX12Engine::createStructuredBuffer(U32 elemSize, U32 numElems,
@@ -1031,8 +1021,9 @@ auto DX12Engine::updateProgram(DX12Program& prog) -> bool {
     }
 }
 
-void DX12Engine::clearRenderTarget(ID3D12DescriptorHeap* descHeap, F32 r, F32 g,
-                                   F32 b, F32 a, U32 slotIndex) {
+void CommandListContext::clearRenderTarget(ID3D12DescriptorHeap* descHeap,
+                                           F32 r, F32 g, F32 b, F32 a,
+                                           U32 slotIndex) {
 // Verify it's actually an RTV heap:
 #ifdef _DEBUG
     NVCHK(descHeap != nullptr, "Invalid desc heap.");
@@ -1053,43 +1044,12 @@ void DX12Engine::clearRenderTarget(ID3D12DescriptorHeap* descHeap, F32 r, F32 g,
 
     D3D12_CPU_DESCRIPTOR_HANDLE descHandle =
         descHeap->GetCPUDescriptorHandleForHeapStart();
-    auto stride = _device->GetDescriptorHandleIncrementSize(
+    auto stride = eng.device()->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     descHandle.ptr += (size_t)slotIndex * stride;
 
-    _cmdList->ClearRenderTargetView(descHandle, clearColor, 0, nullptr);
-}
-
-void DX12Engine::clearRenderTarget(ID3D12Resource* texture, F32 r, F32 g, F32 b,
-                                   F32 a) {
-    // Create RTV descriptor heap if you don't have one cached
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-    rtvHeapDesc.NumDescriptors = 1;
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-    ComPtr<ID3D12DescriptorHeap> rtvHeap;
-    HRESULT hr =
-        _device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap));
-    if (FAILED(hr)) {
-        THROW_MSG("Failed to create RTV heap for clear: 0x{:X}",
-                  static_cast<unsigned int>(hr));
-    }
-
-    // Create RTV
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.Format = texture->GetDesc().Format;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    rtvDesc.Texture2D.MipSlice = 0;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle =
-        rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    _device->CreateRenderTargetView(texture, &rtvDesc, rtvHandle);
-
-    // Clear with the specified color
-    const float clearColor[4] = {r, g, b, a};
-    _cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    cmdList->ClearRenderTargetView(descHandle, clearColor, 0, nullptr);
 }
 
 auto DX12Engine::createViewHeap(U32 numDescriptors, bool shaderVisible)
@@ -1193,6 +1153,53 @@ auto DX12Engine::createTexture2D(U32 width, U32 height,
     setCurrentState(texture.Get(), initialState);
 
     return texture;
+}
+
+auto DX12Engine::getCmdList(I32 idx) -> CommandListContext& {
+    if (idx < 0) {
+        idx = (I32)_currentCmdListIndex;
+    }
+    NVCHK(idx < _cmdListPool.size(), "Out of range command list index {}", idx);
+    return _cmdListPool[idx];
+}
+
+auto DX12Engine::beginCmdList() -> CommandListContext& {
+    // Get a free command list if any:
+    U64 completedValue = _fence->GetCompletedValue();
+
+    for (auto& ctx : _cmdListPool) {
+        if (!ctx.isRecording && ctx.fenceValue <= completedValue) {
+            HRESULT hr = ctx.allocator->Reset();
+            NVCHK(SUCCEEDED(hr), "Failed to reset command allocator.");
+
+            // Reset the command list:
+            hr = ctx.cmdList->Reset(ctx.allocator.Get(), nullptr);
+            NVCHK(SUCCEEDED(hr), "Failed to reset command list.");
+
+            ctx.isRecording = true;
+            return ctx;
+        }
+    }
+
+    // No free command list available, add a new one:
+    auto& ctx = _cmdListPool.emplace_back(CommandListContext{.eng = *this});
+
+    HRESULT hr = _device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                 IID_PPV_ARGS(&ctx.allocator));
+    NVCHK(SUCCEEDED(hr), "Failed to create command allocator.");
+
+    // Create command list
+    hr = _device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                    ctx.allocator.Get(), nullptr,
+                                    IID_PPV_ARGS(&ctx.cmdList));
+    NVCHK(SUCCEEDED(hr), "Failed to create command list.");
+
+    ctx.index = _cmdListPool.size() - 1;
+    logDEBUG("Creating DX12 command list {}", ctx.index);
+
+    ctx.isRecording = true;
+    ctx.fenceValue = 0;
+    return ctx;
 }
 
 } // namespace nv
