@@ -602,6 +602,433 @@ auto DX12Engine::getRequiredReadBufferSize(ID3D12Resource* tex) -> U32 {
     return size;
 }
 
+auto DX12Engine::readShaderFile(const std::string& filename,
+                                std::unordered_set<std::string>& fileList)
+    -> std::string {
+    // Open the file
+    String content = read_virtual_file(filename);
+
+    // Check if we have any include statement in this file:
+    std::regex includeRegex(R"(#include\s+\"([^\"]+)\")");
+    std::smatch match;
+    std::string processedSource;
+    std::string::const_iterator searchStart(content.cbegin());
+
+    while (
+        std::regex_search(searchStart, content.cend(), match, includeRegex)) {
+        // Append content before #include statement
+        processedSource.append(searchStart, match.prefix().first);
+
+        // Extract include file path
+        std::string includePath = match[1].str();
+
+        // Recursively load the included file
+        std::string full_path = _shaderIncludeDir + "/" + includePath;
+
+        // Add this file to the set:
+        if (fileList.insert(full_path).second) {
+            // File effectively inserted because it was not already included
+            // before.
+            std::string includeContent = readShaderFile(full_path, fileList);
+
+            // Append included content
+            processedSource.append(includeContent);
+        }
+
+        // Move past the current match
+        searchStart = match.suffix().first;
+    }
+
+    // Append remaining source content after the last include
+    processedSource.append(searchStart, content.cend());
+
+    return processedSource;
+}
+
+auto DX12Engine::compileShaderSource(const std::string& source,
+                                     const std::string& hint,
+                                     const std::string& funcName,
+                                     const std::string& profile)
+    -> ComPtr<ID3DBlob> {
+    ComPtr<ID3DBlob> shaderBlob;
+    ComPtr<ID3DBlob> errorBlob;
+
+    UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+#ifdef _DEBUG
+    compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+    HRESULT hr =
+        D3DCompile(source.c_str(), source.length(), hint.c_str(), nullptr,
+                   nullptr, funcName.c_str(), profile.c_str(), compileFlags, 0,
+                   shaderBlob.GetAddressOf(), errorBlob.GetAddressOf());
+
+    if (FAILED(hr)) {
+        if (errorBlob) {
+            std::string errorMsg =
+                static_cast<const char*>(errorBlob->GetBufferPointer());
+            THROW_MSG("Shader compilation failed ({}): {}", hint, errorMsg);
+        }
+        THROW_MSG("Shader compilation failed ({}) with HRESULT: 0x{:X}", hint,
+                  static_cast<unsigned int>(hr));
+    }
+
+    return shaderBlob;
+}
+
+auto DX12Engine::createComputeShader(const std::string& source,
+                                     const std::string& hint,
+                                     const std::string& funcName,
+                                     const std::string& profile)
+    -> ComPtr<ID3DBlob> {
+    return compileShaderSource(source, hint, funcName, profile);
+}
+
+auto DX12Engine::createComputeRootSignature() -> ComPtr<ID3D12RootSignature> {
+    // Create a root signature with space for:
+    // - CBV (constant buffer)
+    // - SRV table (shader resource views)
+    // - UAV table (unordered access views)
+
+    D3D12_ROOT_PARAMETER rootParams[3] = {};
+
+    // CBV for constants
+    rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParams[0].Descriptor.ShaderRegister = 0;
+    rootParams[0].Descriptor.RegisterSpace = 0;
+    rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Descriptor table for SRVs
+    D3D12_DESCRIPTOR_RANGE srvRange = {};
+    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    srvRange.NumDescriptors = 8; // Support up to 8 SRVs
+    srvRange.BaseShaderRegister = 0;
+    srvRange.RegisterSpace = 0;
+    srvRange.OffsetInDescriptorsFromTableStart = 0;
+
+    rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+    rootParams[1].DescriptorTable.pDescriptorRanges = &srvRange;
+    rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Descriptor table for UAVs
+    D3D12_DESCRIPTOR_RANGE uavRange = {};
+    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    uavRange.NumDescriptors = 8; // Support up to 8 UAVs
+    uavRange.BaseShaderRegister = 0;
+    uavRange.RegisterSpace = 0;
+    uavRange.OffsetInDescriptorsFromTableStart = 0;
+
+    rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
+    rootParams[2].DescriptorTable.pDescriptorRanges = &uavRange;
+    rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+    rootSigDesc.NumParameters = 3;
+    rootSigDesc.pParameters = rootParams;
+    rootSigDesc.NumStaticSamplers = 0;
+    rootSigDesc.pStaticSamplers = nullptr;
+    rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    HRESULT hr = D3D12SerializeRootSignature(
+        &rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, signature.GetAddressOf(),
+        error.GetAddressOf());
+    if (FAILED(hr)) {
+        if (error) {
+            std::string errorMsg =
+                static_cast<const char*>(error->GetBufferPointer());
+            THROW_MSG("Root signature serialization failed: {}", errorMsg);
+        }
+        THROW_MSG("Root signature serialization failed with HRESULT: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    ComPtr<ID3D12RootSignature> rootSig;
+    hr = _device->CreateRootSignature(0, signature->GetBufferPointer(),
+                                      signature->GetBufferSize(),
+                                      IID_PPV_ARGS(rootSig.GetAddressOf()));
+
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create root signature: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    return rootSig;
+}
+
+auto DX12Engine::createComputePipelineState(ID3D12RootSignature* rootSig,
+                                            ID3DBlob* computeShader)
+    -> ComPtr<ID3D12PipelineState> {
+    D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.pRootSignature = rootSig;
+    psoDesc.CS = {computeShader->GetBufferPointer(),
+                  computeShader->GetBufferSize()};
+    psoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+    ComPtr<ID3D12PipelineState> pso;
+    HRESULT hr = _device->CreateComputePipelineState(
+        &psoDesc, IID_PPV_ARGS(pso.GetAddressOf()));
+
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create compute pipeline state: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    return pso;
+}
+
+auto DX12Engine::createComputeProgram(const std::string& filename)
+    -> DX12Program {
+    DX12Program prog;
+    prog.filename = filename;
+    prog.isCompute = true;
+
+    // Read shader file
+    std::unordered_set<std::string> fileList;
+    std::string fullPath = _shaderIncludeDir + "/" + filename;
+    fileList.insert(fullPath);
+    std::string source = readShaderFile(fullPath, fileList);
+
+    // Store file dependencies
+    prog.files = fileList;
+
+    // Compile compute shader
+    prog.computeShaderBlob =
+        createComputeShader(source, filename, "cs_main", "cs_5_0");
+
+    // Create root signature
+    prog.rootSignature = createComputeRootSignature();
+
+    // Create pipeline state
+    prog.pipelineState = createComputePipelineState(
+        prog.rootSignature.Get(), prog.computeShaderBlob.Get());
+
+    // Update time tracking
+    prog.lastUpdateTime = std::time(nullptr);
+    prog.lastCheckTime = prog.lastUpdateTime;
+
+    return prog;
+}
+
+void DX12Engine::setComputeProgram(const DX12Program& prog) {
+    if (!prog.isCompute) {
+        THROW_MSG("Attempting to set non-compute program as compute program");
+    }
+
+    _cmdList->SetPipelineState(prog.pipelineState.Get());
+    _cmdList->SetComputeRootSignature(prog.rootSignature.Get());
+}
+
+void DX12Engine::dispatch(U32 threadGroupCountX, U32 threadGroupCountY,
+                          U32 threadGroupCountZ) {
+    _cmdList->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+}
+
+auto DX12Engine::createStructuredBuffer(U32 elemSize, U32 numElems,
+                                        D3D12_RESOURCE_FLAGS flags)
+    -> ComPtr<ID3D12Resource> {
+    U32 bufferSize = elemSize * numElems;
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Width = bufferSize;
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Flags = flags;
+
+    ComPtr<ID3D12Resource> buffer;
+    HRESULT hr = _device->CreateCommittedResource(
+        &heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON, nullptr,
+        IID_PPV_ARGS(buffer.GetAddressOf()));
+
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create structured buffer: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    setCommonState(buffer.Get());
+
+    return buffer;
+}
+
+// auto DX12Engine::createReadbackBuffer(U32 size) -> ComPtr<ID3D12Resource> {
+//     D3D12_HEAP_PROPERTIES heapProps = {};
+//     heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+//     heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+//     heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+//     D3D12_RESOURCE_DESC resourceDesc = {};
+//     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+//     resourceDesc.Alignment = 0;
+//     resourceDesc.Width = size;
+//     resourceDesc.Height = 1;
+//     resourceDesc.DepthOrArraySize = 1;
+//     resourceDesc.MipLevels = 1;
+//     resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+//     resourceDesc.SampleDesc.Count = 1;
+//     resourceDesc.SampleDesc.Quality = 0;
+//     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+//     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+//     ComPtr<ID3D12Resource> buffer;
+//     HRESULT hr = _device->CreateCommittedResource(
+//         &heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc,
+//         D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+//         IID_PPV_ARGS(buffer.GetAddressOf()));
+
+//     if (FAILED(hr)) {
+//         THROW_MSG("Failed to create readback buffer: 0x{:X}",
+//                   static_cast<unsigned int>(hr));
+//     }
+
+//     setCopyDstState(buffer.Get());
+
+//     return buffer;
+// }
+
+auto DX12Engine::createDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                      U32 numDescriptors, bool shaderVisible)
+    -> ComPtr<ID3D12DescriptorHeap> {
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors = numDescriptors;
+    heapDesc.Type = type;
+    heapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
+                                   : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    ComPtr<ID3D12DescriptorHeap> heap;
+    HRESULT hr = _device->CreateDescriptorHeap(
+        &heapDesc, IID_PPV_ARGS(heap.GetAddressOf()));
+
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create descriptor heap: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    return heap;
+}
+
+void DX12Engine::createUnorderedAccessView(
+    ID3D12Resource* resource, D3D12_CPU_DESCRIPTOR_HANDLE destDescriptor,
+    U32 numElements, U32 structureByteStride) {
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    uavDesc.Buffer.FirstElement = 0;
+    uavDesc.Buffer.NumElements = numElements;
+    uavDesc.Buffer.StructureByteStride = structureByteStride;
+    uavDesc.Buffer.CounterOffsetInBytes = 0;
+    uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+    _device->CreateUnorderedAccessView(resource, nullptr, &uavDesc,
+                                       destDescriptor);
+}
+
+void DX12Engine::createShaderResourceView(
+    ID3D12Resource* resource, D3D12_CPU_DESCRIPTOR_HANDLE destDescriptor,
+    U32 numElements, U32 structureByteStride) {
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Buffer.FirstElement = 0;
+    srvDesc.Buffer.NumElements = numElements;
+    srvDesc.Buffer.StructureByteStride = structureByteStride;
+    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+    _device->CreateShaderResourceView(resource, &srvDesc, destDescriptor);
+}
+
+void DX12Engine::setShaderIncludeDir(const std::string& dir) {
+    _shaderIncludeDir = dir;
+}
+
+void DX12Engine::check_live_reload(DX12Program& prog) {
+    // Get the current time:
+    auto cur_time = std::time(nullptr);
+
+    // Check if we should check anything:
+    if ((cur_time - prog.lastCheckTime) < 1) {
+        // Do nothing.
+        return;
+    }
+
+    prog.lastCheckTime = cur_time;
+
+    // Iterate on all the files needed for this shader and check their time:
+    for (const auto& filename : prog.files) {
+        // Next we check if the file time changed:
+        auto currentFileTime = std::filesystem::last_write_time(filename);
+        auto systemTime =
+            std::chrono::clock_cast<std::chrono::system_clock>(currentFileTime);
+        auto fileTime = std::chrono::system_clock::to_time_t(systemTime);
+
+        if (fileTime > prog.lastUpdateTime) {
+            // We should try a live reload of this program:
+            logDEBUG("Reloading HLSL program from {}", prog.filename);
+
+            // Update the change/check times anyway:
+            if (!updateProgram(prog)) {
+                logDEBUG("ERROR: live reload failed for {}", prog.filename);
+            }
+
+            // Update the last update time in all cases.
+            prog.lastUpdateTime = fileTime;
+            break;
+        }
+    }
+}
+
+auto DX12Engine::updateProgram(DX12Program& prog) -> bool {
+    try {
+        // Read shader file
+        std::unordered_set<std::string> fileList;
+        std::string fullPath = _shaderIncludeDir + "/" + prog.filename;
+        fileList.insert(fullPath);
+        std::string source = readShaderFile(fullPath, fileList);
+
+        if (prog.isCompute) {
+            // Recompile compute shader
+            auto newComputeBlob =
+                createComputeShader(source, prog.filename, "cs_main", "cs_5_0");
+
+            // Create new pipeline state
+            auto newPSO = createComputePipelineState(prog.rootSignature.Get(),
+                                                     newComputeBlob.Get());
+
+            // Update program
+            prog.computeShaderBlob = newComputeBlob;
+            prog.pipelineState = newPSO;
+            prog.files = fileList;
+
+            return true;
+        }
+
+        THROW_MSG("No support for graphics reload yet.");
+
+        // Add graphics shader reload here if needed
+
+        return false;
+    } catch (const std::exception& e) {
+        logERROR("Failed to reload shader {}: {}", prog.filename, e.what());
+        return false;
+    }
+}
+
 } // namespace nv
 
 #endif

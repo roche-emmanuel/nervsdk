@@ -117,82 +117,63 @@ class DX12Engine {
     // Resource creation
     auto createVertexBuffer(const void* data, U32 size)
         -> ComPtr<ID3D12Resource>;
-#if 0
-    template <typename T>
-    auto createVertexBuffer(const std::vector<T>& elements) -> ID3D12Resource* {
-        return createVertexBuffer(elements.data(), sizeof(T) * elements.size());
-    }
 
-    auto createIndexBuffer(const void* data, U32 size) -> ID3D12Resource*;
+    // Shader compilation and program creation
+    auto readShaderFile(const std::string& filename,
+                        std::unordered_set<std::string>& fileList)
+        -> std::string;
 
-    template <typename T>
-    auto createIndexBuffer(const std::vector<T>& elements) -> ID3D12Resource* {
-        return createIndexBuffer(elements.data(), sizeof(T) * elements.size());
-    }
-
-    auto createConstantBuffer(U32 size) -> ID3D12Resource*;
-
-    template <typename T> auto createConstantBuffer() -> ID3D12Resource* {
-        return createConstantBuffer(sizeof(T));
-    }
-
-    auto createTexture2D(
-        U32 width, U32 height,
-        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-        DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM) -> ID3D12Resource*;
-
-    // Descriptor management
-    auto createDescriptorHeap(
-        D3D12_DESCRIPTOR_HEAP_TYPE type, U32 numDescriptors,
-        D3D12_DESCRIPTOR_HEAP_FLAGS flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE)
-        -> ID3D12DescriptorHeap*;
-
-    auto getCbvSrvUavDescriptorSize() -> U32 {
-        return _cbvSrvUavDescriptorSize;
-    }
-    auto getRtvDescriptorSize() -> U32 { return _rtvDescriptorSize; }
-    auto getDsvDescriptorSize() -> U32 { return _dsvDescriptorSize; }
-
-    // Shader/Pipeline management
-    auto createProgram(const std::string& filename,
-                       const DX12InputLayoutDesc& desc) -> Program;
-    auto createComputeProgram(const std::string& filename) -> Program;
-    void setProgram(const Program& prog);
-
-    // Command list management
-    void resetCommandList();
-    void executeCommandList();
-    void waitForGpu();
-
-    // Basic rendering setup
-    void setViewport(U32 width, U32 height);
-    void setVertexBuffer(ID3D12Resource* buffer, U32 stride, U32 slot = 0);
-    void setIndexBuffer(ID3D12Resource* buffer,
-                        DXGI_FORMAT fmt = DXGI_FORMAT_R32_UINT);
-    void setTriangleList();
-
-    // Render targets and depth
-    auto createDepthStencilView(U32 width, U32 height) -> ID3D12Resource*;
-    void setRenderTargets(D3D12_CPU_DESCRIPTOR_HANDLE* rtvHandles, U32 numRtvs,
-                          D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle = nullptr);
-
-    // Root signature creation
-    auto createRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
-        -> ID3D12RootSignature*;
-
-    // Shader compilation (similar to DX11)
     auto compileShaderSource(const std::string& source, const std::string& hint,
                              const std::string& funcName,
-                             const std::string& profile) -> ID3DBlob*;
-    auto
-    readShaderFile(const std::string& filename,
-                   std::unordered_set<std::string>& fileList) -> std::string;
+                             const std::string& profile) -> ComPtr<ID3DBlob>;
 
-    // Utility functions
-    void setShaderIncludeDir(const std::string& dir) {
-        _shaderIncludeDir = dir;
-    }
-#endif
+    auto createComputeShader(const std::string& source, const std::string& hint,
+                             const std::string& funcName = "cs_main",
+                             const std::string& profile = "cs_5_0")
+        -> ComPtr<ID3DBlob>;
+
+    auto createComputeProgram(const std::string& filename) -> DX12Program;
+
+    auto createComputeRootSignature() -> ComPtr<ID3D12RootSignature>;
+
+    auto createComputePipelineState(ID3D12RootSignature* rootSig,
+                                    ID3DBlob* computeShader)
+        -> ComPtr<ID3D12PipelineState>;
+
+    // Compute shader execution
+    void setComputeProgram(const DX12Program& prog);
+
+    void dispatch(U32 threadGroupCountX, U32 threadGroupCountY = 1,
+                  U32 threadGroupCountZ = 1);
+
+    // Shader hot-reload support
+    void check_live_reload(DX12Program& prog);
+
+    // Buffer creation for compute
+    auto createStructuredBuffer(
+        U32 elemSize, U32 numElems,
+        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
+        -> ComPtr<ID3D12Resource>;
+
+    // auto createReadbackBuffer(U32 size) -> ComPtr<ID3D12Resource>;
+
+    // Descriptor heap management
+    auto createDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
+                              U32 numDescriptors, bool shaderVisible = false)
+        -> ComPtr<ID3D12DescriptorHeap>;
+
+    // UAV creation
+    void createUnorderedAccessView(ID3D12Resource* resource,
+                                   D3D12_CPU_DESCRIPTOR_HANDLE destDescriptor,
+                                   U32 numElements, U32 structureByteStride);
+
+    // SRV creation
+    void createShaderResourceView(ID3D12Resource* resource,
+                                  D3D12_CPU_DESCRIPTOR_HANDLE destDescriptor,
+                                  U32 numElements, U32 structureByteStride);
+
+    // Set shader include directory
+    void setShaderIncludeDir(const std::string& dir);
 
   private:
     // Private constructor for singleton pattern
@@ -232,6 +213,7 @@ class DX12Engine {
     void createUploadBuffer(U32 size);
     void createReadbackBuffer(U32 size);
     auto getRequiredReadBufferSize(ID3D12Resource* tex) -> U32;
+    auto updateProgram(DX12Program& prog) -> bool;
 };
 
 } // namespace nv
