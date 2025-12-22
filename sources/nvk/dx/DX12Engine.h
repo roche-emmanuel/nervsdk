@@ -8,6 +8,26 @@ namespace nv {
 class DX12Engine;
 struct DX12Program;
 
+struct DX12RootSig {
+    void addRootCBV(U32 reg = 0, U32 space = 0,
+                    U32 visibility = D3D12_SHADER_VISIBILITY_ALL);
+    void addRootSRVs(U32 num = 8, U32 reg = 0, U32 space = 0,
+                     U32 visibility = D3D12_SHADER_VISIBILITY_ALL,
+                     U32 offset = 0);
+    void addRootUAVs(U32 num = 8, U32 reg = 0, U32 space = 0,
+                     U32 visibility = D3D12_SHADER_VISIBILITY_ALL,
+                     U32 offset = 0);
+    explicit DX12RootSig(DX12Engine& engine);
+
+    auto getSignature() -> ComPtr<ID3D12RootSignature>;
+
+  private:
+    DX12Engine& _eng;
+    Vector<D3D12_ROOT_PARAMETER> _rootParams;
+    Vector<std::unique_ptr<D3D12_DESCRIPTOR_RANGE>> _descRanges;
+    ComPtr<ID3D12RootSignature> _rootSignature;
+};
+
 struct CommandListContext {
     U32 index;
     ComPtr<ID3D12CommandAllocator> allocator;
@@ -88,30 +108,18 @@ struct DX12Program {
     DX12InputLayoutDesc inputDesc;
     std::string filename;
 
-    // Time tracking (same as DX11)
+    // Time tracking (same as DX11 )
     std::time_t lastCheckTime{0};
     std::time_t lastUpdateTime{0};
     std::unordered_set<std::string> files;
 
     bool isCompute{false};
-
-    void addRootCBV(U32 reg = 0, U32 space = 0,
-                    U32 visibility = D3D12_SHADER_VISIBILITY_ALL);
-    void addRootSRVs(U32 num = 8, U32 reg = 0, U32 space = 0,
-                     U32 visibility = D3D12_SHADER_VISIBILITY_ALL,
-                     U32 offset = 0);
-    void addRootUAVs(U32 num = 8, U32 reg = 0, U32 space = 0,
-                     U32 visibility = D3D12_SHADER_VISIBILITY_ALL,
-                     U32 offset = 0);
-
-  private:
-    Vector<D3D12_ROOT_PARAMETER> _rootParams;
-    Vector<std::unique_ptr<D3D12_DESCRIPTOR_RANGE>> _descRanges;
 };
 
 class DX12Engine {
   public:
     static auto instance(ID3D12Device* device = nullptr) -> DX12Engine&;
+    static void enableDebugLayer(bool enable);
 
     // Delete copy/move constructors and assignment operators
     DX12Engine(const DX12Engine&) = delete;
@@ -160,9 +168,8 @@ class DX12Engine {
                              const std::string& profile = "cs_5_0")
         -> ComPtr<ID3DBlob>;
 
-    auto createComputeProgram(const std::string& filename) -> DX12Program;
-
-    auto createComputeRootSignature() -> ComPtr<ID3D12RootSignature>;
+    auto createComputeProgram(const std::string& filename, DX12RootSig& sig)
+        -> DX12Program;
 
     auto createComputePipelineState(ID3D12RootSignature* rootSig,
                                     ID3DBlob* computeShader)
@@ -224,6 +231,10 @@ class DX12Engine {
 
     auto getCmdList(I32 idx = -1) -> CommandListContext&;
 
+    auto makeRootSig() -> DX12RootSig;
+
+    static auto createDevice() -> ComPtr<ID3D12Device>;
+
   private:
     // Private constructor for singleton pattern
     explicit DX12Engine(ID3D12Device* device);
@@ -260,7 +271,7 @@ class DX12Engine {
     void retireCommandList(U32 index);
 
     // Helper method to create device if none provided
-    void createDevice();
+
     void createCommandObjects();
     void createSyncObjects();
     void uploadToResource(ID3D12Resource* resource, const void* data, U32 size);

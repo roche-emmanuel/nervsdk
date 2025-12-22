@@ -20,6 +20,12 @@ using namespace DirectX;
 
 namespace nv {
 
+#ifdef _DEBUG
+static bool gDebugLayerEnabled = true;
+#else
+static bool gDebugLayerEnabled = true;
+#endif
+
 #if DX12_USE_INCLUDE_HANDLER
 class ShaderIncludeHandler : public ID3DInclude {
   public:
@@ -61,6 +67,8 @@ class ShaderIncludeHandler : public ID3DInclude {
 
 #endif
 
+void DX12Engine::enableDebugLayer(bool enable) { gDebugLayerEnabled = enable; }
+
 auto DX12Engine::instance(ID3D12Device* device) -> DX12Engine& {
     static std::unique_ptr<DX12Engine> singleton;
     if (singleton == nullptr) {
@@ -73,7 +81,7 @@ auto DX12Engine::instance(ID3D12Device* device) -> DX12Engine& {
 DX12Engine::DX12Engine(ID3D12Device* device) {
     if (device == nullptr) {
         logDEBUG("DX12Engine: allocating dedicated DX12 device.");
-        createDevice();
+        _device = createDevice();
     } else {
         logDEBUG("DX12Engine: using provided device.");
         _device = device;
@@ -89,21 +97,26 @@ DX12Engine::DX12Engine(ID3D12Device* device) {
     NVCHK(_fence != nullptr, "Cannot create DX12 fence.");
 }
 
-void DX12Engine::createDevice() {
+auto DX12Engine::createDevice() -> ComPtr<ID3D12Device> {
     // Enable debug layer in debug builds
-#if defined(_DEBUG)
-    logDEBUG("DX12Engine: Trying to enable debug controller...");
-    ComPtr<ID3D12Debug> debugController;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
-        logDEBUG("DX12Engine: Debug controller enabled.");
-        debugController->EnableDebugLayer();
+    if (gDebugLayerEnabled) {
+        logDEBUG("DX12Engine: Trying to enable debug controller...");
+        ComPtr<ID3D12Debug> debugController;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
+            logDEBUG("DX12Engine: Debug controller enabled.");
+            debugController->EnableDebugLayer();
+            // debug->SetEnableGPUBasedValidation(TRUE);
+        }
+    } else {
+        logDEBUG("DX12Engine: Debug layer disabled.");
     }
-#endif
 
     // Create DXGI factory
     ComPtr<IDXGIFactory4> factory;
     HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&factory));
     NVCHK(SUCCEEDED(hr), "Failed to create DXGI factory.");
+
+    ComPtr<ID3D12Device> device;
 
     // Try to create hardware device first
     ComPtr<IDXGIAdapter1> hardwareAdapter;
@@ -122,21 +135,66 @@ void DX12Engine::createDevice() {
         // Try to create device with this adapter
         if (SUCCEEDED(D3D12CreateDevice(hardwareAdapter.Get(),
                                         D3D_FEATURE_LEVEL_12_0,
-                                        IID_PPV_ARGS(&_device)))) {
+                                        IID_PPV_ARGS(device.GetAddressOf())))) {
             break;
         }
     }
 
     // Fallback to WARP device if hardware creation failed
-    if (_device == nullptr) {
+
+    if (device == nullptr) {
         ComPtr<IDXGIAdapter> warpAdapter;
         hr = factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
         NVCHK(SUCCEEDED(hr), "Failed to get WARP adapter.");
 
         hr = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_12_0,
-                               IID_PPV_ARGS(&_device));
+                               IID_PPV_ARGS(device.GetAddressOf()));
         NVCHK(SUCCEEDED(hr), "Failed to create DX12 device with WARP.");
     }
+
+    if (gDebugLayerEnabled) {
+
+        // Configure info queue to break on errors/warnings and print to
+        // console
+        ComPtr<ID3D12InfoQueue1> infoQueue;
+        if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+            // Break on severe issues
+            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION,
+                                          TRUE);
+            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+            // Optional: break on warnings too
+            // infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING,
+            // TRUE);
+
+            // Enable callback to print messages to console
+            DWORD callbackCookie;
+            infoQueue->RegisterMessageCallback(
+                [](D3D12_MESSAGE_CATEGORY Category,
+                   D3D12_MESSAGE_SEVERITY Severity, D3D12_MESSAGE_ID ID,
+                   LPCSTR pDescription, void* pContext) {
+                    switch (Severity) {
+                    case D3D12_MESSAGE_SEVERITY_CORRUPTION:
+                        logERROR("[D3D12 CORRUPTION] {}", pDescription);
+                        break;
+                    case D3D12_MESSAGE_SEVERITY_ERROR:
+                        logERROR("[D3D12 ERROR] {}", pDescription);
+                        break;
+                    // case D3D12_MESSAGE_SEVERITY_WARNING:
+                    //     logINFO("[D3D12 WARNING] {}", pDescription);
+                    //     break;
+                    case D3D12_MESSAGE_SEVERITY_INFO:
+                        logINFO("[D3D12 INFO] {}", pDescription);
+                        break;
+                    default:
+                        // logNOTE("[D3D12 INFO] {}", pDescription);
+                        break;
+                    };
+                },
+                D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &callbackCookie);
+        }
+    }
+
+    return device;
 }
 
 void DX12Engine::createCommandObjects() {
@@ -676,81 +734,6 @@ auto DX12Engine::createComputeShader(const std::string& source,
     return compileShaderSource(source, hint, funcName, profile);
 }
 
-auto DX12Engine::createComputeRootSignature() -> ComPtr<ID3D12RootSignature> {
-    // Create a root signature with space for:
-    // - CBV (constant buffer)
-    // - SRV table (shader resource views)
-    // - UAV table (unordered access views)
-
-    D3D12_ROOT_PARAMETER rootParams[3] = {};
-
-    // CBV for constants
-    rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    rootParams[0].Descriptor.ShaderRegister = 0;
-    rootParams[0].Descriptor.RegisterSpace = 0;
-    rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    // Descriptor table for SRVs
-    D3D12_DESCRIPTOR_RANGE srvRange = {};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 8; // Support up to 8 SRVs
-    srvRange.BaseShaderRegister = 0;
-    srvRange.RegisterSpace = 0;
-    srvRange.OffsetInDescriptorsFromTableStart = 0;
-
-    rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-    rootParams[1].DescriptorTable.pDescriptorRanges = &srvRange;
-    rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    // Descriptor table for UAVs
-    D3D12_DESCRIPTOR_RANGE uavRange = {};
-    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-    uavRange.NumDescriptors = 8; // Support up to 8 UAVs
-    uavRange.BaseShaderRegister = 0;
-    uavRange.RegisterSpace = 0;
-    uavRange.OffsetInDescriptorsFromTableStart = 0;
-
-    rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
-    rootParams[2].DescriptorTable.pDescriptorRanges = &uavRange;
-    rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-    rootSigDesc.NumParameters = 3;
-    rootSigDesc.pParameters = rootParams;
-    rootSigDesc.NumStaticSamplers = 0;
-    rootSigDesc.pStaticSamplers = nullptr;
-    rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-    ComPtr<ID3DBlob> signature;
-    ComPtr<ID3DBlob> error;
-    HRESULT hr = D3D12SerializeRootSignature(
-        &rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, signature.GetAddressOf(),
-        error.GetAddressOf());
-    if (FAILED(hr)) {
-        if (error) {
-            std::string errorMsg =
-                static_cast<const char*>(error->GetBufferPointer());
-            THROW_MSG("Root signature serialization failed: {}", errorMsg);
-        }
-        THROW_MSG("Root signature serialization failed with HRESULT: 0x{:X}",
-                  static_cast<unsigned int>(hr));
-    }
-
-    ComPtr<ID3D12RootSignature> rootSig;
-    hr = _device->CreateRootSignature(0, signature->GetBufferPointer(),
-                                      signature->GetBufferSize(),
-                                      IID_PPV_ARGS(rootSig.GetAddressOf()));
-
-    if (FAILED(hr)) {
-        THROW_MSG("Failed to create root signature: 0x{:X}",
-                  static_cast<unsigned int>(hr));
-    }
-
-    return rootSig;
-}
-
 auto DX12Engine::createComputePipelineState(ID3D12RootSignature* rootSig,
                                             ID3DBlob* computeShader)
     -> ComPtr<ID3D12PipelineState> {
@@ -772,8 +755,8 @@ auto DX12Engine::createComputePipelineState(ID3D12RootSignature* rootSig,
     return pso;
 }
 
-auto DX12Engine::createComputeProgram(const std::string& filename)
-    -> DX12Program {
+auto DX12Engine::createComputeProgram(const std::string& filename,
+                                      DX12RootSig& sig) -> DX12Program {
     DX12Program prog;
     prog.filename = filename;
     prog.isCompute = true;
@@ -792,7 +775,7 @@ auto DX12Engine::createComputeProgram(const std::string& filename)
         createComputeShader(source, filename, "cs_main", "cs_5_0");
 
     // Create root signature
-    prog.rootSignature = createComputeRootSignature();
+    prog.rootSignature = sig.getSignature();
 
     // Create pipeline state
     prog.pipelineState = createComputePipelineState(
@@ -1202,7 +1185,11 @@ auto DX12Engine::beginCmdList() -> CommandListContext& {
     return ctx;
 }
 
-void DX12Program::addRootCBV(U32 reg, U32 space, U32 visibility) {
+void DX12RootSig::addRootCBV(U32 reg, U32 space, U32 visibility) {
+    if (_rootSignature != nullptr) {
+        logWARN("Resetting root signature.");
+        _rootSignature = nullptr;
+    }
     D3D12_ROOT_PARAMETER param{};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     param.Descriptor.ShaderRegister = reg;
@@ -1211,7 +1198,7 @@ void DX12Program::addRootCBV(U32 reg, U32 space, U32 visibility) {
     _rootParams.emplace_back(param);
 }
 
-void DX12Program::addRootSRVs(U32 num, U32 reg, U32 space, U32 visibility,
+void DX12RootSig::addRootSRVs(U32 num, U32 reg, U32 space, U32 visibility,
                               U32 offset) {
     auto* ptr =
         _descRanges.emplace_back(std::make_unique<D3D12_DESCRIPTOR_RANGE>())
@@ -1232,7 +1219,7 @@ void DX12Program::addRootSRVs(U32 num, U32 reg, U32 space, U32 visibility,
     _rootParams.emplace_back(param);
 };
 
-void DX12Program::addRootUAVs(U32 num, U32 reg, U32 space, U32 visibility,
+void DX12RootSig::addRootUAVs(U32 num, U32 reg, U32 space, U32 visibility,
                               U32 offset) {
     auto* ptr =
         _descRanges.emplace_back(std::make_unique<D3D12_DESCRIPTOR_RANGE>())
@@ -1253,6 +1240,49 @@ void DX12Program::addRootUAVs(U32 num, U32 reg, U32 space, U32 visibility,
     _rootParams.emplace_back(param);
 };
 
+auto DX12RootSig::getSignature() -> ComPtr<ID3D12RootSignature> {
+    if (_rootSignature != nullptr) {
+        return _rootSignature;
+    }
+
+    NVCHK(!_rootParams.empty(), "No root parameter description provided.");
+    D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+    rootSigDesc.NumParameters = _rootParams.size();
+    rootSigDesc.pParameters = _rootParams.data();
+    rootSigDesc.NumStaticSamplers = 0;
+    rootSigDesc.pStaticSamplers = nullptr;
+    rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    HRESULT hr = D3D12SerializeRootSignature(
+        &rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, signature.GetAddressOf(),
+        error.GetAddressOf());
+    if (FAILED(hr)) {
+        if (error != nullptr) {
+            std::string errorMsg =
+                static_cast<const char*>(error->GetBufferPointer());
+            THROW_MSG("Root signature serialization failed: {}", errorMsg);
+        }
+        THROW_MSG("Root signature serialization failed with HRESULT: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    ComPtr<ID3D12RootSignature> rootSig;
+    hr = _eng.device()->CreateRootSignature(
+        0, signature->GetBufferPointer(), signature->GetBufferSize(),
+        IID_PPV_ARGS(rootSig.GetAddressOf()));
+
+    if (FAILED(hr)) {
+        THROW_MSG("Failed to create root signature: 0x{:X}",
+                  static_cast<unsigned int>(hr));
+    }
+
+    return rootSig;
+}
+
+DX12RootSig::DX12RootSig(DX12Engine& engine) : _eng(engine) {};
+auto DX12Engine::makeRootSig() -> DX12RootSig { return DX12RootSig{*this}; }
 } // namespace nv
 
 #endif
