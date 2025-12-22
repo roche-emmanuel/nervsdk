@@ -94,6 +94,19 @@ struct DX12Program {
     std::unordered_set<std::string> files;
 
     bool isCompute{false};
+
+    void addRootCBV(U32 reg = 0, U32 space = 0,
+                    U32 visibility = D3D12_SHADER_VISIBILITY_ALL);
+    void addRootSRVs(U32 num = 8, U32 reg = 0, U32 space = 0,
+                     U32 visibility = D3D12_SHADER_VISIBILITY_ALL,
+                     U32 offset = 0);
+    void addRootUAVs(U32 num = 8, U32 reg = 0, U32 space = 0,
+                     U32 visibility = D3D12_SHADER_VISIBILITY_ALL,
+                     U32 offset = 0);
+
+  private:
+    Vector<D3D12_ROOT_PARAMETER> _rootParams;
+    Vector<std::unique_ptr<D3D12_DESCRIPTOR_RANGE>> _descRanges;
 };
 
 class DX12Engine {

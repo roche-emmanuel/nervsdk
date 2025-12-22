@@ -1202,6 +1202,57 @@ auto DX12Engine::beginCmdList() -> CommandListContext& {
     return ctx;
 }
 
+void DX12Program::addRootCBV(U32 reg, U32 space, U32 visibility) {
+    D3D12_ROOT_PARAMETER param{};
+    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    param.Descriptor.ShaderRegister = reg;
+    param.Descriptor.RegisterSpace = space;
+    param.ShaderVisibility = (D3D12_SHADER_VISIBILITY)visibility;
+    _rootParams.emplace_back(param);
+}
+
+void DX12Program::addRootSRVs(U32 num, U32 reg, U32 space, U32 visibility,
+                              U32 offset) {
+    auto* ptr =
+        _descRanges.emplace_back(std::make_unique<D3D12_DESCRIPTOR_RANGE>())
+            .get();
+
+    ptr->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    ptr->NumDescriptors = num;
+    ptr->BaseShaderRegister = reg;
+    ptr->RegisterSpace = space;
+    ptr->OffsetInDescriptorsFromTableStart = offset;
+
+    D3D12_ROOT_PARAMETER param{};
+
+    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    param.DescriptorTable.NumDescriptorRanges = 1;
+    param.DescriptorTable.pDescriptorRanges = ptr;
+    param.ShaderVisibility = (D3D12_SHADER_VISIBILITY)visibility;
+    _rootParams.emplace_back(param);
+};
+
+void DX12Program::addRootUAVs(U32 num, U32 reg, U32 space, U32 visibility,
+                              U32 offset) {
+    auto* ptr =
+        _descRanges.emplace_back(std::make_unique<D3D12_DESCRIPTOR_RANGE>())
+            .get();
+
+    ptr->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    ptr->NumDescriptors = num;
+    ptr->BaseShaderRegister = reg;
+    ptr->RegisterSpace = space;
+    ptr->OffsetInDescriptorsFromTableStart = offset;
+
+    D3D12_ROOT_PARAMETER param{};
+
+    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    param.DescriptorTable.NumDescriptorRanges = 1;
+    param.DescriptorTable.pDescriptorRanges = ptr;
+    param.ShaderVisibility = (D3D12_SHADER_VISIBILITY)visibility;
+    _rootParams.emplace_back(param);
+};
+
 } // namespace nv
 
 #endif
