@@ -235,6 +235,12 @@ class DX12Engine {
 
     static auto createDevice() -> ComPtr<ID3D12Device>;
 
+    // Upload data to buffer
+    void writeBuffer(ID3D12Resource* buffer, const void* data, U32 size);
+
+    // read from buffer
+    void readBuffer(ID3D12Resource* readbackBuffer, void* destData, U32 size);
+
   private:
     // Private constructor for singleton pattern
     explicit DX12Engine(ID3D12Device* device);

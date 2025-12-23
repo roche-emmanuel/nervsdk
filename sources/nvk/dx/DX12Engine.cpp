@@ -1283,6 +1283,52 @@ auto DX12RootSig::getSignature() -> ComPtr<ID3D12RootSignature> {
 
 DX12RootSig::DX12RootSig(DX12Engine& engine) : _eng(engine) {};
 auto DX12Engine::makeRootSig() -> DX12RootSig { return DX12RootSig{*this}; }
+
+void DX12Engine::writeBuffer(ID3D12Resource* buffer, const void* data,
+                             U32 size) {
+    // Ensure upload buffer is large enough
+    if (_uploadBufferSize < size) {
+        createUploadBuffer(size);
+    }
+
+    // Copy data to upload buffer
+    void* mappedData = nullptr;
+    D3D12_RANGE readRange = {0, 0}; // We don't intend to read from this buffer
+    _uploadBuffer->Map(0, &readRange, &mappedData);
+    memcpy(mappedData, data, size);
+    _uploadBuffer->Unmap(0, nullptr);
+
+    // Create command list for copy
+    auto& ctx = beginCmdList();
+
+    // Transition buffer to copy destination
+    ctx.addCopyDstTransition(buffer);
+
+    // Copy from upload buffer to destination buffer
+    ctx.cmdList->CopyBufferRegion(buffer, 0, _uploadBuffer.Get(), 0, size);
+
+    // Transition buffer to common state (or appropriate state for reading)
+    ctx.addCommonTransition(buffer);
+
+    executeCommands(ctx);
+}
+
+void DX12Engine::readBuffer(ID3D12Resource* readbackBuffer, void* destData,
+                            U32 size) {
+    void* mappedData = nullptr;
+    D3D12_RANGE readRange = {0, size};
+
+    HRESULT hr = readbackBuffer->Map(0, &readRange, &mappedData);
+    if (FAILED(hr)) {
+        throw std::runtime_error("Failed to map readback buffer");
+    }
+
+    memcpy(destData, mappedData, size);
+
+    D3D12_RANGE writeRange = {0, 0}; // We didn't write anything
+    readbackBuffer->Unmap(0, &writeRange);
+}
+
 } // namespace nv
 
 #endif
