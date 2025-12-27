@@ -275,7 +275,7 @@ auto DX12Engine::createVertexBuffer(const void* data, U32 size)
     NVCHK(SUCCEEDED(hr), "Failed to create vertex buffer.");
 
     // Upload data
-    uploadToResource(vertexBuffer.Get(), data, size);
+    writeBuffer(vertexBuffer.Get(), data, size);
 
     // Transition to vertex buffer state
     D3D12_RESOURCE_BARRIER barrier = {};
@@ -290,60 +290,6 @@ auto DX12Engine::createVertexBuffer(const void* data, U32 size)
     executeCommands(ctx);
 
     return vertexBuffer;
-}
-
-void DX12Engine::createUploadBuffer(U32 size) {
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-    logDEBUG("Allocating upload buffer of size {}", size);
-
-    D3D12_RESOURCE_DESC bufferDesc = {};
-    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    bufferDesc.Width = size;
-    bufferDesc.Height = 1;
-    bufferDesc.DepthOrArraySize = 1;
-    bufferDesc.MipLevels = 1;
-    bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
-    bufferDesc.SampleDesc.Count = 1;
-    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    HRESULT hr = _device->CreateCommittedResource(
-        &heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-        IID_PPV_ARGS(&_uploadBuffer));
-    NVCHK(SUCCEEDED(hr), "Failed to create upload buffer.");
-
-    _uploadBufferSize = size;
-    _uploadBufferOffset = 0;
-}
-
-void DX12Engine::uploadToResource(ID3D12Resource* resource, const void* data,
-                                  U32 size) {
-    if (_uploadBufferSize < size) {
-        createUploadBuffer(size * 3);
-    }
-
-    // Map upload buffer
-    void* mappedData = nullptr;
-    D3D12_RANGE readRange = {0, 0};
-    HRESULT hr = _uploadBuffer->Map(0, &readRange, &mappedData);
-    NVCHK(SUCCEEDED(hr), "Failed to map upload buffer.");
-
-    // Copy data
-    memcpy(static_cast<char*>(mappedData) + _uploadBufferOffset, data, size);
-    _uploadBuffer->Unmap(0, nullptr);
-
-    // Copy from upload buffer to resource
-    auto& ctx = beginCmdList();
-    ctx.cmdList->CopyBufferRegion(resource, 0, _uploadBuffer.Get(),
-                                  _uploadBufferOffset, size);
-    executeCommands(ctx);
-
-    // Update offset (simple linear allocator)
-    _uploadBufferOffset += (size + 255) & ~255; // Align to 256 bytes
-    if (_uploadBufferOffset + size > _uploadBufferSize) {
-        _uploadBufferOffset = 0; // Reset (simple wraparound)
-    }
 }
 
 void DX12Engine::printGPUInfos() {
@@ -1286,17 +1232,14 @@ auto DX12Engine::makeRootSig() -> DX12RootSig { return DX12RootSig{*this}; }
 
 void DX12Engine::writeBuffer(ID3D12Resource* buffer, const void* data,
                              U32 size) {
-    // Ensure upload buffer is large enough
-    if (_uploadBufferSize < size) {
-        createUploadBuffer(size);
-    }
+    auto& buf = getUploadBuffer(size);
 
     // Copy data to upload buffer
     void* mappedData = nullptr;
     D3D12_RANGE readRange = {0, 0}; // We don't intend to read from this buffer
-    _uploadBuffer->Map(0, &readRange, &mappedData);
+    buf.buffer->Map(0, &readRange, &mappedData);
     memcpy(mappedData, data, size);
-    _uploadBuffer->Unmap(0, nullptr);
+    buf.buffer->Unmap(0, nullptr);
 
     // Create command list for copy
     auto& ctx = beginCmdList();
@@ -1305,12 +1248,17 @@ void DX12Engine::writeBuffer(ID3D12Resource* buffer, const void* data,
     ctx.addCopyDstTransition(buffer);
 
     // Copy from upload buffer to destination buffer
-    ctx.cmdList->CopyBufferRegion(buffer, 0, _uploadBuffer.Get(), 0, size);
+    ctx.cmdList->CopyBufferRegion(buffer, 0, buf.buffer.Get(), 0, size);
 
     // Transition buffer to common state (or appropriate state for reading)
     ctx.addCommonTransition(buffer);
 
     executeCommands(ctx);
+
+    buf.fenceValue = _fenceValue;
+
+    // Mark the upload buffer as not in use anymore:
+    buf.inUse = false;
 }
 
 void DX12Engine::readBuffer(ID3D12Resource* readbackBuffer, void* destData,
@@ -1328,6 +1276,51 @@ void DX12Engine::readBuffer(ID3D12Resource* readbackBuffer, void* destData,
     D3D12_RANGE writeRange = {0, 0}; // We didn't write anything
     readbackBuffer->Unmap(0, &writeRange);
 }
+
+auto DX12Engine::getUploadBuffer(U32 requiredSize) -> UploadBuffer& {
+    U64 completedFenceValue = _fence->GetCompletedValue();
+
+    // First, try to find an existing buffer that's large enough and not in use
+    for (auto& ub : _uploadBufferPool) {
+        // Check if this buffer's GPU work has completed
+        if (!ub.inUse && ub.fenceValue <= completedFenceValue &&
+            ub.size >= requiredSize) {
+            ub.inUse = true;
+            return ub;
+        }
+    }
+
+    // No suitable buffer found, create a new one
+    U32 bufferSize = std::max(requiredSize, _minUploadBufferSize);
+
+    UploadBuffer newBuffer;
+    newBuffer.size = bufferSize;
+    newBuffer.inUse = true;
+    newBuffer.fenceValue = _fence->GetCompletedValue();
+
+    D3D12_HEAP_PROPERTIES uploadHeapProps = {};
+    uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC bufferDesc = {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = bufferSize;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    HRESULT hr = _device->CreateCommittedResource(
+        &uploadHeapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(newBuffer.buffer.GetAddressOf()));
+
+    NVCHK(SUCCEEDED(hr), "Failed to create upload buffer");
+
+    _uploadBufferPool.push_back(std::move(newBuffer));
+    return _uploadBufferPool.back();
+};
 
 } // namespace nv
 

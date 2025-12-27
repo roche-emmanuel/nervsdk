@@ -121,6 +121,13 @@ class DX12Engine {
     static auto instance(ID3D12Device* device = nullptr) -> DX12Engine&;
     static void enableDebugLayer(bool enable);
 
+    struct UploadBuffer {
+        ComPtr<ID3D12Resource> buffer;
+        U32 size;
+        U64 fenceValue{0};
+        bool inUse{false};
+    };
+
     // Delete copy/move constructors and assignment operators
     DX12Engine(const DX12Engine&) = delete;
     auto operator=(const DX12Engine&) -> DX12Engine& = delete;
@@ -258,10 +265,13 @@ class DX12Engine {
     HANDLE _fenceEvent;
     UINT64 _fenceValue{0};
 
+    Vector<UploadBuffer> _uploadBufferPool;
+    U32 _minUploadBufferSize = 1024 * 1024; // 1MB minimum
+
     // Upload heap for resource initialization
-    ComPtr<ID3D12Resource> _uploadBuffer;
-    U32 _uploadBufferSize{0};
-    U32 _uploadBufferOffset{0};
+    // ComPtr<ID3D12Resource> _uploadBuffer;
+    // U32 _uploadBufferSize{0};
+    // U32 _uploadBufferOffset{0};
 
     ComPtr<ID3D12Resource> _readbackBuffer;
     U64 _readbackBufferSize{0};
@@ -280,9 +290,9 @@ class DX12Engine {
 
     void createCommandObjects();
     void createSyncObjects();
-    void uploadToResource(ID3D12Resource* resource, const void* data, U32 size);
-    void createUploadBuffer(U32 size);
     auto updateProgram(DX12Program& prog) -> bool;
+
+    auto getUploadBuffer(U32 requiredSize) -> UploadBuffer&;
 };
 
 } // namespace nv
