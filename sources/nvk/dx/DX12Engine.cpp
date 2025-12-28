@@ -69,16 +69,17 @@ class ShaderIncludeHandler : public ID3DInclude {
 
 void DX12Engine::enableDebugLayer(bool enable) { gDebugLayerEnabled = enable; }
 
-auto DX12Engine::instance(ID3D12Device* device) -> DX12Engine& {
+auto DX12Engine::instance(ID3D12Device* device, ID3D12CommandQueue* queue)
+    -> DX12Engine& {
     static std::unique_ptr<DX12Engine> singleton;
     if (singleton == nullptr) {
         logDEBUG("Creating DX12Engine.");
-        singleton.reset(new DX12Engine(device));
+        singleton.reset(new DX12Engine(device, queue));
     }
     return *singleton;
 }
 
-DX12Engine::DX12Engine(ID3D12Device* device) {
+DX12Engine::DX12Engine(ID3D12Device* device, ID3D12CommandQueue* queue) {
     if (device == nullptr) {
         logDEBUG("DX12Engine: allocating dedicated DX12 device.");
         _device = createDevice();
@@ -90,7 +91,11 @@ DX12Engine::DX12Engine(ID3D12Device* device) {
     NVCHK(_device != nullptr, "Cannot create DX12 device.");
 
     // Create command objects
-    createCommandObjects();
+    if (queue != nullptr) {
+        _cmdQueue = queue;
+    } else {
+        createCommandQueue();
+    }
     createSyncObjects();
 
     NVCHK(_cmdQueue != nullptr, "Cannot create DX12 command queue.");
@@ -197,7 +202,9 @@ auto DX12Engine::createDevice() -> ComPtr<ID3D12Device> {
     return device;
 }
 
-void DX12Engine::createCommandObjects() {
+void DX12Engine::createCommandQueue() {
+    NVCHK(_cmdQueue == nullptr, "Command queue already created.");
+
     // Create command queue
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -1320,6 +1327,30 @@ auto DX12Engine::getUploadBuffer(U32 requiredSize) -> UploadBuffer& {
 
     _uploadBufferPool.push_back(std::move(newBuffer));
     return _uploadBufferPool.back();
+};
+
+auto DX12Engine::get(ID3D12Device* device, ID3D12CommandQueue* queue)
+    -> DX12Engine& {
+    // Check if the device is the one used for the instance:
+    auto& inst = instance(device, queue);
+    if (inst.device() == device) {
+        return inst;
+    }
+
+    // Otherwise check the auxiliary engines:
+    static std::unordered_map<ID3D12Device*, std::unique_ptr<DX12Engine>>
+        engineMap;
+
+    auto it = engineMap.find(device);
+    if (it != engineMap.end()) {
+        return *it->second;
+    }
+
+    // Create a new device:
+    auto res =
+        engineMap.insert(std::make_pair(device, new DX12Engine(device, queue)));
+    NVCHK(res.second, "Could not insert new dx11 engine.");
+    return *res.first->second;
 };
 
 } // namespace nv

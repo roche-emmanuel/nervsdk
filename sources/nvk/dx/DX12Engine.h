@@ -118,7 +118,8 @@ struct DX12Program {
 
 class DX12Engine {
   public:
-    static auto instance(ID3D12Device* device = nullptr) -> DX12Engine&;
+    static auto instance(ID3D12Device* device = nullptr,
+                         ID3D12CommandQueue* queue = nullptr) -> DX12Engine&;
     static void enableDebugLayer(bool enable);
 
     struct UploadBuffer {
@@ -133,6 +134,9 @@ class DX12Engine {
     auto operator=(const DX12Engine&) -> DX12Engine& = delete;
     DX12Engine(DX12Engine&&) = delete;
     auto operator=(DX12Engine&&) -> DX12Engine& = delete;
+
+    static auto get(ID3D12Device* device = nullptr,
+                    ID3D12CommandQueue* queue = nullptr) -> DX12Engine&;
 
     auto device() const -> ID3D12Device* { return _device.Get(); }
     auto cmdQueue() const -> ID3D12CommandQueue* { return _cmdQueue.Get(); }
@@ -250,7 +254,7 @@ class DX12Engine {
 
   private:
     // Private constructor for singleton pattern
-    explicit DX12Engine(ID3D12Device* device);
+    explicit DX12Engine(ID3D12Device* device, ID3D12CommandQueue* queue);
 
     // Core DX12 objects
     ComPtr<ID3D12Device> _device;
@@ -288,7 +292,7 @@ class DX12Engine {
 
     // Helper method to create device if none provided
 
-    void createCommandObjects();
+    void createCommandQueue();
     void createSyncObjects();
     auto updateProgram(DX12Program& prog) -> bool;
 
