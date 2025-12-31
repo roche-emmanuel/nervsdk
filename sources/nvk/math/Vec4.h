@@ -373,6 +373,18 @@ inline auto componentDivide(const Vec4<T>& lhs, const Vec4<T>& rhs) -> Vec4<T> {
 }
 
 template <typename T>
+inline auto componentMax(const Vec4<T>& lhs, const Vec4<T>& rhs) -> Vec4<T> {
+    return {std::max(lhs[0], rhs[0]), std::max(lhs[1], rhs[1]),
+            std::max(lhs[2], rhs[2]), std::max(lhs[3], rhs[3])};
+}
+
+template <typename T>
+inline auto componentMin(const Vec4<T>& lhs, const Vec4<T>& rhs) -> Vec4<T> {
+    return {std::min(lhs[0], rhs[0]), std::min(lhs[1], rhs[1]),
+            std::min(lhs[2], rhs[2]), std::min(lhs[3], rhs[3])};
+}
+
+template <typename T>
 inline auto mix(const Vec4<T>& lhs, const Vec4<T>& rhs, T alpha) -> Vec4<T> {
     return lhs * (1.0 - alpha) + rhs * alpha;
 }
