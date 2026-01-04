@@ -126,6 +126,11 @@ auto remove_vector_element(Vector<RefPtr<T>>& vec, T* val) -> bool {
     return false;
 }
 
+template <typename T>
+auto vector_contains(const Vector<T>& vec, const T& val) -> bool {
+    return std::find(vec.begin(), vec.end(), val) != vec.end();
+}
+
 #if !NV_USE_STD_MEMORY
 template <typename T>
 auto remove_vector_element(std::vector<RefPtr<T>>& vec, T* val) -> bool {
