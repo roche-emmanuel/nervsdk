@@ -1,3 +1,5 @@
+#ifdef _WIN32
+
 #include <nvk/network/IPCHandler.h>
 
 namespace nv {
@@ -400,3 +402,5 @@ void IPCClient::cleanup_connection() {
 }
 
 } // namespace nv
+
+#endif
