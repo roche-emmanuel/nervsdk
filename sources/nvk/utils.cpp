@@ -2,7 +2,9 @@
 #include <nvk/resource/ResourceManager.h>
 #include <nvk/utils.h>
 
+#include <external/RTree.h>
 #include <yaml-cpp/yaml.h>
+
 
 namespace YAML {
 #if !NV_USE_STD_MEMORY

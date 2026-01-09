@@ -4,6 +4,12 @@
 // NOTE This file compiles under MSVC 6 SP5 and MSVC .Net 2003 it may not work on other compilers without modification.
 
 // NOTE These next few lines may be win32 specific, you may need to modify them to compile on other platform
+
+// [emro] **Update from 09/01/2026**: updating this code to compile with MSVC
+// 2022.
+// => we use std::numbers::pi and std::numbers::e below
+
+#include <numbers>
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
@@ -499,8 +505,8 @@ RTREE_QUAL::RTree()
   } else {
     // Stirling's approximation, applicable to high dimensions
     // https://en.wikipedia.org/wiki/Volume_of_an_n-ball#Approximation_for_high_dimensions
-    m_unitSphereVolume = (ELEMTYPEREAL)(1.0 / std::sqrt(NUMDIMS * M_PI) *
-                                        std::pow(2 * M_PI * M_E / NUMDIMS, NUMDIMS / 2.0));
+    m_unitSphereVolume = (ELEMTYPEREAL)(1.0 / std::sqrt(NUMDIMS * std::numbers::pi) *
+                                        std::pow(2 * std::numbers::pi * std::numbers::e / NUMDIMS, NUMDIMS / 2.0));
   }
 }
 
