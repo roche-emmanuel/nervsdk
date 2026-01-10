@@ -3,15 +3,6 @@
 
 namespace nv {
 
-auto seg2d_point_distance(const Vec2f& a, const Vec2f& b, const Vec2f& pt)
-    -> F32 {
-    Vec2f ab = b - a;
-    F32 t = (pt - a).dot(ab) / ab.dot(ab);
-    t = std::clamp(t, 0.0F, 1.0F);
-    Vec2f proj = a + ab * t;
-    return (pt - proj).length();
-}
-
 using SegmentTreef = RTree<const Segment2f*, F32, 2>;
 
 struct IndexedSegments {

@@ -5,6 +5,56 @@
 
 namespace nv {
 
+template <typename T>
+auto seg2_intersect(const Vec2<T>& seg0_a, const Vec2<T>& seg0_b,
+                    const Vec2<T>& seg1_a, const Vec2<T>& seg1_b,
+                    Vec2<T>& intersecPt) -> bool {
+    // Direction vectors
+    const T d0x = seg0_b.x() - seg0_a.x();
+    const T d0y = seg0_b.y() - seg0_a.y();
+    const T d1x = seg1_b.x() - seg1_a.x();
+    const T d1y = seg1_b.y() - seg1_a.y();
+
+    // Cross product of direction vectors (determinant)
+    const T det = d0x * d1y - d0y * d1x;
+
+    // Parallel or collinear segments (no unique intersection)
+    constexpr T epsilon = 1e-10;
+    if (std::abs(det) < epsilon) {
+        return false;
+    }
+
+    // Vector from seg0_a to seg1_a
+    const T dx = seg1_a.x() - seg0_a.x();
+    const T dy = seg1_a.y() - seg0_a.y();
+
+    // Compute parametric coefficients
+    const T inv_det = 1.0 / det;
+    const T t = (dx * d1y - dy * d1x) * inv_det;
+    const T u = (dx * d0y - dy * d0x) * inv_det;
+
+    // Check if intersection is within both segments [0, 1]
+    if (t < 0.0 || t > 1.0 || u < 0.0 || u > 1.0) {
+        return false;
+    }
+
+    // Compute intersection point
+    intersecPt.x() = seg0_a.x() + t * d0x;
+    intersecPt.y() = seg0_a.y() + t * d0y;
+
+    return true;
+}
+
+template <typename T>
+auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt)
+    -> T {
+    Vec2<T> ab = b - a;
+    T t = (pt - a).dot(ab) / ab.dot(ab);
+    t = std::clamp(t, 0.0F, 1.0F);
+    Vec2<T> proj = a + ab * t;
+    return (pt - proj).length();
+}
+
 template <typename T> struct Polyline2 {
     I32 id;
     Vector<Vec2<T>> points;
@@ -12,13 +62,6 @@ template <typename T> struct Polyline2 {
 };
 
 template <typename T> using Polyline2Vector = Vector<Polyline2<T>>;
-
-auto seg2_intersect(const Vec2f& seg0_a, const Vec2f& seg0_b,
-                    const Vec2f& seg1_a, const Vec2f& seg1_b, Vec2f& intersecPt)
-    -> bool;
-
-auto seg2_point_distance(const Vec2f& a, const Vec2f& b, const Vec2f& pt)
-    -> F32;
 
 template <typename T> struct Segment2 {
     Vec2<T> a;
