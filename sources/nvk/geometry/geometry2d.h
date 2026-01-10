@@ -76,6 +76,7 @@ template <typename T> struct Segment2 {
 
     I32 lineId;
     I32 index; // index in the polyline
+    bool isLastLoopSeg{false};
 
     auto bounds() const -> Box2<T> { return {a, b}; }
 

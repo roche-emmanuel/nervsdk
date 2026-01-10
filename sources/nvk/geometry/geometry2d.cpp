@@ -38,6 +38,7 @@ auto build_seg2_tree_data(const Polyline2Vector<F32>& paths)
             s.b = path.points[0];
             s.lineId = path.id;
             s.index = n - 1;
+            s.isLastLoopSeg = true;
             result.segments.push_back(s);
         }
     }
@@ -45,7 +46,7 @@ auto build_seg2_tree_data(const Polyline2Vector<F32>& paths)
     // Insert into R-tree
     for (const auto& s : result.segments) {
         auto bb = s.bounds();
-        result.tree.Insert(bb.bottom_left().ptr(), bb.top_right().ptr(), &s);
+        result.tree.Insert(bb.minimum().ptr(), bb.maximum().ptr(), &s);
     }
 
     return result;
@@ -67,7 +68,9 @@ auto findSegmentIntersections(const Seg2TreeData<T>& tdata)
 
                               // Skip neighbors in same line
                               if (s.lineId == other->lineId &&
-                                  std::abs(s.index - other->index) <= 1)
+                                  (std::abs(s.index - other->index) <= 1 ||
+                                   (other->isLastLoopSeg && s.index == 0) ||
+                                   (s.isLastLoopSeg && other->index == 0)))
                                   return true;
 
                               Vec2<T> ip;
