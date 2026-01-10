@@ -67,8 +67,8 @@ template <typename T> struct Segment2 {
     Vec2<T> a;
     Vec2<T> b;
 
-    int lineId;
-    int index; // index in the polyline
+    I32 lineId;
+    I32 index; // index in the polyline
 
     auto bounds() const -> Box2<T> { return {a, b}; }
 
@@ -81,8 +81,8 @@ template <typename T> struct Segment2 {
     }
 };
 
-using Segment2f = Segment2<F32>;
-using Segment2d = Segment2<F64>;
+using Seg2f = Segment2<F32>;
+using Seg2d = Segment2<F64>;
 
 template <typename T> using Segment2Vector = Vector<Segment2<T>>;
 

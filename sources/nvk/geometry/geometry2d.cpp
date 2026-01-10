@@ -53,15 +53,15 @@ auto build_seg2_tree_data(const Polyline2Vector<F32>& paths)
 
 template <typename T>
 auto findSegmentIntersections(const Seg2TreeData<T>& tdata)
-    -> Segment2IntersectionVector<F32> {
-    Segment2IntersectionVector<F32> result;
+    -> Segment2IntersectionVector<T> {
+    Segment2IntersectionVector<T> result;
 
-    for (const Segment2f& s : tdata.segments) {
+    for (const auto& s : tdata.segments) {
 
         auto bb = s.bounds();
 
         tdata.tree.Search(bb.minimum().ptr(), bb.maximum().ptr(),
-                          [&](const Segment2f* other) {
+                          [&](const Segment2<T>* other) {
                               if (&s >= other)
                                   return true; // avoid duplicates
 
@@ -70,7 +70,7 @@ auto findSegmentIntersections(const Seg2TreeData<T>& tdata)
                                   std::abs(s.index - other->index) <= 1)
                                   return true;
 
-                              Vec2f ip;
+                              Vec2<T> ip;
                               if (s.intersect(*other, ip)) {
                                   result.push_back(
                                       {.position = ip, .s0 = s, .s1 = *other});
@@ -84,16 +84,16 @@ auto findSegmentIntersections(const Seg2TreeData<T>& tdata)
 }
 
 template <typename T>
-auto findEndpointNearSegments(const Polyline2Vector<F32>& paths,
-                              const Seg2TreeData<T>& tdata, F32 distance)
-    -> EndpointNearSegment2Vector<F32> {
-    EndpointNearSegment2Vector<F32> result;
+auto findEndpointNearSegments(const Polyline2Vector<T>& paths,
+                              const Seg2TreeData<T>& tdata, T distance)
+    -> EndpointNearSegment2Vector<T> {
+    EndpointNearSegment2Vector<T> result;
 
-    auto checkPoint = [&](const Vec2f& p, int lineId, bool isStart) {
-        F32 min[2] = {p.x() - distance, p.y() - distance};
-        F32 max[2] = {p.x() + distance, p.y() + distance};
+    auto checkPoint = [&](const Vec2<T>& p, int lineId, bool isStart) {
+        T min[2] = {p.x() - distance, p.y() - distance};
+        T max[2] = {p.x() + distance, p.y() + distance};
 
-        tdata.tree.Search(min, max, [&](const Segment2f* s) {
+        tdata.tree.Search(min, max, [&](const Segment2<T>* s) {
             // Skip same path endpoint segment
             if (s->lineId == lineId)
                 return true;
