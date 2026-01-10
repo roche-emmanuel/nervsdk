@@ -3,15 +3,19 @@
 
 namespace nv {
 
-using SegmentTreef = RTree<const Segment2f*, F32, 2>;
+// Internal helper elements:
+namespace {
 
-struct IndexedSegments {
-    Vector<Segment2f> segments;
-    SegmentTreef tree;
+template <typename T> struct Seg2TreeData {
+    Segment2Vector<T> segments;
+    using SegmentTree = RTree<const Segment2<T>*, T, 2>;
+    SegmentTree tree;
 };
 
-static auto build_index(const Polyline2Vector<F32>& paths) -> IndexedSegments {
-    IndexedSegments result;
+template <typename T>
+auto build_seg2_tree_data(const Polyline2Vector<F32>& paths)
+    -> Seg2TreeData<T> {
+    Seg2TreeData<T> result;
 
     for (const auto& path : paths) {
         int n = (int)path.points.size();
@@ -19,7 +23,7 @@ static auto build_index(const Polyline2Vector<F32>& paths) -> IndexedSegments {
             continue;
 
         for (int i = 0; i < n - 1; ++i) {
-            Segment2f s;
+            Segment2<T> s;
             s.a = path.points[i];
             s.b = path.points[i + 1];
             s.lineId = path.id;
@@ -29,7 +33,7 @@ static auto build_index(const Polyline2Vector<F32>& paths) -> IndexedSegments {
         }
 
         if (path.closedLoop) {
-            Segment2f s;
+            Segment2<T> s;
             s.a = path.points[n - 1];
             s.b = path.points[0];
             s.lineId = path.id;
@@ -47,15 +51,16 @@ static auto build_index(const Polyline2Vector<F32>& paths) -> IndexedSegments {
     return result;
 }
 
-static auto findSegmentIntersections(const IndexedSegments& index)
+template <typename T>
+auto findSegmentIntersections(const Seg2TreeData<T>& tdata)
     -> Segment2IntersectionVector<F32> {
     Segment2IntersectionVector<F32> result;
 
-    for (const Segment2f& s : index.segments) {
+    for (const Segment2f& s : tdata.segments) {
 
         auto bb = s.bounds();
 
-        index.tree.Search(bb.minimum().ptr(), bb.maximum().ptr(),
+        tdata.tree.Search(bb.minimum().ptr(), bb.maximum().ptr(),
                           [&](const Segment2f* other) {
                               if (&s >= other)
                                   return true; // avoid duplicates
@@ -78,8 +83,9 @@ static auto findSegmentIntersections(const IndexedSegments& index)
     return result;
 }
 
+template <typename T>
 auto findEndpointNearSegments(const Polyline2Vector<F32>& paths,
-                              const IndexedSegments& index, F32 distance)
+                              const Seg2TreeData<T>& tdata, F32 distance)
     -> EndpointNearSegment2Vector<F32> {
     EndpointNearSegment2Vector<F32> result;
 
@@ -87,7 +93,7 @@ auto findEndpointNearSegments(const Polyline2Vector<F32>& paths,
         F32 min[2] = {p.x() - distance, p.y() - distance};
         F32 max[2] = {p.x() + distance, p.y() + distance};
 
-        index.tree.Search(min, max, [&](const Segment2f* s) {
+        tdata.tree.Search(min, max, [&](const Segment2f* s) {
             // Skip same path endpoint segment
             if (s->lineId == lineId)
                 return true;
@@ -116,18 +122,19 @@ auto findEndpointNearSegments(const Polyline2Vector<F32>& paths,
 
     return result;
 }
+} // namespace
 
 auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
                                      float endpointDistance)
     -> Polyline2IntersectionResults<F32> {
-    auto index = build_index(paths);
+    auto tdata = build_seg2_tree_data<F32>(paths);
 
     Polyline2IntersectionResults<F32> out;
-    out.intersections = findSegmentIntersections(index);
+    out.intersections = findSegmentIntersections(tdata);
 
     if (endpointDistance > 0.0) {
         out.endpointNearSegments =
-            findEndpointNearSegments(paths, index, endpointDistance);
+            findEndpointNearSegments(paths, tdata, endpointDistance);
     }
 
     return out;
