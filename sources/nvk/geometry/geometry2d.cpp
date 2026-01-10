@@ -89,8 +89,8 @@ static auto findSegmentIntersections(const IndexedSegments& index)
 
 auto findEndpointNearSegments(const Polyline2Vector<F32>& paths,
                               const IndexedSegments& index, F32 distance)
-    -> EndpointNearSegmentVector<F32> {
-    EndpointNearSegmentVector<F32> result;
+    -> EndpointNearSegment2Vector<F32> {
+    EndpointNearSegment2Vector<F32> result;
 
     auto checkPoint = [&](const Vec2f& p, int lineId, bool isStart) {
         F32 min[2] = {p.x() - distance, p.y() - distance};
@@ -124,6 +124,22 @@ auto findEndpointNearSegments(const Polyline2Vector<F32>& paths,
     }
 
     return result;
+}
+
+auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
+                                     float endpointDistance)
+    -> Polyline2IntersectionResults<F32> {
+    auto index = build_index(paths);
+
+    Polyline2IntersectionResults<F32> out;
+    out.intersections = findSegmentIntersections(index);
+
+    if (endpointDistance > 0.0) {
+        out.endpointNearSegments =
+            findEndpointNearSegments(paths, index, endpointDistance);
+    }
+
+    return out;
 }
 
 }; // namespace nv

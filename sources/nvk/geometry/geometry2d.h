@@ -53,7 +53,7 @@ template <typename T> struct Segment2Intersection {
 template <typename T>
 using Segment2IntersectionVector = Vector<Segment2Intersection<T>>;
 
-template <typename T> struct EndpointNearSegment {
+template <typename T> struct EndpointNearSegment2 {
     Vec2<T> endpoint;
     int pathId;
     bool isStart; // true = start, false = end
@@ -63,7 +63,16 @@ template <typename T> struct EndpointNearSegment {
 };
 
 template <typename T>
-using EndpointNearSegmentVector = Vector<EndpointNearSegment<T>>;
+using EndpointNearSegment2Vector = Vector<EndpointNearSegment2<T>>;
+
+template <typename T> struct Polyline2IntersectionResults {
+    Segment2IntersectionVector<T> intersections;
+    EndpointNearSegment2Vector<T> endpointNearSegments;
+};
+
+auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
+                                     float endpointDistance)
+    -> Polyline2IntersectionResults<F32>;
 
 }; // namespace nv
 
