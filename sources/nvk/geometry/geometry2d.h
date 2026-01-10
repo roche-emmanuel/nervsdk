@@ -49,8 +49,15 @@ template <typename T>
 auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt)
     -> T {
     Vec2<T> ab = b - a;
-    T t = (pt - a).dot(ab) / ab.dot(ab);
-    t = std::clamp(t, 0.0F, 1.0F);
+    T ab_len_sq = ab.dot(ab);
+
+    // Handle degenerate case: segment is a point
+    if (ab_len_sq < T(1e-20)) {
+        return (pt - a).length();
+    }
+
+    T t = (pt - a).dot(ab) / ab_len_sq;
+    t = std::clamp(t, T(0.0), T(1.0));
     Vec2<T> proj = a + ab * t;
     return (pt - proj).length();
 }
