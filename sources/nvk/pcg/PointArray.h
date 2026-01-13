@@ -35,6 +35,8 @@ class PointArray : public RefObject {
 
 using PointArrayVector = Vector<RefPtr<PointArray>>;
 
+NV_DEFINE_REFPTR_TYPE_ID(nv::PointArray);
+
 }; // namespace nv
 
 #endif
