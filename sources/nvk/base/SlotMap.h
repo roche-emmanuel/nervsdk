@@ -25,9 +25,11 @@ class SlotMap : public RefObject {
         auto get_type_index() const -> std::type_index { return _typeIndex; }
 
         template <typename T> void set_value(T&& val) {
-            NVCHK(_typeIndex == std::type_index(typeid(T)),
+            using CleanT = std::decay_t<T>;
+            NVCHK(_typeIndex == std::type_index(typeid(CleanT)),
                   "Slot::set_value: type mismatch.");
-            static_cast<SlotHolder<std::decay_t<T>>*>(this)->assign_value(
+            // Forward with the original T, not CleanT
+            static_cast<SlotHolder<CleanT>*>(this)->assign_value(
                 std::forward<T>(val));
         }
 
@@ -51,7 +53,11 @@ class SlotMap : public RefObject {
 
       public:
         SlotHolder() { _typeIndex = std::type_index(typeid(T)); }
-        void assign_value(T&& val) { _value = std::forward<T>(val); }
+
+        template <typename U> void assign_value(U&& val) {
+            _value = std::forward<U>(val);
+        }
+
         auto retrieve_value() const -> const T& { return _value; }
     };
 

@@ -1,7 +1,10 @@
 #include <nvk/pcg/PCGContext.h>
 
 namespace nv {
-PCGContext::PCGContext(Traits traits) : _traits(std::move(traits)) {};
+PCGContext::PCGContext(Traits traits) : _traits(std::move(traits)) {
+    _inputs = SlotMap::create();
+    _outputs = SlotMap::create();
+};
 
 PCGContext::~PCGContext() = default;
 
