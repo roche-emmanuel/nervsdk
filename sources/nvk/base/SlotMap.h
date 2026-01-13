@@ -24,6 +24,10 @@ class SlotMap : public RefObject {
 
         auto get_type_index() const -> std::type_index { return _typeIndex; }
 
+        template <typename T> auto is_a() const -> bool {
+            return _typeIndex == std::type_index(typeid(T));
+        }
+
         template <typename T> void set_value(T&& val) {
             using CleanT = std::decay_t<T>;
             NVCHK(_typeIndex == std::type_index(typeid(CleanT)),
@@ -135,9 +139,9 @@ class SlotMap : public RefObject {
         GetProxy(const SlotMap* map, String slotName)
             : _map(map), _slotName(std::move(slotName)) {}
 
-        template <typename T> operator T() const {
-            return _map->get<T>(_slotName);
-        }
+        // template <typename T> operator T() const {
+        //     return _map->get<T>(_slotName);
+        // }
 
         template <typename T> operator const T&() const {
             return _map->get<T>(_slotName);
