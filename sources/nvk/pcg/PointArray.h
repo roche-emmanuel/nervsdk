@@ -11,11 +11,26 @@ class PointArray : public RefObject {
     NV_DECLARE_NO_MOVE(PointArray)
 
   public:
-    PointArray();
+    struct Traits {};
+
+    explicit PointArray(Traits traits);
+    PointArray(PointAttributeVector attribs, Traits traits);
     ~PointArray() override;
 
+    static auto create(Traits traits) -> RefPtr<PointArray>;
+    static auto create(PointAttributeVector attribs, Traits traits = {})
+        -> RefPtr<PointArray>;
+
+    /** Retrieve the number of attributes. */
+    auto get_num_attributes() const -> U32;
+
+    // void add_attribute(RefPtr<PointAttribute> attrib);
+
   protected:
-    UnorderedMap<String, RefPtr<PointAttribute>> _attributes;
+    Traits _traits;
+    PointAttributeVector _attributes;
+
+    void validate_attributes();
 };
 
 using PointArrayVector = Vector<RefPtr<PointArray>>;
