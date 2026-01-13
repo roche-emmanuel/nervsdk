@@ -29,6 +29,13 @@ class PCGContext : public RefObject {
             ((InputSlotHolder<T>*)this)->assign_value(val);
         };
 
+        template <typename T> auto get_value() const -> const T& {
+            NVCHK(_dataTypeId == TypeId<T>::id,
+                  "InputSlot::set_value: mismatch in type ids.");
+
+            return ((InputSlotHolder<T>*)this)->retrieve_value();
+        };
+
         template <typename T> static auto create() -> RefPtr<InputSlot> {
             return nv::create<InputSlotHolder<T>>();
         }
@@ -44,6 +51,7 @@ class PCGContext : public RefObject {
       public:
         InputSlotHolder() { _dataTypeId = TypeId<T>::id; };
         void assign_value(T val) { _value = std::forward<T>(val); }
+        auto retrieve_value() const -> const T& { return _value; }
     };
 
     struct Traits {};
@@ -54,28 +62,49 @@ class PCGContext : public RefObject {
     static auto create(Traits traits = {}) -> RefPtr<PCGContext>;
 
     template <typename T>
-    auto get_or_create_input_slot(String slotName) -> InputSlot& {
+    auto find_input_slot(const String& slotName) const -> InputSlot* {
         auto it = _inputs.find(slotName);
         if (it != _inputs.end()) {
-            // Check the type of this socket is correct:
             NVCHK(it->second->get_data_type_id() == TypeId<T>::id,
                   "Mismatch in input slot data type id.");
-            return *it->second;
+            return it->second.get();
+        }
+        return nullptr;
+    };
+
+    template <typename T>
+    auto get_input_slot(const String& slotName) const -> InputSlot& {
+        auto* slot = find_input_slot<T>(slotName);
+        NVCHK(slot != nullptr, "Cannot find slot with name {}", slotName);
+        return *slot;
+    };
+
+    template <typename T>
+    auto get_or_create_input_slot(String slotName) -> InputSlot& {
+        auto* slot = find_input_slot<T>(slotName);
+        if (slot != nullptr) {
+            return *slot;
         }
 
         // Create a new slot with this data type:
-        auto slot = InputSlot::create<T>();
-        auto res = _inputs.insert(std::make_pair(std::move(slotName), slot));
+        auto res = _inputs.insert(
+            std::make_pair(std::move(slotName), InputSlot::create<T>()));
         NVCHK(res.second, "Could not insert input {}", slotName);
         return *res.first->second;
     };
 
     template <typename T>
     auto set_input(String slotName, T value) -> InputSlot& {
-        auto& socket = get_or_create_input_slot<T>(std::move(slotName));
+        auto& slot = get_or_create_input_slot<T>(std::move(slotName));
 
-        socket.set_value(std::move(value));
-        return socket;
+        slot.set_value(std::move(value));
+        return slot;
+    };
+
+    template <typename T>
+    auto get_input(const String& slotName) const -> const T& {
+        const auto& slot = get_input_slot<T>(slotName);
+        return slot.template get_value<T>();
     };
 
   protected:
