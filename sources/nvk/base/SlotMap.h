@@ -105,21 +105,36 @@ class SlotMap : public RefObject {
         return slot.template get_value<T>();
     }
 
+    // Get a value with default fallback (type deduced from default value)
+    template <typename T>
+    auto get(const String& slotName, T&& defaultValue) const -> T {
+        using CleanT = std::decay_t<T>;
+        auto it = _slots.find(slotName);
+        if (it == _slots.end()) {
+            return std::forward<T>(defaultValue);
+        }
+        NVCHK(it->second->get_type_index() == std::type_index(typeid(CleanT)),
+              "Slot '{}' exists but has type mismatch (expected {}, got {}).",
+              slotName, typeid(CleanT).name(),
+              it->second->get_type_index().name());
+        return it->second->template get_value<CleanT>();
+    }
+
     // Type-deducing getter via conversion operator proxy
     class GetProxy {
-        const SlotMap* _collection;
+        const SlotMap* _map;
         String _slotName;
 
       public:
-        GetProxy(const SlotMap* collection, String slotName)
-            : _collection(collection), _slotName(std::move(slotName)) {}
+        GetProxy(const SlotMap* map, String slotName)
+            : _map(map), _slotName(std::move(slotName)) {}
 
         template <typename T> operator T() const {
-            return _collection->get<T>(_slotName);
+            return _map->get<T>(_slotName);
         }
 
         template <typename T> operator const T&() const {
-            return _collection->get<T>(_slotName);
+            return _map->get<T>(_slotName);
         }
     };
 
