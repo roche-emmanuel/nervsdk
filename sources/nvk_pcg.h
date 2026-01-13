@@ -9,4 +9,10 @@
 #include <nvk/pcg/PointArray.h>
 #include <nvk/pcg/PointAttribute.h>
 
+namespace nv {
+
+void pcg_find_path_2d_intersections(PCGContext& ctx);
+
+}
+
 #endif

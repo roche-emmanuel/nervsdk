@@ -47,6 +47,17 @@ class SlotMap : public RefObject {
             return nv::create<SlotHolder<std::decay_t<T>>>();
         }
 
+        template <typename T> auto as_vector() const -> Vector<T> {
+            if (is_a<T>()) {
+                return Vector<T>{get_value<T>()};
+            }
+            if (is_a<Vector<T>>()) {
+                return get_value<Vector<T>>();
+            }
+            THROW_MSG("Cannot convert slot to vector");
+            return {};
+        }
+
       protected:
         std::type_index _typeIndex{typeid(void)};
     };
@@ -69,6 +80,19 @@ class SlotMap : public RefObject {
     ~SlotMap() override = default;
 
     static auto create() -> RefPtr<SlotMap>;
+
+    auto find_raw_slot(const String& slotName) const -> Slot* {
+        auto it = _slots.find(slotName);
+        if (it != _slots.end()) {
+            return it->second.get();
+        }
+        return nullptr;
+    }
+    auto get_raw_slot(const String& slotName) const -> Slot& {
+        auto* slot = find_raw_slot(slotName);
+        NVCHK(slot != nullptr, "Invalid slot with name {}", slotName);
+        return *slot;
+    }
 
     // Find a slot by name (returns nullptr if not found)
     template <typename T>
@@ -128,6 +152,15 @@ class SlotMap : public RefObject {
               slotName, typeid(CleanT).name(),
               it->second->get_type_index().name());
         return it->second->template get_value<CleanT>();
+    }
+
+    template <typename T> auto is_a(const String& slotName) const -> bool {
+        auto it = _slots.find(slotName);
+        if (it == _slots.end()) {
+            return false;
+        }
+
+        return it->second->is_a<T>();
     }
 
     // Type-deducing getter via conversion operator proxy

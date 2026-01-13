@@ -6,6 +6,10 @@
 
 namespace nv {
 
+static constexpr const char* pt_position_attr = "position";
+static constexpr const char* pt_rotation_attr = "rotation";
+static constexpr const char* pt_scale_attr = "scale";
+
 class PointArray : public RefObject {
     NV_DECLARE_NO_COPY(PointArray)
     NV_DECLARE_NO_MOVE(PointArray)
@@ -23,6 +27,16 @@ class PointArray : public RefObject {
 
     /** Retrieve the number of attributes. */
     auto get_num_attributes() const -> U32;
+
+    auto find_attribute(const String& name) const -> const PointAttribute*;
+
+    auto get_attribute(const String& name) const -> const PointAttribute&;
+
+    auto get_position_attribute() const -> const PointAttribute&;
+
+    auto get_rotation_attribute() const -> const PointAttribute&;
+
+    auto get_scale_attribute() const -> const PointAttribute&;
 
     // void add_attribute(RefPtr<PointAttribute> attrib);
 

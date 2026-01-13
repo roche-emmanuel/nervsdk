@@ -41,4 +41,28 @@ auto PointArray::get_num_attributes() const -> U32 {
     return _attributes.size();
 }
 
+auto PointArray::get_scale_attribute() const -> const PointAttribute& {
+    return get_attribute(pt_scale_attr);
+}
+auto PointArray::get_rotation_attribute() const -> const PointAttribute& {
+    return get_attribute(pt_rotation_attr);
+}
+auto PointArray::get_position_attribute() const -> const PointAttribute& {
+    return get_attribute(pt_position_attr);
+}
+auto PointArray::get_attribute(const String& name) const
+    -> const PointAttribute& {
+    const auto* attrib = find_attribute(name);
+    NVCHK(attrib != nullptr, "Invalid attribute with name {}", name);
+    return *attrib;
+}
+auto PointArray::find_attribute(const String& name) const
+    -> const PointAttribute* {
+    for (const auto& attrib : _attributes) {
+        if (attrib->name() == name) {
+            return attrib.get();
+        }
+    }
+    return nullptr;
+}
 } // namespace nv
