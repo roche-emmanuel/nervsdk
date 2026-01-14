@@ -5,12 +5,22 @@ PointArray::PointArray(Traits traits) : _traits(std::move(traits)) {};
 
 PointArray::~PointArray() = default;
 
-auto PointArray::create(Traits traits) -> RefPtr<PointArray> {
-    return nv::create<PointArray>(std::move(traits));
+auto PointArray::create(I32 numPoints, Traits traits) -> RefPtr<PointArray> {
+    auto arr = nv::create<PointArray>(std::move(traits));
+    if (numPoints >= 0) {
+        arr->resize(numPoints);
+    }
+    return arr;
 }
 
-PointArray::PointArray(PointAttributeVector attribs, Traits traits)
-    : _traits(std::move(traits)), _attributes(std::move(attribs)) {
+PointArray::PointArray(const PointAttributeVector& attribs, Traits traits)
+    : _traits(std::move(traits)) {
+    for (const auto& attr : attribs) {
+        add_attribute(attr);
+        // auto res = _attributes.insert(std::make_pair(attr->name(), attr));
+        // NVCHK(res.second, "Could not insert attribute {} in PointArray.",
+        //       attr->name());
+    }
     validate_attributes();
 };
 
@@ -21,20 +31,19 @@ void PointArray::validate_attributes() {
     }
 
     // Check that all attributes have the same length:
-    U32 size = _attributes[0]->size();
-    U32 num = _attributes.size();
-    for (U32 i = 1; i < num; ++i) {
-        U32 size2 = _attributes[i]->size();
+    U32 size = _attributes.begin()->second->size();
+    for (const auto& it : _attributes) {
+        U32 size2 = it.second->size();
         if (size != size2) {
-            THROW_MSG("Mismatch in attribute {} num points: {} != {}",
-                      _attributes[i]->name(), size2, size);
+            THROW_MSG("Mismatch in attribute {} num points: {} != {}", it.first,
+                      size2, size);
         }
     }
 };
 
-auto PointArray::create(PointAttributeVector attribs, Traits traits)
+auto PointArray::create(const PointAttributeVector& attribs, Traits traits)
     -> RefPtr<PointArray> {
-    return nv::create<PointArray>(std::move(attribs), std::move(traits));
+    return nv::create<PointArray>(attribs, std::move(traits));
 }
 
 auto PointArray::get_num_attributes() const -> U32 {
@@ -58,11 +67,68 @@ auto PointArray::get_attribute(const String& name) const
 }
 auto PointArray::find_attribute(const String& name) const
     -> const PointAttribute* {
-    for (const auto& attrib : _attributes) {
-        if (attrib->name() == name) {
-            return attrib.get();
-        }
+    auto it = _attributes.find(name);
+    if (it != _attributes.end()) {
+        return it->second.get();
     }
+
     return nullptr;
 }
+auto PointArray::get_num_points() const -> U32 {
+    return _numPoints < 0 ? 0 : _numPoints;
+}
+
+void PointArray::add_attribute(RefPtr<PointAttribute> attr) {
+    NVCHK(attr != nullptr, "Invalid attribute.");
+
+    if (_numPoints >= 0 && attr->size() != _numPoints) {
+        THROW_MSG("Attribute size doesn't match num points: {} != {}",
+                  attr->size(), _numPoints);
+        // logWARN("Resizing attribute to PointArray size {}", _numPoints);
+        // attr->resize(_numPoints);
+    }
+    _numPoints = (I32)attr->size();
+
+    auto res =
+        _attributes.insert(std::make_pair(attr->name(), std::move(attr)));
+    NVCHK(res.second, "Attribute {} was already inserted in PointArray.",
+          attr->name());
+}
+
+auto PointArray::create(const Vector<AttribDesc>& attribs, U32 numPoints,
+                        Traits traits) -> RefPtr<PointArray> {
+    auto arr = create((I32)numPoints, traits);
+    for (const auto& adesc : attribs) {
+        switch (adesc.type) {
+        case DTYPE_BOOL:
+            arr->add_attribute<bool>(adesc.name);
+            break;
+        case DTYPE_I32:
+            arr->add_attribute<I32>(adesc.name);
+            break;
+        case DTYPE_F32:
+            arr->add_attribute<F32>(adesc.name);
+            break;
+        case DTYPE_F64:
+            arr->add_attribute<F64>(adesc.name);
+            break;
+        case DTYPE_VEC2F:
+            arr->add_attribute<Vec2f>(adesc.name);
+            break;
+        case DTYPE_VEC3F:
+            arr->add_attribute<Vec3f>(adesc.name);
+            break;
+        case DTYPE_MAT4F:
+            arr->add_attribute<Mat4f>(adesc.name);
+            break;
+        case DTYPE_MAT4D:
+            arr->add_attribute<Mat4d>(adesc.name);
+            break;
+        default:
+            THROW_MSG("Unsupported PointArray attribute type: {}", adesc.type);
+        }
+    }
+
+    return arr;
+};
 } // namespace nv

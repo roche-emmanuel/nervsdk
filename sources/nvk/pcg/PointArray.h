@@ -17,20 +17,35 @@ class PointArray : public RefObject {
   public:
     struct Traits {};
 
+    struct AttribDesc {
+        String name;
+        I32 type;
+    };
+
     explicit PointArray(Traits traits);
-    PointArray(PointAttributeVector attribs, Traits traits);
+    PointArray(const PointAttributeVector& attribs, Traits traits);
     ~PointArray() override;
 
-    static auto create(Traits traits) -> RefPtr<PointArray>;
-    static auto create(PointAttributeVector attribs, Traits traits = {})
+    static auto create(I32 numPoints = -1, Traits traits = {})
         -> RefPtr<PointArray>;
+    static auto create(const PointAttributeVector& attribs, Traits traits = {})
+        -> RefPtr<PointArray>;
+
+    static auto create(const Vector<AttribDesc>& attribs, U32 numPoints,
+                       Traits traits = {}) -> RefPtr<PointArray>;
 
     /** Retrieve the number of attributes. */
     auto get_num_attributes() const -> U32;
+    auto get_num_points() const -> U32;
 
     auto find_attribute(const String& name) const -> const PointAttribute*;
 
     auto get_attribute(const String& name) const -> const PointAttribute&;
+
+    template <typename T>
+    auto get_data(const String& name) const -> Vector<T>& {
+        return get_attribute(name).get_values<T>();
+    };
 
     auto get_position_attribute() const -> const PointAttribute&;
 
@@ -38,11 +53,30 @@ class PointArray : public RefObject {
 
     auto get_scale_attribute() const -> const PointAttribute&;
 
+    void add_attribute(RefPtr<PointAttribute> attr);
+
+    template <typename T>
+    auto add_attribute(const String& name, T&& initValue = {}) -> Vector<T>& {
+        auto size = get_num_points();
+        auto attr =
+            PointAttribute::create<T>(name, size, std::forward<T>(initValue));
+        add_attribute(attr);
+        return attr->template get_values<T>();
+    }
+
+    void resize(U32 size) {
+        _numPoints = (I32)size;
+        for (const auto& it : _attributes) {
+            it.second->resize(size);
+        }
+    }
+
     // void add_attribute(RefPtr<PointAttribute> attrib);
 
   protected:
     Traits _traits;
-    PointAttributeVector _attributes;
+    PointAttributeMap _attributes;
+    I32 _numPoints{-1};
 
     void validate_attributes();
 };
