@@ -11,7 +11,25 @@
 #include <cstdint>
 #include <limits.h>
 
+#ifdef __EMSCRIPTEN__
+// Taken from fenv.h:
+#define FE_INEXACT 0x00000001
+#define FE_UNDERFLOW 0x00000002
+#define FE_OVERFLOW 0x00000004
+#define FE_DIVBYZERO 0x00000008
+#define FE_INVALID 0x00000010
+#endif
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4668) // undefined macro treated as '0'
+#endif
+
 #include <external/half.hpp>
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 namespace nv {
 

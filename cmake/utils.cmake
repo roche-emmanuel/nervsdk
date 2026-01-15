@@ -81,7 +81,7 @@ macro(setup_compiler_flags)
 
     # cf.
     # https://stackoverflow.com/questions/44960715/how-to-enable-stdc17-in-vs2017-with-cmake
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++20 /Zc:__cplusplus")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++20 /utf-8 /Zc:__cplusplus")
 
   elseif(IS_CLANG)
     message(STATUS "Building with Clang compiler")
