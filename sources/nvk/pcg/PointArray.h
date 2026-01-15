@@ -6,9 +6,16 @@
 
 namespace nv {
 
-static constexpr const char* pt_position_attr = "position";
-static constexpr const char* pt_rotation_attr = "rotation";
-static constexpr const char* pt_scale_attr = "scale";
+static constexpr const char* pt_index_attr = "$Index";
+static constexpr const char* pt_position_attr = "$Position";
+static constexpr const char* pt_rotation_attr = "$Rotation";
+static constexpr const char* pt_scale_attr = "$Scale";
+static constexpr const char* pt_boundsmin_attr = "$BoundsMin";
+static constexpr const char* pt_boundsmax_attr = "$BoundsMax";
+static constexpr const char* pt_color_attr = "$Color";
+static constexpr const char* pt_density_attr = "$Density";
+static constexpr const char* pt_steepness_attr = "$Steepness";
+static constexpr const char* pt_seed_attr = "$Seed";
 
 class PointArray : public RefObject {
     NV_DECLARE_NO_COPY(PointArray)
@@ -39,11 +46,19 @@ class PointArray : public RefObject {
     auto get_num_points() const -> U32;
 
     auto find_attribute(const String& name) const -> const PointAttribute*;
+    auto find_attribute(const String& name) -> PointAttribute*;
 
     auto get_attribute(const String& name) const -> const PointAttribute&;
+    auto get_attribute(const String& name) -> PointAttribute&;
 
-    template <typename T>
-    auto get_data(const String& name) const -> Vector<T>& {
+    template <typename T> auto find(const String& name) -> Vector<T>* {
+        const auto* attr = find_attribute(name);
+        if (attr->is_type<T>()) {
+            return &attr->get_values<T>();
+        }
+        return nullptr;
+    };
+    template <typename T> auto get(const String& name) -> Vector<T>& {
         return get_attribute(name).get_values<T>();
     };
 
@@ -71,7 +86,7 @@ class PointArray : public RefObject {
         }
     }
 
-    // void add_attribute(RefPtr<PointAttribute> attrib);
+    auto get_attributes() const -> const PointAttributeMap&;
 
   protected:
     Traits _traits;
@@ -82,8 +97,6 @@ class PointArray : public RefObject {
 };
 
 using PointArrayVector = Vector<RefPtr<PointArray>>;
-
-NV_DEFINE_REFPTR_TYPE_ID(nv::PointArray);
 
 }; // namespace nv
 

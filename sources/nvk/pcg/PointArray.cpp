@@ -65,8 +65,21 @@ auto PointArray::get_attribute(const String& name) const
     NVCHK(attrib != nullptr, "Invalid attribute with name {}", name);
     return *attrib;
 }
+auto PointArray::get_attribute(const String& name) -> PointAttribute& {
+    auto* attrib = find_attribute(name);
+    NVCHK(attrib != nullptr, "Invalid attribute with name {}", name);
+    return *attrib;
+}
 auto PointArray::find_attribute(const String& name) const
     -> const PointAttribute* {
+    auto it = _attributes.find(name);
+    if (it != _attributes.end()) {
+        return it->second.get();
+    }
+
+    return nullptr;
+}
+auto PointArray::find_attribute(const String& name) -> PointAttribute* {
     auto it = _attributes.find(name);
     if (it != _attributes.end()) {
         return it->second.get();
@@ -131,4 +144,7 @@ auto PointArray::create(const Vector<AttribDesc>& attribs, U32 numPoints,
 
     return arr;
 };
+auto PointArray::get_attributes() const -> const PointAttributeMap& {
+    return _attributes;
+}
 } // namespace nv

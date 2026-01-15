@@ -97,18 +97,7 @@ inline constexpr auto str_id_const(const char* str) noexcept -> StringID {
     return hash_64_fnv1a_const(str);
 }
 
-template <typename T> struct TypeId {};
-template <U64 T> struct TypeMap {};
-
-#define NV_DEFINE_TYPE_ID(tname)                                               \
-    template <> struct TypeId<tname> {                                         \
-        constexpr static nv::StringID id = str_id_const(#tname);               \
-    };                                                                         \
-    template <> struct TypeMap<str_id_const(#tname)> {                         \
-        using type = tname;                                                    \
-    };
-
-#define NV_DEFINE_REFPTR_TYPE_ID(tname) NV_DEFINE_TYPE_ID(nv::RefPtr<tname>)
+#define NV_TYPE_ID(tname) std::type_index(typeid(tname))
 
 } // namespace nv
 
