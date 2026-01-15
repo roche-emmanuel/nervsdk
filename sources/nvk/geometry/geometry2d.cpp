@@ -13,8 +13,7 @@ template <typename T> struct Seg2TreeData {
 };
 
 template <typename T>
-auto build_seg2_tree_data(const Polyline2Vector<F32>& paths)
-    -> Seg2TreeData<T> {
+auto build_seg2_tree_data(const Polyline2Vector<T>& paths) -> Seg2TreeData<T> {
     Seg2TreeData<T> result;
 
     for (const auto& path : paths) {
@@ -133,6 +132,22 @@ auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
     auto tdata = build_seg2_tree_data<F32>(paths);
 
     Polyline2IntersectionResults<F32> out;
+    out.intersections = findSegmentIntersections(tdata);
+
+    if (endpointDistance > 0.0) {
+        out.endpointNearSegments =
+            findEndpointNearSegments(paths, tdata, endpointDistance);
+    }
+
+    return out;
+}
+
+auto compute_polyline2_intersections(const Polyline2Vector<F64>& paths,
+                                     F64 endpointDistance)
+    -> Polyline2IntersectionResults<F64> {
+    auto tdata = build_seg2_tree_data<F64>(paths);
+
+    Polyline2IntersectionResults<F64> out;
     out.intersections = findSegmentIntersections(tdata);
 
     if (endpointDistance > 0.0) {

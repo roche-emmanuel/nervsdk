@@ -122,8 +122,12 @@ template <typename T> struct Polyline2IntersectionResults {
 };
 
 auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
-                                     float endpointDistance)
+                                     F32 endpointDistance)
     -> Polyline2IntersectionResults<F32>;
+
+auto compute_polyline2_intersections(const Polyline2Vector<F64>& paths,
+                                     F64 endpointDistance)
+    -> Polyline2IntersectionResults<F64>;
 
 }; // namespace nv
 
