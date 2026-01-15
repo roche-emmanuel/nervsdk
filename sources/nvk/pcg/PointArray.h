@@ -4,6 +4,8 @@
 #include <nvk/pcg/PointAttribute.h>
 #include <nvk_common.h>
 
+#include <nvk_type_ids.h>
+
 namespace nv {
 
 static constexpr const char* pt_index_attr = "$Index";

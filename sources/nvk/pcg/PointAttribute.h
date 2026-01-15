@@ -20,43 +20,42 @@ class PointAttribute : public RefObject {
     virtual auto element_size() const -> U32 = 0;
 
     auto name() const -> const String& { return _name; }
-    auto get_type_index() const -> std::type_index { return _typeIndex; }
-    // auto get_type_id() const -> StringID = 0;
+    auto get_type_id() const -> StringID { return _typeId; }
 
     template <typename T> auto is_type() const -> bool {
-        return _typeIndex == std::type_index(typeid(T));
+        return _typeId == TypeId<T>::id;
     }
 
     // Set values (with type checking)
     template <typename T> void set_values(Vector<T>&& values) {
-        NVCHK(_typeIndex == std::type_index(typeid(T)),
+        NVCHK(_typeId == TypeId<T>::id,
               "PointAttribute::set_values: type mismatch.");
         static_cast<AttributeHolder<T>*>(this)->assign_values(
             std::move(values));
     }
 
     template <typename T> void set_values(const Vector<T>& values) {
-        NVCHK(_typeIndex == std::type_index(typeid(T)),
+        NVCHK(_typeId == TypeId<T>::id,
               "PointAttribute::set_values: type mismatch.");
         static_cast<AttributeHolder<T>*>(this)->assign_values(values);
     }
 
     // Get values (with type checking)
     template <typename T> auto get_values() -> Vector<T>& {
-        NVCHK(_typeIndex == std::type_index(typeid(T)),
+        NVCHK(_typeId == TypeId<T>::id,
               "PointAttribute::get_values: type mismatch.");
         return static_cast<AttributeHolder<T>*>(this)->retrieve_values();
     }
 
     template <typename T> auto get_values() const -> const Vector<T>& {
-        NVCHK(_typeIndex == std::type_index(typeid(T)),
+        NVCHK(_typeId == TypeId<T>::id,
               "PointAttribute::get_values: type mismatch.");
         return static_cast<const AttributeHolder<T>*>(this)->retrieve_values();
     }
 
     // Get single value at index
     template <typename T> auto get_value(U64 index) const -> const T& {
-        NVCHK(_typeIndex == std::type_index(typeid(T)),
+        NVCHK(_typeId == TypeId<T>::id,
               "PointAttribute::get_value: type mismatch.");
         return static_cast<const AttributeHolder<T>*>(this)->retrieve_value(
             index);
@@ -64,7 +63,7 @@ class PointAttribute : public RefObject {
 
     // Set single value at index
     template <typename T> void set_value(U64 index, T&& value) {
-        NVCHK(_typeIndex == std::type_index(typeid(T)),
+        NVCHK(_typeId == TypeId<T>::id,
               "PointAttribute::set_value: type mismatch.");
         static_cast<AttributeHolder<T>*>(this)->assign_value(
             index, std::forward<T>(value));
@@ -88,7 +87,7 @@ class PointAttribute : public RefObject {
   protected:
     Traits _traits;
     String _name;
-    std::type_index _typeIndex{typeid(void)};
+    StringID _typeId{0};
 };
 
 template <typename T>
@@ -97,13 +96,13 @@ class PointAttribute::AttributeHolder : public PointAttribute {
     AttributeHolder(String name, U32 size, const T& value, Traits traits)
         : PointAttribute(std::move(name), std::move(traits)),
           _values(size, value) {
-        _typeIndex = std::type_index(typeid(T));
+        _typeId = TypeId<T>::id;
     }
 
     AttributeHolder(String name, Vector<T> values, Traits traits)
         : PointAttribute(std::move(name), std::move(traits)),
           _values(std::move(values)) {
-        _typeIndex = std::type_index(typeid(T));
+        _typeId = TypeId<T>::id;
     }
 
     void assign_values(Vector<T>&& values) { _values = std::move(values); }

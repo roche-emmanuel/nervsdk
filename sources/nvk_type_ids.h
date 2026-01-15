@@ -31,6 +31,10 @@ NV_DEFINE_TYPE_ID(nv::Vec4f);
 NV_DEFINE_TYPE_ID(nv::Vec4d);
 NV_DEFINE_TYPE_ID(nv::Vec4i);
 NV_DEFINE_TYPE_ID(nv::Vec4u);
+NV_DEFINE_TYPE_ID(nv::Quatf);
+NV_DEFINE_TYPE_ID(nv::Quatd);
+NV_DEFINE_TYPE_ID(nv::Mat4f);
+NV_DEFINE_TYPE_ID(nv::Mat4d);
 
 } // namespace nv
 
