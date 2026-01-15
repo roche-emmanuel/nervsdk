@@ -32,6 +32,8 @@
 #include <nvk/math/Vec3.h>
 #include <nvk/math/Vec4.h>
 
+#include <nvk/base/RandGen.h>
+
 #include <nvk_type_ids.h>
 
 #endif
