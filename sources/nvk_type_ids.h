@@ -1,7 +1,7 @@
 #ifndef _NV_TYPE_IDS_H_
 #define _NV_TYPE_IDS_H_
 
-#include <nvk_common.h>
+#include <nvk_types.h>
 
 namespace nv {
 
@@ -15,6 +15,7 @@ NV_DEFINE_TYPE_ID(nv::I32);
 NV_DEFINE_TYPE_ID(nv::U32);
 NV_DEFINE_TYPE_ID(nv::I64);
 NV_DEFINE_TYPE_ID(nv::U64);
+NV_DEFINE_TYPE_ID(nv::F16);
 NV_DEFINE_TYPE_ID(nv::F32);
 NV_DEFINE_TYPE_ID(nv::F64);
 
@@ -35,6 +36,36 @@ NV_DEFINE_TYPE_ID(nv::Quatf);
 NV_DEFINE_TYPE_ID(nv::Quatd);
 NV_DEFINE_TYPE_ID(nv::Mat4f);
 NV_DEFINE_TYPE_ID(nv::Mat4d);
+
+enum DataType : U64 {
+    DTYPE_UNKNOWN = 0,
+    DTYPE_BOOL = NV_TYPE_ID(bool),
+    DTYPE_U8 = NV_TYPE_ID(U8),
+    DTYPE_I8 = NV_TYPE_ID(I8),
+    DTYPE_U16 = NV_TYPE_ID(U16),
+    DTYPE_I16 = NV_TYPE_ID(I16),
+    DTYPE_U32 = NV_TYPE_ID(U32),
+    DTYPE_I32 = NV_TYPE_ID(I32),
+    DTYPE_U64 = NV_TYPE_ID(U64),
+    DTYPE_I64 = NV_TYPE_ID(I64),
+    DTYPE_F16 = NV_TYPE_ID(F16),
+    DTYPE_F32 = NV_TYPE_ID(F32),
+    DTYPE_F64 = NV_TYPE_ID(F64),
+    DTYPE_VEC2I = NV_TYPE_ID(Vec2i),
+    DTYPE_VEC2U = NV_TYPE_ID(Vec2u),
+    DTYPE_VEC2F = NV_TYPE_ID(Vec2f),
+    DTYPE_VEC2D = NV_TYPE_ID(Vec2d),
+    DTYPE_VEC3I = NV_TYPE_ID(Vec3i),
+    DTYPE_VEC3U = NV_TYPE_ID(Vec3u),
+    DTYPE_VEC3F = NV_TYPE_ID(Vec3f),
+    DTYPE_VEC3D = NV_TYPE_ID(Vec3d),
+    DTYPE_VEC4I = NV_TYPE_ID(Vec4i),
+    DTYPE_VEC4U = NV_TYPE_ID(Vec4u),
+    DTYPE_VEC4F = NV_TYPE_ID(Vec4f),
+    DTYPE_VEC4D = NV_TYPE_ID(Vec4d),
+    DTYPE_MAT4F = NV_TYPE_ID(Mat4f),
+    DTYPE_MAT4D = NV_TYPE_ID(Mat4d),
+};
 
 } // namespace nv
 

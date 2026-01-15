@@ -28,7 +28,7 @@ class PointArray : public RefObject {
 
     struct AttribDesc {
         String name;
-        I32 type;
+        StringID type;
     };
 
     explicit PointArray(Traits traits);

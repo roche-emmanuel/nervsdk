@@ -1,41 +1,12 @@
 #ifndef NVK_ENUMS_
 #define NVK_ENUMS_
 
+#include <nvk_types.h>
+
 namespace nv {
 
 enum BasicEventType {
     EVT_GL_CONTEXT_MADE_CURRENT,
-};
-
-enum DataType {
-    DTYPE_UNKNOWN,
-    DTYPE_BOOL,
-    DTYPE_U8,
-    DTYPE_I8,
-    DTYPE_U16,
-    DTYPE_I16,
-    DTYPE_U32,
-    DTYPE_I32,
-    DTYPE_U64,
-    DTYPE_I64,
-    DTYPE_F16,
-    DTYPE_F32,
-    DTYPE_F64,
-    DTYPE_VEC2I,
-    DTYPE_VEC2U,
-    DTYPE_VEC2F,
-    DTYPE_VEC2D,
-    DTYPE_VEC3I,
-    DTYPE_VEC3U,
-    DTYPE_VEC3F,
-    DTYPE_VEC3D,
-    DTYPE_VEC4I,
-    DTYPE_VEC4U,
-    DTYPE_VEC4F,
-    DTYPE_VEC4D,
-    DTYPE_MAT4F,
-    DTYPE_MAT4D,
-    DTYPE_OTHER,
 };
 
 enum EventType {

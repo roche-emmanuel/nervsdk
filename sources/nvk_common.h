@@ -5,7 +5,6 @@
 
 #include <nvk_config.h>
 
-#include <nvk_enums.h>
 #include <nvk_macros.h>
 #include <nvk_math.h>
 #include <nvk_memory.h>
@@ -15,6 +14,8 @@
 #include <nvk/base/RefPtr.h>
 #include <nvk/base/std_containers.h>
 #include <nvk/base/string_id.h>
+
+#include <nvk_enums.h>
 
 #include <nvk/utils.h>
 
@@ -30,5 +31,7 @@
 #include <nvk/math/Vec2.h>
 #include <nvk/math/Vec3.h>
 #include <nvk/math/Vec4.h>
+
+#include <nvk_type_ids.h>
 
 #endif
