@@ -18,6 +18,7 @@ class PointAttribute : public RefObject {
     virtual void resize(U32 size) = 0;
     virtual auto size() const -> U64 = 0;
     virtual auto element_size() const -> U32 = 0;
+    virtual void randomize() = 0;
 
     auto name() const -> const String& { return _name; }
     auto get_type_id() const -> StringID { return _typeId; }
@@ -69,6 +70,13 @@ class PointAttribute : public RefObject {
             index, std::forward<T>(value));
     }
 
+    // Randomize with type checking and custom ranges
+    template <typename T> void randomize_values(T min, T max) {
+        NVCHK(_typeId == TypeId<T>::id,
+              "PointAttribute::randomize_values: type mismatch.");
+        static_cast<AttributeHolder<T>*>(this)->randomize_with_range(min, max);
+    }
+
     // Factory method
     template <typename T>
     static auto create(String name, U32 size, const T& value = T{},
@@ -88,6 +96,87 @@ class PointAttribute : public RefObject {
     Traits _traits;
     String _name;
     StringID _typeId{0};
+};
+
+// Default randomization traits - can be specialized for custom types
+template <typename T> struct RandomizationTraits {
+    static constexpr bool supported = false;
+    static auto default_min() -> T { return T{}; }
+    static auto default_max() -> T { return T{}; }
+    static void fill(T* ptr, U32 count, const T& min, const T& max) {}
+};
+
+// Specialization for I32
+template <> struct RandomizationTraits<I32> {
+    static constexpr bool supported = true;
+    static auto default_min() -> I32 { return 0; }
+    static auto default_max() -> I32 { return 100; }
+    static void fill(I32* ptr, U32 count, I32 min, I32 max) {
+        RandGen::instance().uniform_int_array(ptr, count, min, max);
+    }
+};
+
+// Specialization for I64
+template <> struct RandomizationTraits<I64> {
+    static constexpr bool supported = true;
+    static auto default_min() -> I64 { return 0; }
+    static auto default_max() -> I64 { return 100; }
+    static void fill(I64* ptr, U32 count, I64 min, I64 max) {
+        RandGen::instance().uniform_int_array(ptr, count, min, max);
+    }
+};
+
+// Specialization for F32
+template <> struct RandomizationTraits<F32> {
+    static constexpr bool supported = true;
+    static auto default_min() -> F32 { return 0.0f; }
+    static auto default_max() -> F32 { return 1.0f; }
+    static void fill(F32* ptr, U32 count, F32 min, F32 max) {
+        RandGen::instance().uniform_real_array(ptr, count, min, max);
+    }
+};
+
+// Specialization for F64
+template <> struct RandomizationTraits<F64> {
+    static constexpr bool supported = true;
+    static auto default_min() -> F64 { return 0.0; }
+    static auto default_max() -> F64 { return 1.0; }
+    static void fill(F64* ptr, U32 count, F64 min, F64 max) {
+        RandGen::instance().uniform_real_array(ptr, count, min, max);
+    }
+};
+
+// Specialization for Vec2d
+template <> struct RandomizationTraits<Vec2d> {
+    static constexpr bool supported = true;
+    static auto default_min() -> Vec2d { return Vec2d(0.0); }
+    static auto default_max() -> Vec2d { return Vec2d(1.0); }
+    static void fill(Vec2d* ptr, U32 count, const Vec2d& min,
+                     const Vec2d& max) {
+        RandGen::instance().uniform_real_array(ptr, count, min, max);
+    }
+};
+
+// Specialization for Vec3d
+template <> struct RandomizationTraits<Vec3d> {
+    static constexpr bool supported = true;
+    static auto default_min() -> Vec3d { return Vec3d(0.0); }
+    static auto default_max() -> Vec3d { return Vec3d(1.0); }
+    static void fill(Vec3d* ptr, U32 count, const Vec3d& min,
+                     const Vec3d& max) {
+        RandGen::instance().uniform_real_array(ptr, count, min, max);
+    }
+};
+
+// Specialization for Vec4d
+template <> struct RandomizationTraits<Vec4d> {
+    static constexpr bool supported = true;
+    static auto default_min() -> Vec4d { return Vec4d(0.0); }
+    static auto default_max() -> Vec4d { return Vec4d(1.0); }
+    static void fill(Vec4d* ptr, U32 count, const Vec4d& min,
+                     const Vec4d& max) {
+        RandGen::instance().uniform_real_array(ptr, count, min, max);
+    }
 };
 
 template <typename T>
@@ -129,6 +218,34 @@ class PointAttribute::AttributeHolder : public PointAttribute {
     void resize(U32 size) override { _values.resize(size); }
     auto size() const -> U64 override { return _values.size(); }
     auto element_size() const -> U32 override { return sizeof(T); }
+
+    // Default randomization using traits defaults
+    void randomize() override {
+        if constexpr (RandomizationTraits<T>::supported) {
+            randomize_with_range(RandomizationTraits<T>::default_min(),
+                                 RandomizationTraits<T>::default_max());
+        } else {
+            NVCHK(false,
+                  "PointAttribute::randomize: type '{}' does not support "
+                  "randomization.",
+                  TypeId<T>::id);
+        }
+    }
+
+    // Randomization with custom range
+    void randomize_with_range(const T& min, const T& max) {
+        if constexpr (RandomizationTraits<T>::supported) {
+            if (!_values.empty()) {
+                RandomizationTraits<T>::fill(
+                    _values.data(), static_cast<U32>(_values.size()), min, max);
+            }
+        } else {
+            NVCHK(false,
+                  "PointAttribute::randomize_with_range: type '{}' does not "
+                  "support randomization.",
+                  TypeId<T>::name);
+        }
+    }
 
   protected:
     Vector<T> _values;

@@ -69,6 +69,15 @@ class RandGen {
     }
 
     template <typename T>
+    void uniform_int_array(T* ptr, U32 num, T min, T max) const {
+        F64 range = static_cast<F64>(max) - static_cast<F64>(min) + 1.0;
+        for (U32 i = 0; i < num; ++i) {
+            ptr[i] = static_cast<T>(static_cast<F64>(min) +
+                                    std::floor(_udis(_gen) * range));
+        }
+    }
+
+    template <typename T>
     [[nodiscard]] auto uniform_int_vector(U32 count, T min, T max) const
         -> Vector<T> {
         Vector<T> res(count);
@@ -126,9 +135,21 @@ inline auto gen_vec4d(F64 mini = -1.0, F64 maxi = 1.0) -> Vec4d {
     return res;
 }
 
+inline auto gen_vec4d(const Vec4d& mini, const Vec4d& maxi) -> Vec4d {
+    Vec4d res;
+    RandGen::instance().uniform_real_array(&res, 1, mini, maxi);
+    return res;
+}
+
 inline auto gen_vec4f(F32 mini = -1.0, F32 maxi = 1.0) -> Vec4f {
     Vec4f res;
     RandGen::instance().uniform_real_array(res._v.data(), 4, mini, maxi);
+    return res;
+}
+
+inline auto gen_vec4f(const Vec4f& mini, const Vec4f& maxi) -> Vec4f {
+    Vec4f res;
+    RandGen::instance().uniform_real_array(&res, 1, mini, maxi);
     return res;
 }
 
@@ -138,9 +159,21 @@ inline auto gen_vec3d(F64 mini = -1.0, F64 maxi = 1.0) -> Vec3d {
     return res;
 }
 
+inline auto gen_vec3d(const Vec3d& mini, const Vec3d& maxi) -> Vec3d {
+    Vec3d res;
+    RandGen::instance().uniform_real_array(&res, 1, mini, maxi);
+    return res;
+}
+
 inline auto gen_vec3f(F32 mini = -1.0, F32 maxi = 1.0) -> Vec3f {
     Vec3f res;
     RandGen::instance().uniform_real_array(res._v.data(), 3, mini, maxi);
+    return res;
+}
+
+inline auto gen_vec3f(const Vec3f& mini, const Vec3f& maxi) -> Vec3f {
+    Vec3f res;
+    RandGen::instance().uniform_real_array(&res, 1, mini, maxi);
     return res;
 }
 
@@ -150,9 +183,21 @@ inline auto gen_vec2d(F64 mini = -1.0, F64 maxi = 1.0) -> Vec2d {
     return res;
 }
 
+inline auto gen_vec2d(const Vec2d& mini, const Vec2d& maxi) -> Vec2d {
+    Vec2d res;
+    RandGen::instance().uniform_real_array(&res, 1, mini, maxi);
+    return res;
+}
+
 inline auto gen_vec2f(F32 mini = -1.0, F32 maxi = 1.0) -> Vec2f {
     Vec2f res;
     RandGen::instance().uniform_real_array(res._v.data(), 2, mini, maxi);
+    return res;
+}
+
+inline auto gen_vec2f(const Vec2f& mini, const Vec2f& maxi) -> Vec2f {
+    Vec2f res;
+    RandGen::instance().uniform_real_array(&res, 1, mini, maxi);
     return res;
 }
 
