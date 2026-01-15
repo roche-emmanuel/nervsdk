@@ -111,40 +111,61 @@ void PointArray::add_attribute(RefPtr<PointAttribute> attr) {
 auto PointArray::create(const Vector<AttribDesc>& attribs, U32 numPoints,
                         Traits traits) -> RefPtr<PointArray> {
     auto arr = create((I32)numPoints, traits);
-    for (const auto& adesc : attribs) {
-        switch (adesc.type) {
-        case DTYPE_BOOL:
-            arr->add_attribute<bool>(adesc.name);
-            break;
-        case DTYPE_I32:
-            arr->add_attribute<I32>(adesc.name);
-            break;
-        case DTYPE_F32:
-            arr->add_attribute<F32>(adesc.name);
-            break;
-        case DTYPE_F64:
-            arr->add_attribute<F64>(adesc.name);
-            break;
-        case DTYPE_VEC2F:
-            arr->add_attribute<Vec2f>(adesc.name);
-            break;
-        case DTYPE_VEC3F:
-            arr->add_attribute<Vec3f>(adesc.name);
-            break;
-        case DTYPE_MAT4F:
-            arr->add_attribute<Mat4f>(adesc.name);
-            break;
-        case DTYPE_MAT4D:
-            arr->add_attribute<Mat4d>(adesc.name);
-            break;
-        default:
-            THROW_MSG("Unsupported PointArray attribute type: {}", adesc.type);
-        }
-    }
+    arr->add_attributes(attribs);
 
     return arr;
 };
 auto PointArray::get_attributes() const -> const PointAttributeMap& {
     return _attributes;
 }
+
+void PointArray::add_std_attributes() {
+    static std::vector<AttribDesc> stdAttribs = {
+        {.name = pt_position_attr, .type = DTYPE_VEC3D},
+        {.name = pt_rotation_attr, .type = DTYPE_VEC3D},
+        {.name = pt_scale_attr, .type = DTYPE_VEC3D},
+        {.name = pt_boundsmin_attr, .type = DTYPE_VEC3D},
+        {.name = pt_boundsmax_attr, .type = DTYPE_VEC3D},
+        {.name = pt_color_attr, .type = DTYPE_VEC4D},
+        {.name = pt_density_attr, .type = DTYPE_F32},
+        {.name = pt_steepness_attr, .type = DTYPE_F32},
+        {.name = pt_seed_attr, .type = DTYPE_I32},
+    };
+
+    add_attributes(stdAttribs);
+};
+
+void PointArray::add_attributes(const Vector<AttribDesc>& attribs) {
+    for (const auto& adesc : attribs) {
+        switch (adesc.type) {
+        case DTYPE_BOOL:
+            add_attribute<bool>(adesc.name);
+            break;
+        case DTYPE_I32:
+            add_attribute<I32>(adesc.name);
+            break;
+        case DTYPE_F32:
+            add_attribute<F32>(adesc.name);
+            break;
+        case DTYPE_F64:
+            add_attribute<F64>(adesc.name);
+            break;
+        case DTYPE_VEC2F:
+            add_attribute<Vec2f>(adesc.name);
+            break;
+        case DTYPE_VEC3F:
+            add_attribute<Vec3f>(adesc.name);
+            break;
+        case DTYPE_MAT4F:
+            add_attribute<Mat4f>(adesc.name);
+            break;
+        case DTYPE_MAT4D:
+            add_attribute<Mat4d>(adesc.name);
+            break;
+        default:
+            THROW_MSG("Unsupported PointArray attribute type: {}", adesc.type);
+        }
+    }
+};
+
 } // namespace nv

@@ -64,12 +64,15 @@ class PointArray : public RefObject {
         return get_attribute(name).get_values<T>();
     };
 
+    void add_std_attributes();
+
     auto get_position_attribute() const -> const PointAttribute&;
 
     auto get_rotation_attribute() const -> const PointAttribute&;
 
     auto get_scale_attribute() const -> const PointAttribute&;
 
+    void add_attributes(const Vector<AttribDesc>& attribs);
     void add_attribute(RefPtr<PointAttribute> attr);
 
     template <typename T>
