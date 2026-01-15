@@ -21,6 +21,7 @@ class PointAttribute : public RefObject {
 
     auto name() const -> const String& { return _name; }
     auto get_type_index() const -> std::type_index { return _typeIndex; }
+    // auto get_type_id() const -> StringID = 0;
 
     template <typename T> auto is_type() const -> bool {
         return _typeIndex == std::type_index(typeid(T));

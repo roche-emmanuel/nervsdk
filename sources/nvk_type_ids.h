@@ -1,0 +1,37 @@
+#ifndef _NV_TYPE_IDS_H_
+#define _NV_TYPE_IDS_H_
+
+#include <nvk_common.h>
+
+namespace nv {
+
+NV_DEFINE_TYPE_ID(nv::VoidPtr);
+NV_DEFINE_TYPE_ID(nv::Bool);
+NV_DEFINE_TYPE_ID(nv::I8);
+NV_DEFINE_TYPE_ID(nv::U8);
+NV_DEFINE_TYPE_ID(nv::I16);
+NV_DEFINE_TYPE_ID(nv::U16);
+NV_DEFINE_TYPE_ID(nv::I32);
+NV_DEFINE_TYPE_ID(nv::U32);
+NV_DEFINE_TYPE_ID(nv::I64);
+NV_DEFINE_TYPE_ID(nv::U64);
+NV_DEFINE_TYPE_ID(nv::F32);
+NV_DEFINE_TYPE_ID(nv::F64);
+
+NV_DEFINE_TYPE_ID(nv::String);
+NV_DEFINE_TYPE_ID(nv::Vec2f);
+NV_DEFINE_TYPE_ID(nv::Vec2d);
+NV_DEFINE_TYPE_ID(nv::Vec2i);
+NV_DEFINE_TYPE_ID(nv::Vec2u);
+NV_DEFINE_TYPE_ID(nv::Vec3f);
+NV_DEFINE_TYPE_ID(nv::Vec3d);
+NV_DEFINE_TYPE_ID(nv::Vec3i);
+NV_DEFINE_TYPE_ID(nv::Vec3u);
+NV_DEFINE_TYPE_ID(nv::Vec4f);
+NV_DEFINE_TYPE_ID(nv::Vec4d);
+NV_DEFINE_TYPE_ID(nv::Vec4i);
+NV_DEFINE_TYPE_ID(nv::Vec4u);
+
+} // namespace nv
+
+#endif
