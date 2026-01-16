@@ -14,8 +14,8 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
     // We generate the polylines from the provided paths:
     Polyline2Vector<F64> lines;
     I32 idx = 0;
-    for (const auto& path : paths) {
 
+    for (const auto& path : paths) {
         Polyline2<F64> line;
         line.id = idx;
         line.closedLoop = false;
@@ -39,10 +39,17 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
     // Compute the 2D intersections:
     auto results = compute_polyline2_intersections(lines, 0.01);
 
-    // Collect the intersection results:
-    auto outPoints = PointArray::create(results.intersections.size());
+    // In the process we also need to collect the attribute types to recreate
+    // them on the output:
 
-    auto& posArr = outPoints->add_attribute<Vec3d>(pt_position_attr);
+    auto adescs = PointArray::collect_all_attribute_types(paths);
+
+    // Collect the intersection results:
+    auto outPoints = PointArray::create(adescs, results.intersections.size());
+
+    // We must already have the position attribute now.
+    // auto& posArr = outPoints->add_attribute<Vec3d>(pt_position_attr);
+    auto& posArr = outPoints->get<Vec3d>(pt_position_attr);
     auto& seg0LineArr = outPoints->add_attribute<I32>("seg0_line_index");
     auto& seg0IdxArr = outPoints->add_attribute<I32>("seg0_index");
     auto& seg1LineArr = outPoints->add_attribute<I32>("seg1_line_index");

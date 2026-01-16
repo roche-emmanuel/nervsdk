@@ -261,6 +261,7 @@ class PointAttribute::AttributeHolder : public PointAttribute {
 
 using PointAttributeVector = Vector<RefPtr<PointAttribute>>;
 using PointAttributeMap = UnorderedMap<String, RefPtr<PointAttribute>>;
+using PointAttributeTypeMap = UnorderedMap<String, StringID>;
 
 } // namespace nv
 

@@ -201,4 +201,39 @@ auto PointArray::clone() const -> RefPtr<PointArray> {
     return arr;
 };
 
+void PointArray::collect_attribute_types(PointAttributeTypeMap& atypes) {
+    for (const auto& it : _attributes) {
+        auto it2 = atypes.find(it.first);
+        auto atype = it.second->get_type_id();
+
+        if (it2 == atypes.end()) {
+            // Add a new entry for this attribute:
+            auto res = atypes.insert(std::make_pair(it.first, atype));
+            NVCHK(res.second, "Cannot insert attribute {}", it.first);
+        } else {
+            // Check that we have the same type:
+            NVCHK(it2->second == it.second->get_type_id(),
+                  "collect_attribute_types: attribute type mismatch {} != {}",
+                  it2->second, atype);
+        }
+    }
+};
+
+auto PointArray::collect_all_attribute_types(
+    const Vector<RefPtr<PointArray>>& arrays) -> Vector<AttribDesc> {
+    PointAttributeTypeMap atypes;
+
+    for (const auto& arr : arrays) {
+        arr->collect_attribute_types(atypes);
+    }
+
+    Vector<PointArray::AttribDesc> adescs;
+    for (const auto& it : atypes) {
+        adescs.emplace_back(
+            PointArray::AttribDesc{.name = it.first, .type = it.second});
+    }
+
+    return adescs;
+};
+
 } // namespace nv
