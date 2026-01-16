@@ -156,6 +156,18 @@ void PointArray::add_attributes(const Vector<AttribDesc>& attribs) {
         case DTYPE_VEC3F:
             add_attribute<Vec3f>(adesc.name);
             break;
+        case DTYPE_VEC4F:
+            add_attribute<Vec4f>(adesc.name);
+            break;
+        case DTYPE_VEC2D:
+            add_attribute<Vec2d>(adesc.name);
+            break;
+        case DTYPE_VEC3D:
+            add_attribute<Vec3d>(adesc.name);
+            break;
+        case DTYPE_VEC4D:
+            add_attribute<Vec4d>(adesc.name);
+            break;
         case DTYPE_MAT4F:
             add_attribute<Mat4f>(adesc.name);
             break;
@@ -167,5 +179,16 @@ void PointArray::add_attributes(const Vector<AttribDesc>& attribs) {
         }
     }
 };
+
+void PointArray::randomize_all_attributes(UnorderedMap<String, Box4d> ranges) {
+    for (auto& it : _attributes) {
+        auto it2 = ranges.find(it.first);
+        if (it2 == ranges.end()) {
+            it.second->randomize();
+        } else {
+            it.second->randomize_values(it2->second);
+        }
+    }
+}
 
 } // namespace nv

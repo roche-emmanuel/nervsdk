@@ -23,6 +23,7 @@
 
 #include <nvk/math/Box2.h>
 #include <nvk/math/Box3.h>
+#include <nvk/math/Box4.h>
 #include <nvk/math/Mat2.h>
 #include <nvk/math/Mat3.h>
 #include <nvk/math/Mat4.h>

@@ -77,6 +77,8 @@ class PointAttribute : public RefObject {
         static_cast<AttributeHolder<T>*>(this)->randomize_with_range(min, max);
     }
 
+    void randomize_values(const Box4d& range);
+
     // Factory method
     template <typename T>
     static auto create(String name, U32 size, const T& value = T{},
@@ -253,14 +255,6 @@ class PointAttribute::AttributeHolder : public PointAttribute {
 
 using PointAttributeVector = Vector<RefPtr<PointAttribute>>;
 using PointAttributeMap = UnorderedMap<String, RefPtr<PointAttribute>>;
-
-// Convenience type aliases (optional - can cast from RefPtr<PointAttribute>)
-template <typename T>
-using TypedPointAttribute = PointAttribute::AttributeHolder<T>;
-using F32PointAttribute = TypedPointAttribute<F32>;
-using F64PointAttribute = TypedPointAttribute<F64>;
-using Vec3fPointAttribute = TypedPointAttribute<Vec3f>;
-using Vec3dPointAttribute = TypedPointAttribute<Vec3d>;
 
 } // namespace nv
 

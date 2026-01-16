@@ -75,13 +75,18 @@ class PointArray : public RefObject {
     void add_attributes(const Vector<AttribDesc>& attribs);
     void add_attribute(RefPtr<PointAttribute> attr);
 
+    /** Randomize all attribute values. */
+    void randomize_all_attributes(UnorderedMap<String, Box4d> ranges = {});
+
     template <typename T>
-    auto add_attribute(const String& name, T&& initValue = {}) -> Vector<T>& {
+    auto add_attribute(const String& name, T&& initValue = {})
+        -> Vector<std::remove_reference_t<T>>& {
+        using ValueType = std::remove_reference_t<T>;
         auto size = get_num_points();
-        auto attr =
-            PointAttribute::create<T>(name, size, std::forward<T>(initValue));
+        auto attr = PointAttribute::create<ValueType>(
+            name, size, std::forward<T>(initValue));
         add_attribute(attr);
-        return attr->template get_values<T>();
+        return attr->template get_values<ValueType>();
     }
 
     void resize(U32 size) {

@@ -12,7 +12,8 @@
 namespace nv {
 
 void pcg_find_path_2d_intersections(PCGContext& ctx);
+void pcg_set_data_id(PCGContext& ctx);
 
-}
+} // namespace nv
 
 #endif

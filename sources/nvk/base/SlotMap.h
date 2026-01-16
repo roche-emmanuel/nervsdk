@@ -42,6 +42,11 @@ class SlotMap : public RefObject {
                   "Slot::get_value: type mismatch.");
             return static_cast<const SlotHolder<T>*>(this)->retrieve_value();
         }
+        template <typename T> auto get_value() -> T& {
+            NVCHK(_typeIndex == std::type_index(typeid(T)),
+                  "Slot::get_value: type mismatch.");
+            return static_cast<SlotHolder<T>*>(this)->retrieve_value();
+        }
 
         template <typename T> static auto create() -> RefPtr<Slot> {
             return nv::create<SlotHolder<std::decay_t<T>>>();
@@ -74,6 +79,7 @@ class SlotMap : public RefObject {
         }
 
         auto retrieve_value() const -> const T& { return _value; }
+        auto retrieve_value() -> T& { return _value; }
     };
 
     SlotMap() = default;
@@ -100,7 +106,9 @@ class SlotMap : public RefObject {
         auto it = _slots.find(slotName);
         if (it != _slots.end()) {
             NVCHK(it->second->get_type_index() == std::type_index(typeid(T)),
-                  "Slot '{}' exists but has different type.", slotName);
+                  "Slot '{}' exists but has different type: {} != {}", slotName,
+                  it->second->get_type_index().name(),
+                  std::type_index(typeid(T)).name());
             return it->second.get();
         }
         return nullptr;
@@ -134,8 +142,8 @@ class SlotMap : public RefObject {
     }
 
     // Get a value (template type must be specified)
-    template <typename T> auto get(const String& slotName) const -> const T& {
-        const auto& slot = get_slot<T>(slotName);
+    template <typename T> auto get(const String& slotName) const -> T& {
+        auto& slot = get_slot<T>(slotName);
         return slot.template get_value<T>();
     }
 
@@ -176,7 +184,7 @@ class SlotMap : public RefObject {
         //     return _map->get<T>(_slotName);
         // }
 
-        template <typename T> operator const T&() const {
+        template <typename T> operator T&() const {
             return _map->get<T>(_slotName);
         }
     };
