@@ -257,4 +257,12 @@ auto PointArray::get_point(U64 index) -> PCGPointRef {
           "PointArray::get_point: index {} out of bounds", index);
     return {this, index};
 }
+auto PointArray::get_attribute_names() const -> Vector<String> {
+    StringVector res;
+    for (const auto& it : _attributes) {
+        res.emplace_back(it.first);
+    }
+    return res;
+};
+
 } // namespace nv

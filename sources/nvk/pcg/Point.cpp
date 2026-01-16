@@ -96,4 +96,147 @@ void PCGPoint::apply_value_to_ref(const String& name, const std::any& value,
         THROW_MSG("apply_value_to_ref: Unsupported any type {}", type.name());
     }
 }
+
+void PCGPointRef::set_weighted_average(
+    const Vector<WeightedPoint>& weighted_points,
+    const UnorderedSet<String>& skip_attributes) {
+
+    if (weighted_points.empty()) {
+        return;
+    }
+
+    // Get the list of attributes from the array
+    const auto& attributes = _array->get_attributes();
+
+    for (const auto& [attr_name, attr] : attributes) {
+        // Skip if in skip list
+        if (skip_attributes.contains(attr_name)) {
+            continue;
+        }
+
+        StringID type_id = attr->get_type_id();
+
+        // Dispatch to appropriate typed version based on attribute type
+        if (type_id == TypeId<I32>::id) {
+            compute_weighted_average_for_attribute<I32>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<I64>::id) {
+            compute_weighted_average_for_attribute<I64>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<F32>::id) {
+            compute_weighted_average_for_attribute<F32>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<F64>::id) {
+            compute_weighted_average_for_attribute<F64>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<Vec2d>::id) {
+            compute_weighted_average_for_attribute<Vec2d>(attr_name,
+                                                          weighted_points);
+        } else if (type_id == TypeId<Vec3d>::id) {
+            compute_weighted_average_for_attribute<Vec3d>(attr_name,
+                                                          weighted_points);
+        } else if (type_id == TypeId<Vec4d>::id) {
+            compute_weighted_average_for_attribute<Vec4d>(attr_name,
+                                                          weighted_points);
+        }
+        // Unsupported types are silently skipped
+    }
+}
+
+// PCGPoint implementation
+void PCGPoint::set_weighted_average(
+    const Vector<WeightedPoint>& weighted_points,
+    const UnorderedSet<String>& skip_attributes) {
+
+    if (weighted_points.empty()) {
+        return;
+    }
+
+    // Get attribute names from the first point
+    Vector<String> attr_names;
+    if (std::holds_alternative<PCGPoint>(weighted_points[0].point)) {
+        attr_names =
+            std::get<PCGPoint>(weighted_points[0].point).get_attribute_names();
+    } else {
+        attr_names = std::get<PCGPointRef>(weighted_points[0].point)
+                         .array()
+                         ->get_attribute_names();
+    }
+
+    for (const auto& attr_name : attr_names) {
+        // Skip if in skip list
+        if (skip_attributes.contains(attr_name)) {
+            continue;
+        }
+
+        // Get type from first point's attribute
+        StringID type_id{0};
+
+        if (std::holds_alternative<PCGPoint>(weighted_points[0].point)) {
+            const auto& first_point =
+                std::get<PCGPoint>(weighted_points[0].point);
+            auto it = first_point._values.find(attr_name);
+            if (it == first_point._values.end()) {
+                THROW_MSG("set_weighted_average: No attribute with name {} in "
+                          "input point.",
+                          attr_name);
+            }
+
+            const auto& type = it->second.type();
+            if (type == typeid(I32))
+                type_id = TypeId<I32>::id;
+            else if (type == typeid(I64))
+                type_id = TypeId<I64>::id;
+            else if (type == typeid(F32))
+                type_id = TypeId<F32>::id;
+            else if (type == typeid(F64))
+                type_id = TypeId<F64>::id;
+            else if (type == typeid(Vec2d))
+                type_id = TypeId<Vec2d>::id;
+            else if (type == typeid(Vec3d))
+                type_id = TypeId<Vec3d>::id;
+            else if (type == typeid(Vec4d))
+                type_id = TypeId<Vec4d>::id;
+            else {
+                THROW_MSG("set_weighted_average: Unsupported type {}",
+                          type.name());
+            }
+        } else {
+            const auto& ref = std::get<PCGPointRef>(weighted_points[0].point);
+            const auto* attr = ref.array()->find_attribute(attr_name);
+            if (attr == nullptr) {
+                THROW_MSG(
+                    "set_weighted_average: Invalid attribute with name {}",
+                    attr_name);
+            }
+
+            type_id = attr->get_type_id();
+        }
+
+        // Dispatch based on type
+        if (type_id == TypeId<I32>::id) {
+            compute_weighted_average_for_attribute<I32>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<I64>::id) {
+            compute_weighted_average_for_attribute<I64>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<F32>::id) {
+            compute_weighted_average_for_attribute<F32>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<F64>::id) {
+            compute_weighted_average_for_attribute<F64>(attr_name,
+                                                        weighted_points);
+        } else if (type_id == TypeId<Vec2d>::id) {
+            compute_weighted_average_for_attribute<Vec2d>(attr_name,
+                                                          weighted_points);
+        } else if (type_id == TypeId<Vec3d>::id) {
+            compute_weighted_average_for_attribute<Vec3d>(attr_name,
+                                                          weighted_points);
+        } else if (type_id == TypeId<Vec4d>::id) {
+            compute_weighted_average_for_attribute<Vec4d>(attr_name,
+                                                          weighted_points);
+        }
+    }
+}
+
 } // namespace nv
