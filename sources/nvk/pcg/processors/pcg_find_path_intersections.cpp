@@ -49,33 +49,53 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
 
     // We must already have the position attribute now.
     // auto& posArr = outPoints->add_attribute<Vec3d>(pt_position_attr);
-    auto& posArr = outPoints->get<Vec3d>(pt_position_attr);
+    // auto& posArr = outPoints->get<Vec3d>(pt_position_attr);
     auto& seg0LineArr = outPoints->add_attribute<I32>("seg0_line_index");
     auto& seg0IdxArr = outPoints->add_attribute<I32>("seg0_index");
     auto& seg1LineArr = outPoints->add_attribute<I32>("seg1_line_index");
     auto& seg1IdxArr = outPoints->add_attribute<I32>("seg1_index");
 
-    I32 i = 0;
-    for (const auto& intersec : results.intersections) {
-        // TODO: should compute an interpolated Z value for the position below:
-        posArr[i].set(intersec.position.x(), intersec.position.y(), 0.0);
-        // get the involved paths:
-        auto& path0 = paths[intersec.s0.lineId];
-        // Start pos:
-        auto& positions = path0->get<Vec3d>(pt_position_attr);
-        auto startPos = positions[intersec.s0.index];
-        auto endPos = intersec.s0.index == (positions.size() - 1)
-                          ? positions[0]
-                          : positions[intersec.s0.index + 1];
+    auto interpolate_point = [&paths](I32 pathId, I32 segId,
+                                      const Vec2d& ipos) {
+        auto& path = paths[pathId];
+        auto startPt = path->get_point(segId);
+        auto endPt = path->get_point(
+            segId == (path->get_num_points() - 1) ? 0 : (segId + 1));
+
         // Compute our interpolation ratio:
+        auto startPos = startPt.position().xy();
+        auto endPos = endPt.position().xy();
         auto ratio = startPos == endPos ? 0.0
-                                        : (posArr[i] - startPos).length() /
+                                        : (ipos - startPos).length() /
                                               (endPos - startPos).length();
 
-        seg0LineArr[i] = intersec.s0.lineId;
-        seg0IdxArr[i] = intersec.s0.index;
-        seg1LineArr[i] = intersec.s1.lineId;
-        seg1IdxArr[i] = intersec.s1.index;
+        //   Ratio should be in range [0,1]
+        NVCHK(0.0 <= ratio && ratio <= 1.0,
+              "Unexpected interpolation ratio: {}", ratio);
+
+        // Create a new point and interpolate there:
+        return PCGPoint::mix(startPt, endPt, ratio);
+    };
+
+    I32 i = 0;
+    for (const auto& intersec : results.intersections) {
+        auto pathId0 = intersec.s0.lineId;
+        auto segId0 = intersec.s0.index;
+
+        auto pathId1 = intersec.s1.lineId;
+        auto segId1 = intersec.s1.index;
+
+        auto pt0 = interpolate_point(pathId0, segId0, intersec.position);
+        auto pt1 = interpolate_point(pathId1, segId1, intersec.position);
+
+        // Mix the point into the output array:
+        auto outPt = outPoints->get_point(i);
+        outPt.mix_from(pt0, pt1, 0.5);
+
+        seg0LineArr[i] = pathId0;
+        seg0IdxArr[i] = segId0;
+        seg1LineArr[i] = pathId1;
+        seg1IdxArr[i] = segId1;
         ++i;
     }
 

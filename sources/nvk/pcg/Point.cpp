@@ -239,4 +239,33 @@ void PCGPoint::set_weighted_average(
     }
 }
 
+auto PCGPoint::mix_from(const PCGVariantPoint& pt0, const PCGVariantPoint& pt1,
+                        F64 ratio) -> PCGPoint& {
+    set_weighted_average({{pt0, 1.0 - ratio}, {pt1, ratio}});
+    return *this;
+};
+
+auto PCGPointRef::mix_from(const PCGVariantPoint& pt0,
+                           const PCGVariantPoint& pt1, F64 ratio)
+    -> PCGPointRef& {
+    set_weighted_average({{pt0, 1.0 - ratio}, {pt1, ratio}});
+    return *this;
+};
+
+auto PCGPoint::mix(const PCGVariantPoint& pt0, const PCGVariantPoint& pt1,
+                   F64 ratio) -> PCGPoint {
+    PCGPoint pt;
+    pt.set_weighted_average({{pt0, 1.0 - ratio}, {pt1, ratio}});
+    return pt;
+};
+
+auto WeightedPoint::has_attribute(const String& aname) const -> bool {
+
+    if (std::holds_alternative<PCGPoint>(point)) {
+        return std::get<PCGPoint>(point).has(aname);
+    }
+
+    return std::get<PCGPointRef>(point).array()->has_attribute(aname);
+};
+
 } // namespace nv

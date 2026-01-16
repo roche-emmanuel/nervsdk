@@ -3,11 +3,15 @@
 
 #include <nvk/pcg/PointArray.h>
 
+#include <utility>
+
 namespace nv {
 
 // Forward declarations
 class PCGPoint;
 class PCGPointRef;
+
+using PCGVariantPoint = std::variant<PCGPoint, PCGPointRef>;
 
 // Trait to determine if a type supports weighted averaging
 template <typename T> struct WeightedAverageTraits {
@@ -123,6 +127,9 @@ class PCGPointRef {
     void set_weighted_average(const Vector<WeightedPoint>& weighted_points,
                               const UnorderedSet<String>& skip_attributes = {});
 
+    auto mix_from(const PCGVariantPoint& pt0, const PCGVariantPoint& pt1,
+                  F64 ratio) -> PCGPointRef&;
+
   private:
     PointArray* _array;
     U64 _index;
@@ -139,6 +146,12 @@ class PCGPoint {
 
     // Construct from a PCGPointRef (makes a copy)
     explicit PCGPoint(const PCGPointRef& ref);
+
+    auto mix_from(const PCGVariantPoint& pt0, const PCGVariantPoint& pt1,
+                  F64 ratio) -> PCGPoint&;
+
+    static auto mix(const PCGVariantPoint& pt0, const PCGVariantPoint& pt1,
+                    F64 ratio) -> PCGPoint;
 
     // Get attribute value
     template <typename T>
@@ -193,18 +206,20 @@ class PCGPoint {
 
 // Weighted point structure
 struct WeightedPoint {
-    std::variant<PCGPoint, PCGPointRef> point;
+    PCGVariantPoint point;
     F64 weight;
 
+    WeightedPoint(PCGVariantPoint p, F64 w) : point(std::move(p)), weight(w) {}
     WeightedPoint(const PCGPoint& p, F64 w) : point(p), weight(w) {}
     WeightedPoint(const PCGPointRef& p, F64 w) : point(p), weight(w) {}
     WeightedPoint(PCGPoint&& p, F64 w) : point(std::move(p)), weight(w) {}
+
+    [[nodiscard]] auto has_attribute(const String& aname) const -> bool;
 };
 
-// Helper function to get attribute value from variant point
 template <typename T>
-auto get_point_attribute(const std::variant<PCGPoint, PCGPointRef>& point,
-                         const String& name) -> T {
+auto get_point_attribute(const PCGVariantPoint& point, const String& name)
+    -> T {
     if (std::holds_alternative<PCGPoint>(point)) {
         return std::get<PCGPoint>(point).get<T>(name);
     }
@@ -231,7 +246,12 @@ void PCGPointRef::compute_weighted_average_for_attribute(
     AccumType accumulated{};
     F64 total_weight = 0.0;
 
+    // We should only accumulate on the points that do have this attribute:
     for (const auto& wp : weighted_points) {
+        if (!wp.has_attribute(attr_name)) {
+            continue;
+        }
+
         T value = get_point_attribute<T>(wp.point, attr_name);
         accumulated += WeightedAverageTraits<T>::accumulate(value, wp.weight);
         total_weight += wp.weight;
@@ -263,14 +283,19 @@ void PCGPoint::compute_weighted_average_for_attribute(
     F64 total_weight = 0.0;
 
     for (const auto& wp : weighted_points) {
+        if (!wp.has_attribute(attr_name)) {
+            continue;
+        }
+
         T value = get_point_attribute<T>(wp.point, attr_name);
         accumulated += WeightedAverageTraits<T>::accumulate(value, wp.weight);
         total_weight += wp.weight;
     }
 
-    T result = WeightedAverageTraits<T>::divide(
-        accumulated, total_weight == 0.0 ? 1.0 : total_weight);
-    set<T>(attr_name, result);
+    if (total_weight > 0.0) {
+        T result = WeightedAverageTraits<T>::divide(accumulated, total_weight);
+        set<T>(attr_name, result);
+    }
 }
 
 } // namespace nv

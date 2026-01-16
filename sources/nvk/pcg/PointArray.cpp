@@ -265,4 +265,8 @@ auto PointArray::get_attribute_names() const -> Vector<String> {
     return res;
 };
 
+auto PointArray::has_attribute(const String& name) const -> bool {
+    return _attributes.contains(name);
+};
+
 } // namespace nv

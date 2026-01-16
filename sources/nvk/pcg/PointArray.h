@@ -58,6 +58,7 @@ class PointArray : public RefObject {
     // Get all attribute names
     [[nodiscard]] auto get_attribute_names() const -> Vector<String>;
 
+    auto has_attribute(const String& name) const -> bool;
     auto find_attribute(const String& name) const -> const PointAttribute*;
     auto find_attribute(const String& name) -> PointAttribute*;
 
