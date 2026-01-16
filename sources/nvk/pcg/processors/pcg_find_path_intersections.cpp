@@ -59,6 +59,19 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
     for (const auto& intersec : results.intersections) {
         // TODO: should compute an interpolated Z value for the position below:
         posArr[i].set(intersec.position.x(), intersec.position.y(), 0.0);
+        // get the involved paths:
+        auto& path0 = paths[intersec.s0.lineId];
+        // Start pos:
+        auto& positions = path0->get<Vec3d>(pt_position_attr);
+        auto startPos = positions[intersec.s0.index];
+        auto endPos = intersec.s0.index == (positions.size() - 1)
+                          ? positions[0]
+                          : positions[intersec.s0.index + 1];
+        // Compute our interpolation ratio:
+        auto ratio = startPos == endPos ? 0.0
+                                        : (posArr[i] - startPos).length() /
+                                              (endPos - startPos).length();
+
         seg0LineArr[i] = intersec.s0.lineId;
         seg0IdxArr[i] = intersec.s0.index;
         seg1LineArr[i] = intersec.s1.lineId;

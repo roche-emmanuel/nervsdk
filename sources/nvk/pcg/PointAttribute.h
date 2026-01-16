@@ -65,9 +65,10 @@ class PointAttribute : public RefObject {
 
     // Set single value at index
     template <typename T> void set_value(U64 index, T&& value) {
-        NVCHK(_typeId == TypeId<T>::id,
+        using cleanT = std::decay_t<T>;
+        NVCHK(_typeId == TypeId<cleanT>::id,
               "PointAttribute::set_value: type mismatch.");
-        static_cast<AttributeHolder<T>*>(this)->assign_value(
+        static_cast<AttributeHolder<cleanT>*>(this)->assign_value(
             index, std::forward<T>(value));
     }
 

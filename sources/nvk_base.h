@@ -45,6 +45,11 @@
 
 namespace nv {
 using Json = nlohmann::json;
-}
+
+class PointArray;
+class PCGPoint;
+class PCGPointRef;
+
+} // namespace nv
 
 #endif

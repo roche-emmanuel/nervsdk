@@ -1,3 +1,4 @@
+#include <nvk/pcg/Point.h>
 #include <nvk/pcg/PointArray.h>
 
 namespace nv {
@@ -236,4 +237,24 @@ auto PointArray::collect_all_attribute_types(
     return adescs;
 };
 
+void PointArray::set_point(U64 index, const PCGPoint& point) {
+    auto ref = get_point(index);
+    point.apply_to(ref);
+}
+
+auto PointArray::copy_point(U64 index) const -> PCGPoint {
+    return PCGPoint(get_point(index));
+}
+
+auto PointArray::get_point(U64 index) const -> PCGPointRef {
+    NVCHK(index < static_cast<U64>(_numPoints),
+          "PointArray::get_point: index {} out of bounds", index);
+    return {const_cast<PointArray*>(this), index};
+}
+
+auto PointArray::get_point(U64 index) -> PCGPointRef {
+    NVCHK(index < static_cast<U64>(_numPoints),
+          "PointArray::get_point: index {} out of bounds", index);
+    return {this, index};
+}
 } // namespace nv
