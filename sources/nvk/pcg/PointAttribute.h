@@ -19,6 +19,7 @@ class PointAttribute : public RefObject {
     virtual auto size() const -> U64 = 0;
     virtual auto element_size() const -> U32 = 0;
     virtual void randomize() = 0;
+    virtual auto clone() const -> RefPtr<PointAttribute> = 0;
 
     auto name() const -> const String& { return _name; }
     auto get_type_id() const -> StringID { return _typeId; }
@@ -220,6 +221,11 @@ class PointAttribute::AttributeHolder : public PointAttribute {
     void resize(U32 size) override { _values.resize(size); }
     auto size() const -> U64 override { return _values.size(); }
     auto element_size() const -> U32 override { return sizeof(T); }
+
+    // Clone implementation - creates a deep copy
+    auto clone() const -> RefPtr<PointAttribute> override {
+        return nv::create<AttributeHolder<T>>(_name, _values, _traits);
+    }
 
     // Default randomization using traits defaults
     void randomize() override {

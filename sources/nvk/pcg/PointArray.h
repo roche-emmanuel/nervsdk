@@ -43,6 +43,8 @@ class PointArray : public RefObject {
     static auto create(const Vector<AttribDesc>& attribs, U32 numPoints,
                        Traits traits = {}) -> RefPtr<PointArray>;
 
+    auto clone() const -> RefPtr<PointArray>;
+
     /** Retrieve the number of attributes. */
     auto get_num_attributes() const -> U32;
     auto get_num_points() const -> U32;

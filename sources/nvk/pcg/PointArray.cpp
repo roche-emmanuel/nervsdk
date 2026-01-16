@@ -191,4 +191,14 @@ void PointArray::randomize_all_attributes(UnorderedMap<String, Box4d> ranges) {
     }
 }
 
+auto PointArray::clone() const -> RefPtr<PointArray> {
+    auto arr = create(_numPoints, _traits);
+
+    for (const auto& it : _attributes) {
+        arr->add_attribute(it.second->clone());
+    }
+
+    return arr;
+};
+
 } // namespace nv
