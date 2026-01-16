@@ -80,8 +80,8 @@ class PointArray : public RefObject {
 
     template <typename T>
     auto add_attribute(const String& name, T&& initValue = {})
-        -> Vector<std::remove_reference_t<T>>& {
-        using ValueType = std::remove_reference_t<T>;
+        -> Vector<std::decay_t<T>>& {
+        using ValueType = std::decay_t<T>;
         auto size = get_num_points();
         auto attr = PointAttribute::create<ValueType>(
             name, size, std::forward<T>(initValue));

@@ -15,6 +15,20 @@ class SlotMap : public RefObject {
   public:
     template <typename T> class SlotHolder;
 
+    template <typename T> struct StorageType {
+        using type = T;
+    };
+
+    template <> struct StorageType<const char*> {
+        using type = String;
+    };
+
+    template <> struct StorageType<char*> {
+        using type = String;
+    };
+
+    template <typename T> using storage_type_t = typename StorageType<T>::type;
+
     class Slot : public RefObject {
         NV_DECLARE_NO_COPY(Slot)
         NV_DECLARE_NO_MOVE(Slot)
@@ -31,7 +45,8 @@ class SlotMap : public RefObject {
         template <typename T> void set_value(T&& val) {
             using CleanT = std::decay_t<T>;
             NVCHK(_typeIndex == std::type_index(typeid(CleanT)),
-                  "Slot::set_value: type mismatch.");
+                  "Slot::set_value: type mismatch: {} != {}", _typeIndex.name(),
+                  std::type_index(typeid(CleanT)).name());
             // Forward with the original T, not CleanT
             static_cast<SlotHolder<CleanT>*>(this)->assign_value(
                 std::forward<T>(val));
@@ -136,8 +151,17 @@ class SlotMap : public RefObject {
     // Set a value (template type deduced from value)
     template <typename T> auto set(String slotName, T&& value) -> SlotMap& {
         using CleanT = std::decay_t<T>;
-        auto& slot = get_or_create_slot<CleanT>(std::move(slotName));
-        slot.set_value(std::forward<T>(value));
+        using StorageT = storage_type_t<CleanT>;
+
+        auto& slot = get_or_create_slot<StorageT>(std::move(slotName));
+
+        // If storage type differs from clean type, convert explicitly
+        if constexpr (!std::is_same_v<CleanT, StorageT>) {
+            slot.set_value(StorageT(std::forward<T>(value)));
+        } else {
+            slot.set_value(std::forward<T>(value));
+        }
+
         return *this;
     }
 
@@ -149,17 +173,23 @@ class SlotMap : public RefObject {
 
     // Get a value with default fallback (type deduced from default value)
     template <typename T>
-    auto get(const String& slotName, T&& defaultValue) const -> T {
+    auto get(const String& slotName, T&& defaultValue) const
+        -> storage_type_t<std::decay_t<T>> {
         using CleanT = std::decay_t<T>;
+        using StorageT = storage_type_t<CleanT>;
+
         auto it = _slots.find(slotName);
         if (it == _slots.end()) {
-            return std::forward<T>(defaultValue);
+            // Convert defaultValue to StorageT
+            return StorageT(std::forward<T>(defaultValue));
         }
-        NVCHK(it->second->get_type_index() == std::type_index(typeid(CleanT)),
+
+        NVCHK(it->second->get_type_index() == std::type_index(typeid(StorageT)),
               "Slot '{}' exists but has type mismatch (expected {}, got {}).",
-              slotName, typeid(CleanT).name(),
+              slotName, typeid(StorageT).name(),
               it->second->get_type_index().name());
-        return it->second->template get_value<CleanT>();
+
+        return it->second->template get_value<StorageT>();
     }
 
     template <typename T> auto is_a(const String& slotName) const -> bool {
