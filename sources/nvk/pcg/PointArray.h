@@ -111,16 +111,16 @@ class PointArray : public RefObject {
     auto get_attributes() const -> const PointAttributeMap&;
 
     // Get a reference to a point (modifications affect the array)
-    auto get_point(U64 index) -> PCGPointRef;
+    auto get_point(I64 index) -> PCGPointRef;
 
     // Get a const reference to a point
-    auto get_point(U64 index) const -> PCGPointRef;
+    auto get_point(I64 index) const -> PCGPointRef;
 
     // Get a copy of a point (modifications don't affect the array)
-    auto copy_point(U64 index) const -> PCGPoint;
+    auto copy_point(I64 index) const -> PCGPoint;
 
     // Set a point's values from a Point object
-    void set_point(U64 index, const PCGPoint& point);
+    void set_point(I64 index, const PCGPoint& point);
 
   protected:
     Traits _traits;

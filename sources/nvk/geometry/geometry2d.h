@@ -62,6 +62,26 @@ auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt)
     return (pt - proj).length();
 }
 
+template <typename T>
+auto seg2_project_point(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt,
+                        T* t = nullptr) -> Vec2<T> {
+    Vec2<T> ab = b - a;
+    T ab_len_sq = ab.dot(ab);
+
+    // Handle degenerate case: segment is a point
+    if (ab_len_sq < T(1e-20)) {
+        if (t)
+            *t = T(0);
+        return a;
+    }
+
+    T t_val = (pt - a).dot(ab) / ab_len_sq;
+    if (t)
+        *t = t_val;
+
+    return a + ab * t_val;
+}
+
 template <typename T> struct Polyline2 {
     I32 id;
     Vector<Vec2<T>> points;

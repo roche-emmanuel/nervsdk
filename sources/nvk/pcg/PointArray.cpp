@@ -237,25 +237,28 @@ auto PointArray::collect_all_attribute_types(
     return adescs;
 };
 
-void PointArray::set_point(U64 index, const PCGPoint& point) {
+void PointArray::set_point(I64 index, const PCGPoint& point) {
     auto ref = get_point(index);
     point.apply_to(ref);
 }
 
-auto PointArray::copy_point(U64 index) const -> PCGPoint {
+auto PointArray::copy_point(I64 index) const -> PCGPoint {
     return PCGPoint(get_point(index));
 }
 
-auto PointArray::get_point(U64 index) const -> PCGPointRef {
-    NVCHK(index < static_cast<U64>(_numPoints),
+auto PointArray::get_point(I64 index) const -> PCGPointRef {
+    if (index < 0) {
+        index += _numPoints;
+    }
+    NVCHK(index < get_num_points(),
           "PointArray::get_point: index {} out of bounds", index);
-    return {const_cast<PointArray*>(this), index};
+    return {const_cast<PointArray*>(this), U64(index)};
 }
 
-auto PointArray::get_point(U64 index) -> PCGPointRef {
-    NVCHK(index < static_cast<U64>(_numPoints),
+auto PointArray::get_point(I64 index) -> PCGPointRef {
+    NVCHK(index < get_num_points(),
           "PointArray::get_point: index {} out of bounds", index);
-    return {this, index};
+    return {this, U64(index)};
 }
 auto PointArray::get_attribute_names() const -> Vector<String> {
     StringVector res;

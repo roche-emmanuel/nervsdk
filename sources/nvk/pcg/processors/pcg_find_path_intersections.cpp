@@ -3,13 +3,21 @@
 
 namespace nv {
 
+enum IntersectType {
+    ITYPE_NONE = 0,
+    ITYPE_4WAY = 1,
+    ITYPE_3WAY = 2,
+};
+
 /** Find intersections from all the input paths. */
 void pcg_find_path_2d_intersections(PCGContext& ctx) {
 
-    auto& in = ctx.inputs().get_raw_slot("In");
+    auto& in = ctx.inputs();
 
-    auto paths = in.as_vector<RefPtr<PointArray>>();
+    auto paths = in.get_raw_slot("In").as_vector<RefPtr<PointArray>>();
     logDEBUG("Processing {} input paths.", paths.size());
+
+    F64 endPointDist = in.get("EndPointSnapDistance", 0.0);
 
     // We generate the polylines from the provided paths:
     Polyline2Vector<F64> lines;
@@ -37,7 +45,7 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
     }
 
     // Compute the 2D intersections:
-    auto results = compute_polyline2_intersections(lines, 0.01);
+    auto results = compute_polyline2_intersections(lines, endPointDist);
 
     // In the process we also need to collect the attribute types to recreate
     // them on the output:
@@ -45,15 +53,18 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
     auto adescs = PointArray::collect_all_attribute_types(paths);
 
     // Collect the intersection results:
-    auto outPoints = PointArray::create(adescs, results.intersections.size());
+    U32 nIntersecs =
+        results.intersections.size() + results.endpointNearSegments.size();
+    auto outPoints = PointArray::create(adescs, nIntersecs);
 
     // We must already have the position attribute now.
     // auto& posArr = outPoints->add_attribute<Vec3d>(pt_position_attr);
     // auto& posArr = outPoints->get<Vec3d>(pt_position_attr);
-    auto& seg0LineArr = outPoints->add_attribute<I32>("seg0_line_index");
+    auto& seg0LineArr = outPoints->add_attribute<I32>("line0_index");
     auto& seg0IdxArr = outPoints->add_attribute<I32>("seg0_index");
-    auto& seg1LineArr = outPoints->add_attribute<I32>("seg1_line_index");
+    auto& seg1LineArr = outPoints->add_attribute<I32>("line1_index");
     auto& seg1IdxArr = outPoints->add_attribute<I32>("seg1_index");
+    auto& intersecTypeArr = outPoints->add_attribute<I32>("intersect_type");
 
     auto interpolate_point = [&paths](I32 pathId, I32 segId,
                                       const Vec2d& ipos) {
@@ -96,6 +107,44 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
         seg0IdxArr[i] = segId0;
         seg1LineArr[i] = pathId1;
         seg1IdxArr[i] = segId1;
+        intersecTypeArr[i] = ITYPE_4WAY;
+        ++i;
+    }
+
+    // Now handle the 3way intersections:
+    for (const auto& nearSeg : results.endpointNearSegments) {
+        // Get the end point details:
+        auto endPoint =
+            paths[nearSeg.pathId]->get_point(nearSeg.isStart ? 0 : -1);
+
+        // Get the alternate segment points:
+        const auto& path = paths[nearSeg.segment.lineId];
+        auto segId = nearSeg.segment.index;
+        auto pt0 = path->get_point(segId);
+        auto pt1 = path->get_point(
+            segId == (path->get_num_points() - 1) ? 0 : (segId + 1));
+
+        // Next we need to project our endPoint onto the segment:
+        F64 t = 0.0;
+        seg2_project_point(pt0.position().xy(), pt1.position().xy(),
+                           endPoint.position().xy(), &t);
+
+        NVCHK(0 <= t && t <= 1.0, "Expected projection to be on segment: t={}",
+              t);
+        auto ptA = PCGPoint::mix(pt0, pt1, t);
+
+        auto outPt = outPoints->get_point(i);
+        outPt.mix_from(ptA, endPoint, 0.5);
+
+        // Replace the position of the output point as this one should be left
+        // on the segment:
+        outPt.set_position(ptA.position());
+
+        seg0LineArr[i] = nearSeg.pathId;
+        seg0IdxArr[i] = (I32)endPoint.index();
+        seg1LineArr[i] = nearSeg.segment.lineId;
+        seg1IdxArr[i] = nearSeg.segment.index;
+        intersecTypeArr[i] = ITYPE_3WAY;
         ++i;
     }
 
