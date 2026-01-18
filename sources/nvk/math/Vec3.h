@@ -311,8 +311,51 @@ template <typename T> struct Vec3 {
     [[nodiscard]] auto xz() const -> Vec2<T> { return {_v[0], _v[2]}; }
 
     /** Component multiply */
-    [[nodiscard]] inline auto mult(const Vec3 rhs) const -> Vec3 {
+    [[nodiscard]] auto mult(const Vec3 rhs) const -> Vec3 {
         return {_v[0] * rhs._v[0], _v[1] * rhs._v[1], _v[2] * rhs._v[2]};
+    }
+
+    /** Compute the angle between this vector and another vector in radians.
+     * Returns the angle in the range [0, pi].
+     */
+    [[nodiscard]] auto angleTo(const Vec3& rhs) const -> value_t {
+        value_t dot_product = dot(rhs);
+        value_t len_product = length() * rhs.length();
+
+        if (len_product == 0.0) {
+            return 0.0;
+        }
+
+        // Clamp to avoid numerical issues with acos
+        value_t cos_angle = dot_product / len_product;
+        cos_angle = nv::clamp(cos_angle, static_cast<value_t>(-1.0),
+                              static_cast<value_t>(1.0));
+
+        return std::acos(cos_angle);
+    }
+
+    /** Compute the signed angle from this vector to another vector in radians,
+     * relative to a reference axis (normal vector).
+     * Returns the angle in the range [-pi, pi].
+     * Positive angles indicate counter-clockwise rotation when viewing along
+     * the normal.
+     *
+     * @param rhs The target vector
+     * @param normal The reference axis (should be normalized and perpendicular
+     * to the plane)
+     */
+    [[nodiscard]] auto signedAngleTo(const Vec3& rhs, const Vec3& normal) const
+        -> value_t {
+        Vec3 cross_product = cross(rhs);
+        value_t sin_angle = cross_product.length();
+        value_t cos_angle = dot(rhs);
+
+        // Determine sign based on the normal
+        if (cross_product.dot(normal) < 0.0) {
+            sin_angle = -sin_angle;
+        }
+
+        return std::atan2(sin_angle, cos_angle);
     }
 
     template <class Archive> void serialize(Archive& ar) { ar(_v); }

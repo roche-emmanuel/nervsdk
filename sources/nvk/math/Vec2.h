@@ -251,6 +251,34 @@ template <typename T> struct Vec2 {
         return {std::ceil(_v[0]), std::ceil(_v[1])};
     }
 
+    /** Compute the angle between this vector and another vector in radians.
+     * Returns the angle in the range [0, pi].
+     */
+    [[nodiscard]] auto angleTo(const Vec2& rhs) const -> value_t {
+        value_t dot_product = dot(rhs);
+        value_t len_product = length() * rhs.length();
+
+        if (len_product == 0.0) {
+            return 0.0;
+        }
+
+        // Clamp to avoid numerical issues with acos
+        value_t cos_angle = dot_product / len_product;
+        cos_angle = nv::clamp(cos_angle, static_cast<value_t>(-1.0),
+                              static_cast<value_t>(1.0));
+
+        return std::acos(cos_angle);
+    }
+
+    /** Compute the signed angle from this vector to another vector in radians.
+     * Returns the angle in the range [-pi, pi].
+     * Positive angles indicate counter-clockwise rotation.
+     */
+    [[nodiscard]] auto signedAngleTo(const Vec2& rhs) const -> value_t {
+        value_t angle = std::atan2(cross(rhs), dot(rhs));
+        return angle;
+    }
+
     template <class Archive> void serialize(Archive& ar) { ar(_v); }
 }; // end of class Vec2
 
