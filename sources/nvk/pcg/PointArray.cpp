@@ -250,13 +250,16 @@ auto PointArray::get_point(I64 index) const -> PCGPointRef {
     if (index < 0) {
         index += _numPoints;
     }
-    NVCHK(index < get_num_points(),
+    NVCHK(0 <= index && index < get_num_points(),
           "PointArray::get_point: index {} out of bounds", index);
     return {const_cast<PointArray*>(this), U64(index)};
 }
 
 auto PointArray::get_point(I64 index) -> PCGPointRef {
-    NVCHK(index < get_num_points(),
+    if (index < 0) {
+        index += _numPoints;
+    }
+    NVCHK(0 <= index && index < get_num_points(),
           "PointArray::get_point: index {} out of bounds", index);
     return {this, U64(index)};
 }

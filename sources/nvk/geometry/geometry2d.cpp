@@ -100,8 +100,9 @@ auto findEndpointNearSegments(const Polyline2Vector<T>& paths,
             if (s->lineId == lineId)
                 return true;
 
-            F32 d = s->point_distance(p);
-            if (d <= distance) {
+            T t = 0.0;
+            T d = s->point_distance(p, false, &t);
+            if (d <= distance && 0 <= t && t <= 1.0) {
                 result.push_back({.endpoint = p,
                                   .pathId = lineId,
                                   .isStart = isStart,

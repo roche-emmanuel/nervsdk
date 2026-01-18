@@ -45,20 +45,46 @@ auto seg2_intersect(const Vec2<T>& seg0_a, const Vec2<T>& seg0_b,
     return true;
 }
 
+// template <typename T>
+// auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>&
+// pt)
+//     -> T {
+//     Vec2<T> ab = b - a;
+//     T ab_len_sq = ab.dot(ab);
+
+//     // Handle degenerate case: segment is a point
+//     if (ab_len_sq < T(1e-20)) {
+//         return (pt - a).length();
+//     }
+
+//     T t = (pt - a).dot(ab) / ab_len_sq;
+//     t = std::clamp(t, T(0.0), T(1.0));
+//     Vec2<T> proj = a + ab * t;
+//     return (pt - proj).length();
+// }
+
 template <typename T>
-auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt)
-    -> T {
+auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt,
+                         bool clampProj = true, T* t = nullptr) -> T {
     Vec2<T> ab = b - a;
     T ab_len_sq = ab.dot(ab);
 
     // Handle degenerate case: segment is a point
     if (ab_len_sq < T(1e-20)) {
+        if (t)
+            *t = T(0);
         return (pt - a).length();
     }
 
-    T t = (pt - a).dot(ab) / ab_len_sq;
-    t = std::clamp(t, T(0.0), T(1.0));
-    Vec2<T> proj = a + ab * t;
+    T t_val = (pt - a).dot(ab) / ab_len_sq;
+
+    if (clampProj)
+        t_val = std::clamp(t_val, T(0.0), T(1.0));
+
+    if (t)
+        *t = t_val;
+
+    Vec2<T> proj = a + ab * t_val;
     return (pt - proj).length();
 }
 
@@ -104,8 +130,9 @@ template <typename T> struct Segment2 {
         return seg2_intersect(a, b, seg.a, seg.b, intersectPt);
     };
 
-    auto point_distance(const Vec2<T>& pt) const -> T {
-        return seg2_point_distance(a, b, pt);
+    auto point_distance(const Vec2<T>& pt, bool clampProj, T* t = nullptr) const
+        -> T {
+        return seg2_point_distance(a, b, pt, clampProj, t);
     }
 };
 
