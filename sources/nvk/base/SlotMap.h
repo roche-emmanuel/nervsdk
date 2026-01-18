@@ -149,10 +149,18 @@ class SlotMap : public RefObject {
     }
 
     // Set a value (template type deduced from value)
-    template <typename T> auto set(String slotName, T&& value) -> SlotMap& {
+    template <typename T>
+    auto set(String slotName, T&& value, bool overrideType = false)
+        -> SlotMap& {
         using CleanT = std::decay_t<T>;
         using StorageT = storage_type_t<CleanT>;
 
+        if (overrideType) {
+            auto* slotPtr = find_raw_slot(slotName);
+            if (slotPtr != nullptr && !slotPtr->is_a<StorageT>()) {
+                remove_slot(slotName);
+            }
+        }
         auto& slot = get_or_create_slot<StorageT>(std::move(slotName));
 
         // If storage type differs from clean type, convert explicitly

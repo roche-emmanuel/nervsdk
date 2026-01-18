@@ -54,6 +54,7 @@ class PointArray : public RefObject {
     /** Retrieve the number of attributes. */
     auto get_num_attributes() const -> U32;
     auto get_num_points() const -> U32;
+    auto get_num_segments() const -> U32;
 
     // Get all attribute names
     [[nodiscard]] auto get_attribute_names() const -> Vector<String>;
@@ -122,10 +123,25 @@ class PointArray : public RefObject {
     // Set a point's values from a Point object
     void set_point(I64 index, const PCGPoint& point);
 
+    // Get segment start:
+    auto get_seg_start_point(I64 segId) -> PCGPointRef;
+    // Get segment end:
+    auto get_seg_end_point(I64 segId) -> PCGPointRef;
+
+    auto is_closed_loop() const { return _closedLoop; }
+    void set_closed_loop(bool closed) { _closedLoop = closed; }
+
+    auto add_tag(const String& tag) -> bool;
+    void add_tags(const Set<String>& tags);
+    auto get_tags() const -> const Set<String>&;
+
   protected:
     Traits _traits;
     PointAttributeMap _attributes;
     I32 _numPoints{-1};
+    bool _closedLoop{false};
+
+    Set<String> _tags;
 
     void validate_attributes();
 };

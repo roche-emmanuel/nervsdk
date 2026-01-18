@@ -92,6 +92,14 @@ auto PointArray::get_num_points() const -> U32 {
     return _numPoints < 0 ? 0 : _numPoints;
 }
 
+auto PointArray::get_num_segments() const -> U32 {
+    U32 nPoints = get_num_points();
+    if (nPoints <= 1)
+        return 0;
+
+    return _closedLoop ? nPoints : nPoints - 1;
+}
+
 void PointArray::add_attribute(RefPtr<PointAttribute> attr) {
     NVCHK(attr != nullptr, "Invalid attribute.");
 
@@ -248,7 +256,7 @@ auto PointArray::copy_point(I64 index) const -> PCGPoint {
 
 auto PointArray::get_point(I64 index) const -> PCGPointRef {
     if (index < 0) {
-        index += _numPoints;
+        index += get_num_points();
     }
     NVCHK(0 <= index && index < get_num_points(),
           "PointArray::get_point: index {} out of bounds", index);
@@ -257,7 +265,7 @@ auto PointArray::get_point(I64 index) const -> PCGPointRef {
 
 auto PointArray::get_point(I64 index) -> PCGPointRef {
     if (index < 0) {
-        index += _numPoints;
+        index += get_num_points();
     }
     NVCHK(0 <= index && index < get_num_points(),
           "PointArray::get_point: index {} out of bounds", index);
@@ -275,4 +283,35 @@ auto PointArray::has_attribute(const String& name) const -> bool {
     return _attributes.contains(name);
 };
 
+auto PointArray::get_seg_start_point(I64 segId) -> PCGPointRef {
+    if (segId < 0) {
+        segId += get_num_segments();
+    }
+
+    NVCHK(0 <= segId && segId < get_num_segments(),
+          "PointArray::get_seg_start_point: segId {} out of bounds", segId);
+    return get_point(segId);
+};
+
+auto PointArray::get_seg_end_point(I64 segId) -> PCGPointRef {
+    if (segId < 0) {
+        segId += get_num_segments();
+    }
+
+    NVCHK(0 <= segId && segId < get_num_segments(),
+          "PointArray::get_seg_end_point: segId {} out of bounds", segId);
+
+    auto ptId =
+        (is_closed_loop() && segId == (get_num_segments() - 1)) ? 0 : segId + 1;
+
+    return get_point(ptId);
+};
+
+auto PointArray::get_tags() const -> const Set<String>& { return _tags; }
+void PointArray::add_tags(const Set<String>& tags) {
+    _tags.insert(tags.begin(), tags.end());
+}
+auto PointArray::add_tag(const String& tag) -> bool {
+    return _tags.insert(tag).second;
+}
 } // namespace nv

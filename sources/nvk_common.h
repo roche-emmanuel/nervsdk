@@ -29,6 +29,8 @@
 #include <nvk/math/Mat4.h>
 #include <nvk/math/Quat.h>
 #include <nvk/math/Range.h>
+#include <nvk/math/Spline2.h>
+#include <nvk/math/Spline3.h>
 #include <nvk/math/Vec2.h>
 #include <nvk/math/Vec3.h>
 #include <nvk/math/Vec4.h>

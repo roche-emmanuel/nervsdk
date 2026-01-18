@@ -10,11 +10,17 @@
 #include <nvk/pcg/PointArray.h>
 #include <nvk/pcg/PointAttribute.h>
 
-
 namespace nv {
 
-void pcg_find_path_2d_intersections(PCGContext& ctx);
+enum IntersectionType {
+    ITYPE_NONE = 0,
+    ITYPE_4WAY = 1,
+    ITYPE_3WAY = 2,
+};
+
 void pcg_set_data_id(PCGContext& ctx);
+void pcg_find_path_2d_intersections(PCGContext& ctx);
+void pcg_build_intersection_contours(PCGContext& ctx);
 
 } // namespace nv
 

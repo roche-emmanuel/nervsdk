@@ -3,12 +3,6 @@
 
 namespace nv {
 
-enum IntersectType {
-    ITYPE_NONE = 0,
-    ITYPE_4WAY = 1,
-    ITYPE_3WAY = 2,
-};
-
 /** Find intersections from all the input paths. */
 void pcg_find_path_2d_intersections(PCGContext& ctx) {
 
