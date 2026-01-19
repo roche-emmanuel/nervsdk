@@ -182,9 +182,19 @@ auto get_closest_point(const Vec2d& pos, const Vector<Vec2d>& points) -> Vec2d {
     return best;
 }
 
+struct PathCorrections {
+    Vec2d startOffset;
+    Vec2d endOffset;
+    F64 startYawOffset{};
+    F64 endYawOffset{};
+};
+
+using PathCorrectionsVector = Vector<PathCorrections>;
+
 void cut_road_paths(const RefPtr<PointArray>& path,
                     const IntersectionDiscVector& idiscs,
-                    PointArrayVector& roadPaths) {
+                    PointArrayVector& roadPaths,
+                    PathCorrectionsVector& corrections) {
 
     RefPtr<PointArray> currentSection = nullptr;
 
@@ -204,6 +214,7 @@ void cut_road_paths(const RefPtr<PointArray>& path,
     Vector<I32> pointDiscIndex(num, -1);
 
     I32 cIdx = -1;
+    PathCorrections corrs{};
 
     for (U32 i = 0; i < num; ++i) {
         auto pt = path->get_point(i);
@@ -227,32 +238,37 @@ void cut_road_paths(const RefPtr<PointArray>& path,
                 NVCHK(res, "Cannot find segment/disc intersection.");
 
                 // Compute the interpolated point:
-                if (t > 0.0) {
-                    auto endPt = PCGPoint::mix(lastPt, pt, t);
+                auto endPt = PCGPoint::mix(lastPt, pt, t);
 
-                    auto center = idiscs[cIdx].center;
+                auto center = idiscs[cIdx].center;
 
-                    // Snap the end point to the closest snap point we have:
-                    auto snapPos =
-                        get_closest_point(endPt.position().xy() - center,
-                                          idiscs[cIdx].snapPoints);
+                // Snap the end point to the closest snap point we have:
+                auto dPos = endPt.position().xy() - center;
+                auto snapPos = get_closest_point(dPos, idiscs[cIdx].snapPoints);
 
-                    endPt.set_position(Vec3d(center + snapPos, 0.0));
+                //   Get the end offsets:
+                corrs.endOffset = snapPos - dPos;
+                endPt.set_position(Vec3d(center + snapPos, 0.0));
 
-                    // When we add a end point, we should update its Yaw
-                    // rotation to match the direction to the center of
-                    // the sphere:
-                    auto dir = (-snapPos).normalized();
-                    auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
-                    endPt.set_rotation({0.0, 0.0, angle});
-                    currentSection->add_point(endPt);
-                }
+                // When we add a end point, we should update its Yaw
+                // rotation to match the direction to the center of
+                // the sphere:
+                auto dir = (-snapPos).normalized();
+                auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
+                auto dir0 = (-dPos).normalized();
+                auto angle0 = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir0));
+                endPt.set_rotation({0.0, 0.0, angle});
+
+                corrs.endYawOffset = angle - angle0;
+                currentSection->add_point(endPt);
 
                 // Add this section to the list:
                 roadPaths.emplace_back(currentSection);
+                corrections.emplace_back(corrs);
 
                 // Now reset the section:
                 currentSection = nullptr;
+                corrs = {};
             }
         } else {
             // we need to keep this point:
@@ -276,28 +292,31 @@ void cut_road_paths(const RefPtr<PointArray>& path,
                     // logDEBUG("Adding road section start point with t={}", t);
 
                     // Compute the interpolated point:
-                    // if (t < 1.0) {
                     auto startPt = PCGPoint::mix(lastPt, pt, t);
 
                     auto center = idiscs[cIdx].center;
 
                     // Snap the end point to the closest snap point we have:
+                    auto dPos = startPt.position().xy() - center;
                     auto snapPos =
-                        get_closest_point(startPt.position().xy() - center,
-                                          idiscs[cIdx].snapPoints);
+                        get_closest_point(dPos, idiscs[cIdx].snapPoints);
 
+                    corrs.startOffset = snapPos - dPos;
                     startPt.set_position(Vec3d(center + snapPos, 0.0));
 
                     // When we add a start point, we should update its Yaw
                     // rotation to match the direction from the center of
                     // the sphere:
-                    auto dir = (snapPos).normalized();
+                    auto dir = snapPos.normalized();
                     auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
+                    auto dir0 = dPos.normalized();
+                    auto angle0 = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir0));
+
                     startPt.set_rotation({0.0, 0.0, angle});
+                    corrs.startYawOffset = angle - angle0;
                     currentSection->add_point(startPt);
 
                     cIdx = -1;
-                    // }
                 }
             }
 
@@ -309,10 +328,13 @@ void cut_road_paths(const RefPtr<PointArray>& path,
     if (currentSection != nullptr) {
         roadPaths.emplace_back(currentSection);
         currentSection = nullptr;
+        corrections.emplace_back(corrs);
+        corrs = {};
     }
 }
 
-auto cut_all_road_paths(PCGContext& ctx, const IntersectionDiscVector& idiscs)
+auto cut_all_road_paths(PCGContext& ctx, const IntersectionDiscVector& idiscs,
+                        PathCorrectionsVector& corrections)
     -> PointArrayVector {
     auto& in = ctx.inputs();
     PointArrayVector& paths = in.get("In");
@@ -320,7 +342,7 @@ auto cut_all_road_paths(PCGContext& ctx, const IntersectionDiscVector& idiscs)
     PointArrayVector roadPaths;
 
     for (const auto& path : paths) {
-        cut_road_paths(path, idiscs, roadPaths);
+        cut_road_paths(path, idiscs, roadPaths, corrections);
     }
 
     return roadPaths;
@@ -359,7 +381,9 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
 
     // Once we have the intersection discs we need to split the input paths
     // cutting the discs where applicable:
-    PointArrayVector roadPaths = cut_all_road_paths(ctx, idiscs);
+    PathCorrectionsVector pathCorrections;
+    PointArrayVector roadPaths =
+        cut_all_road_paths(ctx, idiscs, pathCorrections);
 
     // Re-sample the roadPaths:
     auto ctx2 = PCGContext::create();
