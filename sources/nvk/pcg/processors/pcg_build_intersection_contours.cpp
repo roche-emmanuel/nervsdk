@@ -208,8 +208,11 @@ void cut_road_paths(const RefPtr<PointArray>& path,
     for (U32 i = 0; i < num; ++i) {
         auto pt = path->get_point(i);
 
-        cIdx = is_cutout(pt);
-        if (cIdx >= 0) {
+        I32 curCircleIdx = is_cutout(pt);
+        if (curCircleIdx >= 0) {
+            // We are entering a circle:
+            cIdx = curCircleIdx;
+
             // We need to remove this point.
             // So we check if we are currently build a section already.
             if (currentSection != nullptr) {
@@ -240,7 +243,7 @@ void cut_road_paths(const RefPtr<PointArray>& path,
                     // rotation to match the direction to the center of
                     // the sphere:
                     auto dir = (-snapPos).normalized();
-                    auto angle = -toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
+                    auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
                     endPt.set_rotation({0.0, 0.0, angle});
                     currentSection->add_point(endPt);
                 }
@@ -259,34 +262,42 @@ void cut_road_paths(const RefPtr<PointArray>& path,
 
                 // Check if there was a previous point inside the circle
                 if (i > 0) {
+                    NVCHK(cIdx >= 0, "Unexpected current intersection circle.");
+
                     auto lastPt = path->get_point(i - 1);
                     F64 t{};
                     auto res = seg2_circle_exit(
                         lastPt.position().xy(), pt.position().xy(),
                         idiscs[cIdx].center, idiscs[cIdx].radius, t);
                     NVCHK(res, "Cannot find segment/disc intersection.");
+                    // NVCHK(is_cutout(lastPt) == cIdx,
+                    //       "Invalid is_cutout result.");
+
+                    // logDEBUG("Adding road section start point with t={}", t);
 
                     // Compute the interpolated point:
-                    if (t < 1.0) {
-                        auto startPt = PCGPoint::mix(lastPt, pt, t);
+                    // if (t < 1.0) {
+                    auto startPt = PCGPoint::mix(lastPt, pt, t);
 
-                        auto center = idiscs[cIdx].center;
+                    auto center = idiscs[cIdx].center;
 
-                        // Snap the end point to the closest snap point we have:
-                        auto snapPos =
-                            get_closest_point(startPt.position().xy() - center,
-                                              idiscs[cIdx].snapPoints);
+                    // Snap the end point to the closest snap point we have:
+                    auto snapPos =
+                        get_closest_point(startPt.position().xy() - center,
+                                          idiscs[cIdx].snapPoints);
 
-                        startPt.set_position(Vec3d(center + snapPos, 0.0));
+                    startPt.set_position(Vec3d(center + snapPos, 0.0));
 
-                        // When we add a start point, we should update its Yaw
-                        // rotation to match the direction from the center of
-                        // the sphere:
-                        auto dir = (snapPos).normalized();
-                        auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
-                        startPt.set_rotation({0.0, 0.0, -angle});
-                        currentSection->add_point(startPt);
-                    }
+                    // When we add a start point, we should update its Yaw
+                    // rotation to match the direction from the center of
+                    // the sphere:
+                    auto dir = (snapPos).normalized();
+                    auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
+                    startPt.set_rotation({0.0, 0.0, angle});
+                    currentSection->add_point(startPt);
+
+                    cIdx = -1;
+                    // }
                 }
             }
 
