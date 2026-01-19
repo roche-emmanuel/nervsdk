@@ -384,6 +384,35 @@ void apply_all_paths_corrections(PointArrayVector& paths,
     }
 }
 
+auto construct_road_sections(const PointArrayVector& resampledRoads,
+                             F64 halfWidth) -> PointArrayVector {
+
+    PointArrayVector roads;
+
+    for (const auto& path : resampledRoads) {
+        I32 num = (I32)path->get_num_points();
+        auto arr = PointArray::create_like(path, num * 2);
+
+        auto xaxis = Vec2d(1.0, 0.0);
+        for (I32 i = 0; i < num; ++i) {
+            auto pt = path->get_point(i);
+            auto xdir = xaxis.rotated(toRad(pt.rotation().z()));
+            auto ydir = xdir.ccw90();
+            arr->set_point(i, pt);
+            arr->set_point(-1 - i, pt);
+            auto pos = pt.position();
+            // down point:
+            arr->get_point(i).set_position(pos - Vec3d(ydir * halfWidth, 0.0));
+            // up point:
+            arr->get_point(-1 - i).set_position(pos +
+                                                Vec3d(ydir * halfWidth, 0.0));
+        }
+        roads.emplace_back(arr);
+    }
+
+    return roads;
+}
+
 } // namespace
 
 /** Find intersections from all the input paths. */
@@ -438,9 +467,16 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
     I32 nSteps = in.get("NumCorrectionSteps", 8);
     apply_all_paths_corrections(resampledRoads, pathCorrections, nSteps);
 
+    F64 roadWidth = in.get("RoadWidth", 500.0);
+    F64 halfWidth = roadWidth * 0.5;
+
+    PointArrayVector roadMeshPoints =
+        construct_road_sections(resampledRoads, halfWidth);
+
     // ctx.outputs().set("RoadSections", roadPaths);
 
-    ctx.outputs().set("RoadSections", resampledRoads);
+    // ctx.outputs().set("RoadSections", resampledRoads);
+    ctx.outputs().set("RoadSections", roadMeshPoints);
 }
 
 } // namespace nv
