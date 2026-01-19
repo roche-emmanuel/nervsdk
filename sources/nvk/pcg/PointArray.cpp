@@ -342,4 +342,9 @@ auto PointArray::create_like(const RefPtr<PointArray>& array, I32 numPoints)
     return res;
 };
 
+void PointArray::set_point(I64 index, const PCGPointRef& point) {
+    auto ref = get_point(index);
+    point.copy().apply_to(ref);
+};
+
 } // namespace nv

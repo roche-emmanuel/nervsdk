@@ -124,6 +124,8 @@ class PointArray : public RefObject {
 
     // Set a point's values from a Point object
     void set_point(I64 index, const PCGPoint& point);
+    // Set a point's values from a Point object
+    void set_point(I64 index, const PCGPointRef& point);
 
     void add_point(const PCGPointRef& pt);
     void add_point(const PCGPoint& pt);

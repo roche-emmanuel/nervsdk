@@ -361,6 +361,14 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
     // cutting the discs where applicable:
     PointArrayVector roadPaths = cut_all_road_paths(ctx, idiscs);
 
+    // Re-sample the roadPaths:
+    auto ctx2 = PCGContext::create();
+    auto& in2 = ctx2->inputs();
+    in2.set("In", roadPaths);
+    in2.set("Distance", 100.0);
+    in2.set("FitToCurve", true);
+    pcg_resample_paths(*ctx2);
+
     ctx.outputs().set("RoadSections", roadPaths);
 }
 
