@@ -348,6 +348,42 @@ auto cut_all_road_paths(PCGContext& ctx, const IntersectionDiscVector& idiscs,
     return roadPaths;
 }
 
+void apply_path_corrections(RefPtr<PointArray>& arr,
+                            const PathCorrections& corrs, I32 nSteps) {
+
+    I32 num = std::min(nSteps, I32(arr->get_num_points() / 2));
+
+    // Correct the start:
+    for (I32 i = 1; i < num; ++i) {
+        F64 t = 1.0 - (F64(i) / F64(num - 1));
+        auto pt = arr->get_point(i);
+        auto pos = pt.position();
+        auto ypr = pt.rotation();
+        pt.set_position(pos + Vec3d(corrs.startOffset * t, 0.0));
+        pt.set_rotation(ypr + Vec3d(0.0, 0.0, corrs.startYawOffset * t));
+    }
+    // Correct the end:
+    for (I32 i = 1; i < num; ++i) {
+        F64 t = 1.0 - (F64(i) / F64(num - 1));
+        auto pt = arr->get_point(-1 - i);
+        auto pos = pt.position();
+        auto ypr = pt.rotation();
+        pt.set_position(pos + Vec3d(corrs.endOffset * t, 0.0));
+        pt.set_rotation(ypr + Vec3d(0.0, 0.0, corrs.endYawOffset * t));
+    }
+}
+
+void apply_all_paths_corrections(PointArrayVector& paths,
+                                 const PathCorrectionsVector& corrections,
+                                 I32 nSteps) {
+    NVCHK(paths.size() == corrections.size(),
+          "Mismatch in number of path corrections.");
+    U32 num = paths.size();
+    for (I32 i = 0; i < num; ++i) {
+        apply_path_corrections(paths[i], corrections[i], nSteps);
+    }
+}
+
 } // namespace
 
 /** Find intersections from all the input paths. */
@@ -398,6 +434,10 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
     pcg_resample_paths(*ctx2);
 
     PointArrayVector resampledRoads = ctx2->outputs().get("Out");
+
+    I32 nSteps = in.get("NumCorrectionSteps", 8);
+    apply_all_paths_corrections(resampledRoads, pathCorrections, nSteps);
+
     // ctx.outputs().set("RoadSections", roadPaths);
 
     ctx.outputs().set("RoadSections", resampledRoads);
