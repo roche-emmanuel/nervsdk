@@ -365,11 +365,18 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
     auto ctx2 = PCGContext::create();
     auto& in2 = ctx2->inputs();
     in2.set("In", roadPaths);
-    in2.set("Distance", 100.0);
-    in2.set("FitToCurve", true);
+    auto& in = ctx.inputs();
+    F64 distanceHint = in.get("ResampleDistanceHint", 100.0);
+    in2.set("DistanceHint", distanceHint);
+    bool fitToCurve = in.get("ResampleFitToCurve", true);
+    in2.set("FitToCurve", fitToCurve);
+
     pcg_resample_paths(*ctx2);
 
-    ctx.outputs().set("RoadSections", roadPaths);
+    PointArrayVector resampledRoads = ctx2->outputs().get("Out");
+    // ctx.outputs().set("RoadSections", roadPaths);
+
+    ctx.outputs().set("RoadSections", resampledRoads);
 }
 
 } // namespace nv

@@ -17,6 +17,11 @@ auto get_path_2D_length(const RefPtr<PointArray>& path) -> F64 {
         pt0 = pt1;
     }
 
+    if (path->is_closed_loop()) {
+        auto pt1 = path->get_point(0);
+        total += (pt1.position().xy() - pt0.position().xy()).length();
+    }
+
     return total;
 }
 
@@ -24,30 +29,37 @@ auto resample_path(const RefPtr<PointArray>& path, I32 numPoints, F64 distance)
     -> RefPtr<PointArray> {
     auto arr = PointArray::create_like(path, numPoints);
     auto pt0 = path->get_point(0);
-    arr->set_point(0, pt0);
 
     F64 targetLength = 0.0;
     F64 curBaseLength = 0.0;
     I32 segIdx = 0;
+    I32 nSegs = (I32)path->get_num_segments();
 
-    for (I32 i = i; i < numPoints; ++i) {
+    for (I32 i = 0; i < numPoints; ++i) {
         targetLength = i * distance;
         auto pt1 = path->get_seg_end_point(segIdx);
         auto segLength = (pt1.position().xy() - pt0.position().xy()).length();
 
-        while ((curBaseLength + segLength) < targetLength) {
+        while ((curBaseLength + segLength) < targetLength && segIdx < (nSegs-1)) {
             // move to then next segment:
             pt0 = pt1;
             segIdx++;
+            // NVCHK(segIdx < nSegs, "Out of range path segment index: {}",
+            //       segIdx);
+
             pt1 = path->get_seg_end_point(segIdx);
+            // Move the current base length:
             curBaseLength += segLength;
+
+            // Compute the new segment length:
             segLength = (pt1.position().xy() - pt0.position().xy()).length();
         }
 
         // we are on the proper segment to resample this point, so we get the t
         // parameter:
         F64 t = (targetLength - curBaseLength) / segLength;
-        NVCHK(0.0 <= t && t <= 1.0, "Unexpected t parameter value: {}", t);
+        // NVCHK(0.0 <= t && t <= 1.0, "Unexpected t parameter value: {}", t);
+        t = std::clamp(t, 0.0, 1.0);
 
         arr->set_point(i, PCGPoint::mix(pt0, pt1, t));
     }
@@ -77,6 +89,7 @@ void pcg_resample_paths(PCGContext& ctx) {
         F64 distance = totalLength / F64(numPoints - 1);
 
         auto arr = resample_path(path, numPoints, distance);
+        resampledPaths.emplace_back(arr);
     }
 
     // Next write the same list of arrays as output:
