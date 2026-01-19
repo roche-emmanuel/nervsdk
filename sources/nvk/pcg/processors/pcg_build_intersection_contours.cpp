@@ -30,6 +30,7 @@ struct IntersectionConfig {
     Vector<I32> splineSegments; // num points per segment
     F64 spTension;
     F64 spPower;
+    F64 radius;
 };
 
 auto compute_intersection_config(PCGContext& ctx, const Vec2d& dir0,
@@ -65,6 +66,7 @@ auto compute_intersection_config(PCGContext& ctx, const Vec2d& dir0,
         config.splineSegments = {spNum, 2, spNum}; // middle segment is straight
     }
 
+    config.radius = L;
     config.spTension = in.get("TurnTensionScale", 80.0);
     config.spPower = in.get("TurnTensionPower", 3.2);
 
@@ -128,8 +130,18 @@ auto build_intersection_path(const Vec2d& center,
     return path;
 }
 
+struct IntersectionDisc {
+    Vec2d center;
+    F64 radius;
+    F64 radius2;
+    Vector<Vec2d> snapPoints;
+};
+
+using IntersectionDiscVector = Vector<IntersectionDisc>;
+
 auto handle_intersection(PCGContext& ctx, PCGPointRef& iPt,
-                         PointArrayVector& outPaths, bool is4Way) {
+                         PointArrayVector& outPaths, bool is4Way,
+                         IntersectionDiscVector& idiscs) {
     auto& in = ctx.inputs();
     PointArrayVector& paths = in.get("In");
 
@@ -142,6 +154,165 @@ auto handle_intersection(PCGContext& ctx, PCGPointRef& iPt,
 
     auto path = build_intersection_path(center, config, halfWidth);
     outPaths.emplace_back(path);
+
+    idiscs.emplace_back(IntersectionDisc{
+        .center = iPt.position().xy(),
+        .radius = config.radius,
+        .radius2 = config.radius * config.radius,
+        .snapPoints = config.mainPoints,
+    });
+}
+
+auto get_closest_point(const Vec2d& pos, const Vector<Vec2d>& points) -> Vec2d {
+    if (points.empty()) {
+        THROW_MSG("Empty snap point list.");
+    }
+
+    Vec2d best = points[0];
+    F64 dist2 = (best - pos).length2();
+
+    for (size_t i = 1; i < points.size(); ++i) {
+        F64 L = (points[i] - pos).length2();
+        if (L < dist2) {
+            best = points[i];
+            dist2 = L;
+        }
+    }
+
+    return best;
+}
+
+void cut_road_paths(const RefPtr<PointArray>& path,
+                    const IntersectionDiscVector& idiscs,
+                    PointArrayVector& roadPaths) {
+
+    RefPtr<PointArray> currentSection = nullptr;
+
+    auto is_cutout = [&idiscs](const PCGPointRef& pt) -> I32 {
+        auto pos = pt.position().xy();
+        U32 num = idiscs.size();
+        for (I32 i = 0; i < num; ++i) {
+            if ((pos - idiscs[i].center).length2() < idiscs[i].radius2) {
+                return i;
+            }
+        }
+        return -1;
+    };
+
+    // Iterate on all the path points and check if we are inside a disc or not.
+    U32 num = path->get_num_points();
+    Vector<I32> pointDiscIndex(num, -1);
+
+    I32 cIdx = -1;
+
+    for (U32 i = 0; i < num; ++i) {
+        auto pt = path->get_point(i);
+
+        cIdx = is_cutout(pt);
+        if (cIdx >= 0) {
+            // We need to remove this point.
+            // So we check if we are currently build a section already.
+            if (currentSection != nullptr) {
+                // We have a section in progress. So we need to find the
+                // intersection between the intersection disc and the segment to
+                // this point:
+                auto lastPt = currentSection->get_point(-1);
+                F64 t{};
+                auto res = seg2_circle_entry(
+                    lastPt.position().xy(), pt.position().xy(),
+                    idiscs[cIdx].center, idiscs[cIdx].radius, t);
+                NVCHK(res, "Cannot find segment/disc intersection.");
+
+                // Compute the interpolated point:
+                if (t > 0.0) {
+                    auto endPt = PCGPoint::mix(lastPt, pt, t);
+
+                    auto center = idiscs[cIdx].center;
+
+                    // Snap the end point to the closest snap point we have:
+                    auto snapPos =
+                        get_closest_point(endPt.position().xy() - center,
+                                          idiscs[cIdx].snapPoints);
+
+                    endPt.set_position(Vec3d(center + snapPos, 0.0));
+
+                    // When we add a end point, we should update its Yaw
+                    // rotation to match the direction to the center of
+                    // the sphere:
+                    auto dir = (-snapPos).normalized();
+                    auto angle = -toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
+                    endPt.set_rotation({0.0, 0.0, angle});
+                    currentSection->add_point(endPt);
+                }
+
+                // Add this section to the list:
+                roadPaths.emplace_back(currentSection);
+
+                // Now reset the section:
+                currentSection = nullptr;
+            }
+        } else {
+            // we need to keep this point:
+            if (currentSection == nullptr) {
+                // We need to create a new section first:
+                currentSection = PointArray::create_like(path, 0);
+
+                // Check if there was a previous point inside the circle
+                if (i > 0) {
+                    auto lastPt = path->get_point(i - 1);
+                    F64 t{};
+                    auto res = seg2_circle_exit(
+                        lastPt.position().xy(), pt.position().xy(),
+                        idiscs[cIdx].center, idiscs[cIdx].radius, t);
+                    NVCHK(res, "Cannot find segment/disc intersection.");
+
+                    // Compute the interpolated point:
+                    if (t < 1.0) {
+                        auto startPt = PCGPoint::mix(lastPt, pt, t);
+
+                        auto center = idiscs[cIdx].center;
+
+                        // Snap the end point to the closest snap point we have:
+                        auto snapPos =
+                            get_closest_point(startPt.position().xy() - center,
+                                              idiscs[cIdx].snapPoints);
+
+                        startPt.set_position(Vec3d(center + snapPos, 0.0));
+
+                        // When we add a start point, we should update its Yaw
+                        // rotation to match the direction from the center of
+                        // the sphere:
+                        auto dir = (snapPos).normalized();
+                        auto angle = toDeg(Vec2d(1.0, 0.0).signedAngleTo(dir));
+                        startPt.set_rotation({0.0, 0.0, -angle});
+                        currentSection->add_point(startPt);
+                    }
+                }
+            }
+
+            currentSection->add_point(pt);
+        }
+    }
+
+    // Add the last current section if any:
+    if (currentSection != nullptr) {
+        roadPaths.emplace_back(currentSection);
+        currentSection = nullptr;
+    }
+}
+
+auto cut_all_road_paths(PCGContext& ctx, const IntersectionDiscVector& idiscs)
+    -> PointArrayVector {
+    auto& in = ctx.inputs();
+    PointArrayVector& paths = in.get("In");
+
+    PointArrayVector roadPaths;
+
+    for (const auto& path : paths) {
+        cut_road_paths(path, idiscs, roadPaths);
+    }
+
+    return roadPaths;
 }
 
 } // namespace
@@ -155,16 +326,18 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
     U32 nIntersecs = rawIntersections->get_num_points();
     PointArrayVector outPaths;
 
+    IntersectionDiscVector idiscs;
+
     for (U32 i = 0; i < nIntersecs; ++i) {
         auto iPoint = rawIntersections->get_point(i);
         auto itype = iPoint.get<I32>("intersect_type");
 
         switch (itype) {
         case ITYPE_4WAY:
-            handle_intersection(ctx, iPoint, outPaths, true);
+            handle_intersection(ctx, iPoint, outPaths, true, idiscs);
             break;
         case ITYPE_3WAY:
-            handle_intersection(ctx, iPoint, outPaths, false);
+            handle_intersection(ctx, iPoint, outPaths, false, idiscs);
             break;
         default:
             break;
@@ -172,6 +345,12 @@ void pcg_build_intersection_contours(PCGContext& ctx) {
     }
 
     ctx.outputs().set("Out", outPaths, true);
+
+    // Once we have the intersection discs we need to split the input paths
+    // cutting the discs where applicable:
+    PointArrayVector roadPaths = cut_all_road_paths(ctx, idiscs);
+
+    ctx.outputs().set("RoadSections", roadPaths);
 }
 
 } // namespace nv

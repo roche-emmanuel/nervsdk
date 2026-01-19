@@ -45,6 +45,150 @@ auto seg2_intersect(const Vec2<T>& seg0_a, const Vec2<T>& seg0_b,
     return true;
 }
 
+/** General segment/circle intersection function: */
+template <typename T>
+auto seg2_circle_intersect(const Vec2<T>& seg_a, const Vec2<T>& seg_b,
+                           const Vec2<T>& center, T radius, T& t0, T& t1)
+    -> I32 {
+    // Direction vector from a to b
+    Vec2<T> d = seg_b - seg_a;
+
+    // Vector from center to segment start
+    Vec2<T> f = seg_a - center;
+
+    // Solve quadratic equation: ||a + t*d - center||^2 = radius^2
+    // Expands to: (d·d)t^2 + 2(f·d)t + (f·f - r^2) = 0
+    T a = d.dot(d);
+    T b = T(2) * f.dot(d);
+    T c = f.dot(f) - radius * radius;
+
+    // Check if segment is degenerate (a and b are the same point)
+    if (a < std::numeric_limits<T>::epsilon()) {
+        // Check if the point is on the circle
+        if (std::abs(c) < std::numeric_limits<T>::epsilon()) {
+            t0 = T(0);
+            return 1;
+        }
+        return 0;
+    }
+
+    // Calculate discriminant
+    T discriminant = b * b - T(4) * a * c;
+
+    // No intersection
+    if (discriminant < T(0)) {
+        return 0;
+    }
+
+    // One intersection (tangent)
+    if (discriminant < std::numeric_limits<T>::epsilon()) {
+        T t = -b / (T(2) * a);
+
+        // Check if intersection is within segment bounds [0, 1]
+        if (t >= T(0) && t <= T(1)) {
+            t0 = t;
+            return 1;
+        }
+        return 0;
+    }
+
+    // Two intersections
+    T sqrt_discriminant = std::sqrt(discriminant);
+    T inv_2a = T(1) / (T(2) * a);
+
+    T t_minus = (-b - sqrt_discriminant) * inv_2a;
+    T t_plus = (-b + sqrt_discriminant) * inv_2a;
+
+    // Count how many intersections are within [0, 1]
+    I32 count = 0;
+
+    if (t_minus >= T(0) && t_minus <= T(1)) {
+        t0 = t_minus;
+        count++;
+    }
+
+    if (t_plus >= T(0) && t_plus <= T(1)) {
+        if (count == 0) {
+            t0 = t_plus;
+        } else {
+            t1 = t_plus;
+        }
+        count++;
+    }
+
+    // If only one intersection is in bounds but the other exists outside,
+    // we might need to handle the case where we found t_plus but not t_minus
+    if (count == 1 && t_minus < T(0) && t_plus >= T(0) && t_plus <= T(1)) {
+        t0 = t_plus;
+    }
+
+    return count;
+}
+
+template <typename T>
+auto seg2_circle_cross(const Vec2<T>& seg_a, const Vec2<T>& seg_b,
+                       const Vec2<T>& center, T radius, T& t0, bool a_outside)
+    -> bool {
+    Vec2<T> d = seg_b - seg_a;
+    Vec2<T> f = seg_a - center;
+
+    T a = d.dot(d);
+    T b = T(2) * f.dot(d);
+    T c = f.dot(f) - radius * radius;
+
+    T discriminant = b * b - T(4) * a * c;
+    T sqrt_disc = std::sqrt(discriminant);
+    T inv_2a = T(1) / (T(2) * a);
+
+    // outside->inside: use smaller t (entry point)
+    // inside->outside: use larger t (exit point)
+    t0 = a_outside ? (-b - sqrt_disc) * inv_2a : (-b + sqrt_disc) * inv_2a;
+
+    return true;
+}
+
+template <typename T>
+auto seg2_circle_entry(const Vec2<T>& seg_a, const Vec2<T>& seg_b,
+                       const Vec2<T>& center, T radius, T& t0) -> bool {
+    Vec2<T> d = seg_b - seg_a;
+    Vec2<T> f = seg_a - center;
+
+    T a = d.dot(d);
+    T b = T(2) * f.dot(d);
+    T c = f.dot(f) - radius * radius;
+
+    T discriminant = b * b - T(4) * a * c;
+    T sqrt_disc = std::sqrt(discriminant);
+    T inv_2a = T(1) / (T(2) * a);
+
+    // outside->inside: use smaller t (entry point)
+    // inside->outside: use larger t (exit point)
+    t0 = (-b - sqrt_disc) * inv_2a;
+
+    return true;
+}
+
+template <typename T>
+auto seg2_circle_exit(const Vec2<T>& seg_a, const Vec2<T>& seg_b,
+                      const Vec2<T>& center, T radius, T& t0) -> bool {
+    Vec2<T> d = seg_b - seg_a;
+    Vec2<T> f = seg_a - center;
+
+    T a = d.dot(d);
+    T b = T(2) * f.dot(d);
+    T c = f.dot(f) - radius * radius;
+
+    T discriminant = b * b - T(4) * a * c;
+    T sqrt_disc = std::sqrt(discriminant);
+    T inv_2a = T(1) / (T(2) * a);
+
+    // outside->inside: use smaller t (entry point)
+    // inside->outside: use larger t (exit point)
+    t0 = (-b + sqrt_disc) * inv_2a;
+
+    return true;
+}
+
 // template <typename T>
 // auto seg2_point_distance(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>&
 // pt)

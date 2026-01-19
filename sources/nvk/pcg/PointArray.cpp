@@ -311,7 +311,35 @@ auto PointArray::get_tags() const -> const Set<String>& { return _tags; }
 void PointArray::add_tags(const Set<String>& tags) {
     _tags.insert(tags.begin(), tags.end());
 }
+
 auto PointArray::add_tag(const String& tag) -> bool {
     return _tags.insert(tag).second;
 }
+
+void PointArray::add_point(const PCGPoint& pt) {
+    auto ref = add_point();
+    pt.apply_to(ref);
+};
+
+void PointArray::add_point(const PCGPointRef& pt) {
+    auto ref = add_point();
+    pt.copy().apply_to(ref);
+};
+
+auto PointArray::add_point() -> PCGPointRef {
+    U32 num = get_num_points() + 1;
+    resize(num);
+    return get_point(-1);
+};
+
+auto PointArray::create_like(const RefPtr<PointArray>& array, I32 numPoints)
+    -> RefPtr<PointArray> {
+
+    auto res = PointArray::create(numPoints, array->_traits);
+    auto adescs = collect_all_attribute_types({array});
+
+    res->add_attributes(adescs);
+    return res;
+};
+
 } // namespace nv

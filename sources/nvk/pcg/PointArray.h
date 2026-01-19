@@ -42,6 +42,8 @@ class PointArray : public RefObject {
 
     static auto create(const Vector<AttribDesc>& attribs, U32 numPoints,
                        Traits traits = {}) -> RefPtr<PointArray>;
+    static auto create_like(const RefPtr<PointArray>& array, I32 numPoints = -1)
+        -> RefPtr<PointArray>;
 
     static auto
     collect_all_attribute_types(const Vector<RefPtr<PointArray>>& arrays)
@@ -122,6 +124,11 @@ class PointArray : public RefObject {
 
     // Set a point's values from a Point object
     void set_point(I64 index, const PCGPoint& point);
+
+    void add_point(const PCGPointRef& pt);
+    void add_point(const PCGPoint& pt);
+
+    auto add_point() -> PCGPointRef;
 
     // Get segment start:
     auto get_seg_start_point(I64 segId) -> PCGPointRef;
