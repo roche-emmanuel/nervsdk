@@ -153,6 +153,7 @@ using Segment2IntersectionVector = Vector<Segment2Intersection<T>>;
 
 template <typename T> struct EndpointNearSegment2 {
     Vec2<T> endpoint;
+    Vec2<T> intersection;
     int pathId;
     bool isStart; // true = start, false = end
 

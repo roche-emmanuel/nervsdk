@@ -85,6 +85,7 @@ auto findSegmentIntersections(const Seg2TreeData<T>& tdata)
     return result;
 }
 
+#if 0
 template <typename T>
 auto findEndpointNearSegments(const Polyline2Vector<T>& paths,
                               const Seg2TreeData<T>& tdata, T distance)
@@ -125,6 +126,122 @@ auto findEndpointNearSegments(const Polyline2Vector<T>& paths,
 
     return result;
 }
+#else
+template <typename T>
+auto findEndpointNearSegments(const Polyline2Vector<T>& paths,
+                              const Seg2TreeData<T>& tdata, T maxDistance)
+    -> EndpointNearSegment2Vector<T> {
+    EndpointNearSegment2Vector<T> result;
+
+    auto checkPoint = [&](const Vec2<T>& p, int lineId, bool isStart) {
+        auto& path = paths[lineId];
+        auto npoints = path.points.size();
+        if (npoints <= 1)
+            return;
+
+        Vec2<T> p0 = path.points[isStart ? 0 : npoints - 1];
+        Vec2<T> p1 = path.points[isStart ? 1 : npoints - 2];
+
+        Vec2<T> dir = (p0 - p1).normalized(); // direction away from path
+        Vec2<T> rayEnd = p0 + dir * maxDistance;
+
+        auto small_epsilon = 0.01;
+
+        auto bb = Box2<T>(p0, rayEnd);
+        bb.expand(small_epsilon);
+
+        tdata.tree.Search(
+            bb.minimum().ptr(), bb.maximum().ptr(),
+            [&](const Segment2<T>* other) {
+                Vec2<T> ip;
+                if (seg2_intersect(p0, rayEnd, other->a, other->b, ip)) {
+                    T dist = (ip - p0).length();
+                    if (dist <= maxDistance && dist > small_epsilon) {
+                        result.push_back({.endpoint = p0,
+                                          .intersection = ip,
+                                          .pathId = path.id,
+                                          .isStart = isStart,
+                                          .segment = *other,
+                                          .distance = dist});
+                    }
+                }
+
+                return true;
+            });
+    };
+
+    for (const auto& path : paths) {
+        if (path.points.empty())
+            continue;
+
+        checkPoint(path.points.front(), path.id, true);
+
+        if (!path.closedLoop)
+            checkPoint(path.points.back(), path.id, false);
+    }
+
+    return result;
+}
+#endif
+
+// template <typename T>
+// auto findEndpointExtensionIntersections(const Polyline2Vector<T>& paths,
+//                                         const Seg2TreeData<T>& tdata,
+//                                         T maxDistance)
+//     -> EndpointExtensionIntersectionVector<T> {
+
+//     EndpointExtensionIntersectionVector<T> result;
+
+//     for (const auto& path : paths) {
+//         if (path.closedLoop || path.points.size() < 2)
+//             continue;
+
+//         // Check start endpoint
+//         {
+//             Vec2<T> p0 = path.points[0];
+//             Vec2<T> p1 = path.points[1];
+//             Vec2<T> dir = (p0 - p1).normalized(); // direction away from path
+//             Vec2<T> rayEnd = p0 + dir * maxDistance;
+
+//             // Search area around the ray
+//             auto bb = Box2<T>(p0, rayEnd).expanded(small_epsilon);
+
+//             tdata.tree.Search(
+//                 bb.minimum().ptr(), bb.maximum().ptr(),
+//                 [&](const Segment2<T>* s) {
+//                     if (s->lineId == path.id)
+//                         return true; // skip same path
+
+//                     Vec2<T> ip;
+//                     if (seg2_intersect(p0, rayEnd, s->a, s->b, ip)) {
+//                         T dist = (ip - p0).length();
+//                         if (dist <= maxDistance && dist > small_epsilon) {
+//                             result.push_back({.position = ip,
+//                                               .pathId = path.id,
+//                                               .isStart = true,
+//                                               .segment = *s,
+//                                               .distance = dist});
+//                         }
+//                     }
+//                     return true;
+//                 });
+//         }
+
+//         // Check end endpoint (similar logic)
+//         {
+//             int n = path.points.size();
+//             Vec2<T> pn = path.points[n - 1];
+//             Vec2<T> pn1 = path.points[n - 2];
+//             Vec2<T> dir = (pn - pn1).normalized();
+//             Vec2<T> rayEnd = pn + dir * maxDistance;
+
+//             // ... similar search logic
+//         }
+//     }
+
+//     return result;
+// }
+
 } // namespace
 
 auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,

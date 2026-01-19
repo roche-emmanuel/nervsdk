@@ -118,13 +118,15 @@ void pcg_find_path_2d_intersections(PCGContext& ctx) {
         auto pt1 = path->get_point(
             segId == (path->get_num_points() - 1) ? 0 : (segId + 1));
 
-        // Next we need to project our endPoint onto the segment:
-        F64 t = 0.0;
-        seg2_project_point(pt0.position().xy(), pt1.position().xy(),
-                           endPoint.position().xy(), &t);
+        F64 t = (nearSeg.intersection - pt0.position().xy()).length() /
+                (pt1.position().xy() - pt0.position().xy()).length();
 
-        NVCHK(0 <= t && t <= 1.0, "Expected projection to be on segment: t={}",
-              t);
+        // // Next we need to project our endPoint onto the segment:
+        // F64 t = 0.0;
+        // seg2_project_point(pt0.position().xy(), pt1.position().xy(),
+        //                    endPoint.position().xy(), &t);
+        NVCHK(0 <= t && t <= 1.0,
+              "Expected projection to be on segment: t = {} ", t);
         auto ptA = PCGPoint::mix(pt0, pt1, t);
 
         auto outPt = outPoints->get_point(i);
