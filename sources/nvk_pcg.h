@@ -22,6 +22,7 @@ void pcg_set_data_id(PCGContext& ctx);
 void pcg_find_path_2d_intersections(PCGContext& ctx);
 void pcg_build_intersection_contours(PCGContext& ctx);
 void pcg_resample_paths(PCGContext& ctx);
+void pcg_compute_path_contours(PCGContext& ctx);
 
 } // namespace nv
 
