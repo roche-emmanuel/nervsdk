@@ -26,3 +26,4 @@ cmake_projects:
       OPENSSL_DIR: openssl
       ZLIB_DIR: zlib
       YAMLCPP_DIR: yamlcpp
+      CLIPPER2_DIR: clipper2

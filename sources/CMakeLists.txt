@@ -4,6 +4,10 @@ include_directories(${FMT_DIR}/include)
 include_directories(${OPENSSL_DIR}/include)
 include_directories(${ZLIB_DIR}/include)
 include_directories(${YAMLCPP_DIR}/include)
+include_directories(${CLIPPER2_DIR}/include)
+
+# library should be linked to this: set(CLIPPER2_LIBS
+# ${CLIPPER2_DIR}/lib/libClipper2.a)
 
 include_directories(.)
 
