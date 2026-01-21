@@ -252,6 +252,81 @@ auto seg2_project_point(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt,
     return a + ab * t_val;
 }
 
+template <typename T>
+auto polygon_signed_area_2d(const Vec2<T>* polygon, U32 size) -> T {
+    if (size < 3)
+        return T(0.0);
+    NVCHK(polygon != nullptr, "Invalid polygon");
+
+    T sum = 0.0;
+    for (size_t i = 1; i < size - 1; ++i) {
+        auto v1 = polygon[i] - polygon[0];
+        auto v2 = polygon[i + 1] - polygon[0];
+        sum += v1.x() * v2.y() - v1.y() * v2.x();
+    }
+
+    return sum * T(0.5);
+}
+
+template <typename T>
+auto polygon_signed_area_xy(const Vec3<T>* polygon, U32 size) -> T {
+    if (size < 3)
+        return T(0.0);
+
+    NVCHK(polygon != nullptr, "Invalid polygon");
+
+    T sum = 0.0;
+    for (size_t i = 1; i < size - 1; ++i) {
+        auto v1 = polygon[i] - polygon[0];
+        auto v2 = polygon[i + 1] - polygon[0];
+        sum += v1.x() * v2.y() - v1.y() * v2.x();
+    }
+
+    return sum * T(0.5);
+}
+
+/**
+Note: the formula below assume that all the polygon points are in the same
+plane!
+*/
+template <typename T>
+auto polygon_planar_area(const Vec3<T>* polygon, U32 size) -> T {
+    if (size < 3)
+        return T(0);
+
+    NVCHK(polygon != nullptr, "Invalid polygon");
+
+    Vec3<T> normal(0, 0, 0);
+    for (size_t i = 1; i < size - 1; ++i) {
+        auto v1 = polygon[i] - polygon[0];
+        auto v2 = polygon[i + 1] - polygon[0];
+        normal += v1.cross(v2); // Accumulate cross products
+    }
+
+    return normal.length() * T(0.5); // Magnitude gives area
+}
+
+template <typename T>
+auto polygon_signed_area_2d(const Vec3<T>* polygon, U32 size,
+                            const Vec3<T>& plane_normal) -> T {
+    if (size < 3)
+        return T(0);
+
+    NVCHK(polygon != nullptr, "Invalid polygon");
+
+    Vec3<T> accumulated_normal(0, 0, 0);
+    for (size_t i = 1; i < size - 1; ++i) {
+        auto v1 = polygon[i] - polygon[0];
+        auto v2 = polygon[i + 1] - polygon[0];
+        accumulated_normal += v1.cross(v2);
+    }
+
+    // Project onto plane normal to get signed twice-area
+    T signed_twice_area = accumulated_normal.dot(plane_normal);
+
+    return signed_twice_area * T(0.5);
+}
+
 template <typename T> struct Polyline2 {
     I32 id;
     Vector<Vec2<T>> points;
