@@ -1,3 +1,4 @@
+#include "nvk/geometry/geometry2d.h"
 #include <nvk/pcg/Point.h>
 #include <nvk/pcg/PointArray.h>
 
@@ -345,6 +346,15 @@ auto PointArray::create_like(const RefPtr<PointArray>& array, I32 numPoints)
 void PointArray::set_point(I64 index, const PCGPointRef& point) {
     auto ref = get_point(index);
     point.copy().apply_to(ref);
+};
+
+auto PointArray::compute_area() const -> F64 {
+    if (!is_closed_loop()) {
+        return 0.0;
+    }
+
+    const auto* positions = find<Vec3d>(pt_position_attr);
+    return polygon_signed_area_xy(positions->data(), positions->size());
 };
 
 } // namespace nv

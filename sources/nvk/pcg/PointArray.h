@@ -68,6 +68,14 @@ class PointArray : public RefObject {
     auto get_attribute(const String& name) const -> const PointAttribute&;
     auto get_attribute(const String& name) -> PointAttribute&;
 
+    template <typename T>
+    auto find(const String& name) const -> const Vector<T>* {
+        const auto* attr = find_attribute(name);
+        if (attr != nullptr && attr->is_type<T>()) {
+            return &attr->get_values<T>();
+        }
+        return nullptr;
+    };
     template <typename T> auto find(const String& name) -> Vector<T>* {
         auto* attr = find_attribute(name);
         if (attr != nullptr && attr->is_type<T>()) {
@@ -143,6 +151,9 @@ class PointArray : public RefObject {
     auto add_tag(const String& tag) -> bool;
     void add_tags(const Set<String>& tags);
     auto get_tags() const -> const Set<String>&;
+
+    /** Compute the polygon area */
+    auto compute_area() const -> F64;
 
   protected:
     Traits _traits;
