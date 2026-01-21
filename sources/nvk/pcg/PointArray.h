@@ -19,12 +19,16 @@ static constexpr const char* pt_density_attr = "$Density";
 static constexpr const char* pt_steepness_attr = "$Steepness";
 static constexpr const char* pt_seed_attr = "$Seed";
 
+struct PointArrayTraits {
+    bool closedLoop{false};
+};
+
 class PointArray : public RefObject {
     NV_DECLARE_NO_COPY(PointArray)
     NV_DECLARE_NO_MOVE(PointArray)
 
   public:
-    struct Traits {};
+    using Traits = PointArrayTraits;
 
     struct AttribDesc {
         String name;
@@ -145,8 +149,8 @@ class PointArray : public RefObject {
     // Get segment end:
     auto get_seg_end_point(I64 segId) -> PCGPointRef;
 
-    auto is_closed_loop() const { return _closedLoop; }
-    void set_closed_loop(bool closed) { _closedLoop = closed; }
+    auto is_closed_loop() const { return _traits.closedLoop; }
+    void set_closed_loop(bool closed) { _traits.closedLoop = closed; }
 
     auto add_tag(const String& tag) -> bool;
     void add_tags(const Set<String>& tags);
@@ -159,7 +163,6 @@ class PointArray : public RefObject {
     Traits _traits;
     PointAttributeMap _attributes;
     I32 _numPoints{-1};
-    bool _closedLoop{false};
 
     Set<String> _tags;
 

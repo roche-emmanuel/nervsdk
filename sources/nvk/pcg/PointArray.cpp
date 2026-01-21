@@ -98,7 +98,7 @@ auto PointArray::get_num_segments() const -> U32 {
     if (nPoints <= 1)
         return 0;
 
-    return _closedLoop ? nPoints : nPoints - 1;
+    return _traits.closedLoop ? nPoints : nPoints - 1;
 }
 
 void PointArray::add_attribute(RefPtr<PointAttribute> attr) {
