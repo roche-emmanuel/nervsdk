@@ -69,8 +69,8 @@ class PointArray : public RefObject {
     auto get_attribute(const String& name) -> PointAttribute&;
 
     template <typename T> auto find(const String& name) -> Vector<T>* {
-        const auto* attr = find_attribute(name);
-        if (attr->is_type<T>()) {
+        auto* attr = find_attribute(name);
+        if (attr != nullptr && attr->is_type<T>()) {
             return &attr->get_values<T>();
         }
         return nullptr;
