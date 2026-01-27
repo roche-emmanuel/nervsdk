@@ -64,6 +64,26 @@ auto is_yaml_file(const String& filename) -> bool;
 auto is_json_file(const char* filename) -> bool;
 auto is_json_file(const String& filename) -> bool;
 
+auto create_folders(const String& fullpath) -> bool;
+
+auto get_path_extension(const String& fname) -> String;
+
+auto get_parent_folder(const char* fname) -> String;
+
+auto get_parent_folder(const String& fname) -> String;
+
+// Convert wide string to String:
+auto toString(const std::wstring& wstr) -> String;
+
+// Convert string to String:
+auto toString(const std::string& wstr) -> String;
+
+// Get the current working directory
+auto get_cwd() -> String;
+
+// Get the user home directory
+auto get_home_dir() -> String;
+
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
 

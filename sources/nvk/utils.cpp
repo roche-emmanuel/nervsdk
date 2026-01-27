@@ -4,6 +4,9 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <charconv>
+#include <codecvt>
+
 namespace YAML {
 #if !NV_USE_STD_MEMORY
 template <> struct convert<nv::String> {
@@ -508,6 +511,92 @@ auto read_config_file(const String& fname, bool forceAllowSystem) -> Json {
 
     THROW_MSG("Unsupport config file format: {}", fname);
     return {};
+}
+
+auto create_folders(const String& fullpath) -> bool {
+    if (system_dir_exists(fullpath.c_str())) {
+        return true;
+    }
+    return std::filesystem::create_directories(fullpath.c_str());
+}
+
+auto get_path_extension(const String& fname) -> String {
+
+    // Find the position of the last dot (.)
+    std::size_t dotPos = fname.find_last_of('.');
+
+    // && dotPos != 0
+    if (dotPos != String::npos && dotPos < fname.length() - 1) {
+        // Extract the substring after the dot (including the dot)
+        return fname.substr(dotPos);
+    }
+
+    // No extension found
+    return "";
+}
+
+auto get_parent_folder(const char* fname) -> String {
+    std::filesystem::path filePath(fname);
+    std::filesystem::path parentPath = filePath.parent_path();
+
+#if NV_USE_STD_MEMORY
+    return parentPath.string();
+#else
+    return parentPath.string<char, std::char_traits<char>,
+                             STLAllocator<char, DefaultPoolAllocator>>();
+#endif
+}
+
+auto get_parent_folder(const String& fname) -> String {
+    return get_parent_folder(fname.c_str());
+}
+
+auto get_cwd() -> String {
+    auto cwd = std::filesystem::current_path();
+    return toString(cwd.string());
+}
+
+auto toString(const std::wstring& wstr) -> String {
+#if NV_USE_STD_MEMORY
+    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+#else
+    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t,
+                         std::allocator<wchar_t>,
+                         STLAllocator<char, DefaultPoolAllocator>>
+        converter;
+#endif
+    return converter.to_bytes(wstr);
+}
+
+auto toString(const std::string& str) -> String {
+    return {str.data(), str.size()};
+}
+
+#ifdef _WIN32
+namespace {
+auto get_win_home_dir() -> String {
+    const char* home_drive = std::getenv("HOMEDRIVE");
+    const char* home_path = std::getenv("HOMEPATH");
+    NVCHK(home_drive != nullptr && home_path != nullptr,
+          "Invalid windows home drive or path");
+    return String(home_drive) + String(home_path);
+}
+} // namespace
+
+#endif
+
+auto get_home_dir() -> String {
+
+    const char* var = std::getenv("HOME");
+#ifdef _WIN32
+    if (var == nullptr) {
+        // We could be in a windows batch environment here:
+        return get_win_home_dir();
+    }
+#endif
+
+    NVCHK(var != nullptr, "Invalid home directory");
+    return var;
 }
 
 } // namespace nv
