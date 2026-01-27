@@ -34,6 +34,10 @@ inline auto system_file_exists(const String& fname) -> bool {
 
 auto system_dir_exists(const char* path) -> bool;
 
+/** Check if a virtual file exists. */
+auto virtual_file_exists(const String& fname, bool forceAllowSystem = false)
+    -> bool;
+
 auto is_absolute_path(const String& path) -> bool;
 auto get_absolute_path(const String& path) -> String;
 
@@ -46,6 +50,11 @@ auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
 auto read_json_string(const String& content) -> Json;
 
 auto read_json_file(const String& fname, bool forceAllowSystem = false) -> Json;
+
+auto read_ordered_json_string(const String& content) -> OrderedJson;
+
+auto read_ordered_json_file(const String& fname, bool forceAllowSystem = false)
+    -> OrderedJson;
 
 void write_json_file(const char* fname, const Json& content, I32 indent = 2);
 

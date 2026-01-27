@@ -357,13 +357,36 @@ auto expand_files_wildcard(const String& pattern) -> Set<String> {
     return all_matched_files;
 }
 
+namespace {
+auto remove_comments(const String& input) -> String {
+    String cleaned = input;
+
+    // Remove C++ style comments
+    // cleaned = std::regex_replace(cleaned, std::regex(R"(//[^\n]*\n)"), "\n");
+    cleaned = std::regex_replace(cleaned, std::regex("//.*?(\\r?\\n|$)"), "\n");
+
+    // Remove C style comments
+    // cleaned = std::regex_replace(cleaned, std::regex(R"(/\*.*?\*/)"), " ");
+    // below with multilines support:
+    cleaned = std::regex_replace(cleaned, std::regex(R"(/\*[\s\S]*?\*/)"), " ");
+
+    // Remove trailing commas
+    cleaned =
+        std::regex_replace(cleaned, std::regex(R"(,(\s*)([\]\}]))"), "$1$2");
+
+    return cleaned;
+};
+} // namespace
+
 auto read_json_string(const String& content) -> Json {
     Json data;
+    auto cleaned = remove_comments(content);
 
     try {
-        // Parse with the JSON5 extension flag
-        data = Json::parse(content, nullptr, true, true);
+        // Parse
+        data = Json::parse(cleaned, nullptr, true, false);
     } catch (Json::parse_error& e) {
+        logERROR("Error parsing JSON content:\n{}", cleaned);
         THROW_MSG("JSON parse error: {}", e.what());
     }
 
@@ -374,6 +397,26 @@ auto read_json_file(const String& fname, bool forceAllowSystem) -> Json {
     auto content = read_virtual_file(fname, forceAllowSystem);
     return read_json_string(content);
 };
+
+auto read_ordered_json_string(const String& content) -> OrderedJson {
+    OrderedJson data;
+    auto cleaned = remove_comments(content);
+
+    try {
+        // Parse
+        data = OrderedJson::parse(cleaned, nullptr, true, false);
+    } catch (OrderedJson::parse_error& e) {
+        logERROR("Error parsing JSON content:\n{}", cleaned);
+        THROW_MSG("JSON parse error: {}", e.what());
+    }
+    return data;
+}
+
+auto read_ordered_json_file(const String& fname, bool forceAllowSystem)
+    -> OrderedJson {
+    auto content = read_virtual_file(fname, forceAllowSystem);
+    return read_ordered_json_string(content);
+}
 
 void write_json_file(const char* fname, const Json& content, I32 indent) {
     // Write JSON to file
@@ -759,6 +802,11 @@ auto make_extensions_regex(const Vector<String>& extensions) -> std::regex {
     pattern += ")$";
 
     return std::regex(pattern, std::regex::icase);
+}
+
+auto virtual_file_exists(const String& fname, bool forceAllowSystem) -> bool {
+    return ResourceManager::instance().virtual_file_exists(fname,
+                                                           forceAllowSystem);
 }
 
 } // namespace nv

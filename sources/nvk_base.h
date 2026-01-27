@@ -46,6 +46,7 @@
 
 namespace nv {
 using Json = nlohmann::json;
+using OrderedJson = nlohmann::ordered_json;
 
 class PointArray;
 class PCGPoint;
