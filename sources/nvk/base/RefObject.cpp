@@ -22,7 +22,7 @@ static SpinLock refSP;
 
 static auto get_object_refs(RefObject* ptr) -> std::atomic<I64>& {
     auto& refs = get_object_refs();
-    WITH_SPINLOCK(refSP);
+    WITH_NV_SPINLOCK(refSP);
     auto it = refs.find(ptr);
     if (it == refs.end()) {
         refs[ptr] = 0;
@@ -34,7 +34,7 @@ static auto get_object_refs(RefObject* ptr) -> std::atomic<I64>& {
 
 static void remove_object_refs(RefObject* ptr) {
     auto& refs = get_object_refs();
-    WITH_SPINLOCK(refSP);
+    WITH_NV_SPINLOCK(refSP);
 
     auto it = refs.find(ptr);
     if (it == refs.end()) {
@@ -107,7 +107,7 @@ void RefObject::check_memory_refs() {
 
     std::cout << "Looking for memory leaks..." << std::endl;
     auto& refs = get_object_refs();
-    WITH_SPINLOCK(refSP);
+    WITH_NV_SPINLOCK(refSP);
 
     if (!refs.empty()) {
         std::cout << "[FATAL] Found " << refs.size() << " memory leaks!!!"

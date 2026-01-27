@@ -78,12 +78,12 @@ class SpinLock {
 
 using SpinLockGuard = std::lock_guard<SpinLock>;
 
-#define WITH_SPINLOCK(sp) nv::SpinLockGuard lock(sp)            // NOLINT
-#define WITH_MUTEXLOCK(sp) std::lock_guard<std::mutex> lock(sp) // NOLINT
-#define WITH_RMUTEXLOCK(sp)                                                    \
-    std::lock_guard<std::recursive_mutex> lock(sp)                // NOLINT
-#define WITH_LOCK(m) std::lock_guard<decltype(m)> lock(m);        // NOLINT
-#define WITH_UNIQUELOCK(m) std::unique_lock<decltype(m)> lock(m); // NOLINT
+#define WITH_NV_SPINLOCK(sp) nv::SpinLockGuard lock(sp)            // NOLINT
+#define WITH_NV_MUTEXLOCK(sp) std::lock_guard<std::mutex> lock(sp) // NOLINT
+#define WITH_NV_RMUTEXLOCK(sp)                                                 \
+    std::lock_guard<std::recursive_mutex> lock(sp)                   // NOLINT
+#define WITH_NV_LOCK(m) std::lock_guard<decltype(m)> lock(m);        // NOLINT
+#define WITH_NV_UNIQUELOCK(m) std::unique_lock<decltype(m)> lock(m); // NOLINT
 
 }; // namespace nv
 

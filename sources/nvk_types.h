@@ -25,6 +25,13 @@
 #pragma warning(disable : 4668) // undefined macro treated as '0'
 #endif
 
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
 #include <external/half.hpp>
 
 #if defined(_MSC_VER)

@@ -599,4 +599,166 @@ auto get_home_dir() -> String {
     return var;
 }
 
+auto copy_file(const char* source_path, const char* dest_path, U32 buffer_size,
+               bool createFolders) -> bool {
+    // Check if source file exists
+    NVCHK(system_file_exists(source_path), "Source file doesn't exist: {}",
+          source_path);
+
+    // Open source file in binary mode
+    std::ifstream source(source_path, std::ios::binary);
+    NVCHK(source.is_open(), "Could not open source file: {}", source_path);
+
+    auto folder = get_parent_folder(dest_path);
+    if (!system_dir_exists(folder.c_str())) {
+        if (createFolders) {
+            if (!create_folders(folder)) {
+                logERROR("Could not create folder {}", folder);
+                return false;
+            };
+        } else {
+            THROW_MSG("Parent folder {} doesn't exist.", folder);
+        }
+    }
+
+    // Open destination file in binary mode
+    std::ofstream dest(dest_path, std::ios::binary | std::ios::trunc);
+    NVCHK(dest.is_open(), "Could not open destination file: {}", dest_path);
+
+    try {
+        // Create buffer
+        std::vector<char> buffer(buffer_size);
+
+        // Copy data in chunks
+        while (!source.eof()) {
+            // Read a chunk
+            source.read(buffer.data(), buffer.size());
+            std::streamsize bytes_read = source.gcount();
+
+            // Write the chunk
+            if (bytes_read > 0) {
+                dest.write(buffer.data(), bytes_read);
+                if (dest.fail()) {
+                    THROW_MSG("Failed to write to destination file");
+                }
+            }
+        }
+
+        // Close files
+        source.close();
+        dest.close();
+
+        // Preserve file attributes and timestamps
+        try {
+            std::filesystem::permissions(
+                dest_path, std::filesystem::status(source_path).permissions(),
+                std::filesystem::perm_options::replace);
+
+            std::filesystem::last_write_time(
+                dest_path, std::filesystem::last_write_time(source_path));
+        } catch (const std::filesystem::filesystem_error& e) {
+            logWARN("Could not preserve file attributes: {}", e.what());
+            // Not a fatal error, continue
+        }
+
+        return true;
+    } catch (const std::exception& e) {
+        source.close();
+        dest.close();
+
+        // Clean up the partially written destination file
+        try {
+            if (std::filesystem::exists(dest_path)) {
+                std::filesystem::remove(dest_path);
+            }
+        } catch (...) {
+            // Ignore cleanup errors
+        }
+
+        THROW_MSG("Error during file copy: {}", e.what());
+        return false;
+    }
+}
+
+auto copy_file(const String& source_path, const String& dest_path,
+               U32 buffer_size, bool createFolders) -> bool {
+    return copy_file(source_path.c_str(), dest_path.c_str(), buffer_size,
+                     createFolders);
+};
+
+auto get_files(const String& directory, bool recursive) -> Vector<String> {
+    Vector<String> files;
+
+    if (recursive) {
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(directory)) {
+            if (std::filesystem::is_regular_file(entry)) {
+                files.push_back(entry.path().string().c_str());
+            }
+        }
+    } else {
+        for (const auto& entry :
+             std::filesystem::directory_iterator(directory)) {
+            if (std::filesystem::is_regular_file(entry)) {
+                files.push_back(entry.path().string().c_str());
+            }
+        }
+    }
+
+    return files;
+}
+
+auto get_files(const String& directory, const std::regex& pattern,
+               bool recursive) -> Vector<String> {
+    Vector<String> files;
+
+    if (recursive) {
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(directory)) {
+            if (std::filesystem::is_regular_file(entry)) {
+                const auto& str = entry.path().string();
+                if (std::regex_match(str, pattern)) {
+                    files.push_back(str.c_str());
+                }
+            }
+        }
+    } else {
+        for (const auto& entry :
+             std::filesystem::directory_iterator(directory)) {
+            if (std::filesystem::is_regular_file(entry)) {
+                const auto& str = entry.path().string();
+                if (std::regex_match(str, pattern)) {
+                    files.push_back(str.c_str());
+                }
+            }
+        }
+    }
+
+    return files;
+}
+
+auto make_extensions_regex(const Vector<String>& extensions) -> std::regex {
+    std::string pattern = ".*(?:";
+
+    for (size_t i = 0; i < extensions.size(); ++i) {
+        std::string ext = extensions[i].c_str();
+        NVCHK(!ext.empty(), "Cannot handle empty extension");
+
+        // If the extension starts with a dot, escape it for the regex
+        if (ext[0] == '.') {
+            pattern += "\\" + ext;
+        } else {
+            pattern += "\\." + ext;
+        }
+
+        if (i < extensions.size() - 1) {
+            pattern += "|";
+        }
+    }
+
+    pattern += ")$";
+
+    return std::regex(pattern, std::regex::icase);
+}
+
 } // namespace nv

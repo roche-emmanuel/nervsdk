@@ -84,6 +84,20 @@ auto get_cwd() -> String;
 // Get the user home directory
 auto get_home_dir() -> String;
 
+auto copy_file(const char* source_path, const char* dest_path,
+               U32 buffer_size = 64 * 1024, bool createFolders = true) -> bool;
+
+auto copy_file(const String& source_path, const String& dest_path,
+               U32 buffer_size = 64 * 1024, bool createFolders = true) -> bool;
+
+auto get_files(const String& directory, bool recursive = false)
+    -> Vector<String>;
+
+auto get_files(const String& directory, const std::regex& pattern,
+               bool recursive) -> Vector<String>;
+
+auto make_extensions_regex(const Vector<String>& extensions) -> std::regex;
+
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
 

@@ -174,7 +174,7 @@ auto LogManager::get_output_string() -> std::string& {
     // We must add the mem buffer:
     std::string* bufPtr = nullptr;
     {
-        WITH_SPINLOCK(_logSP);
+        WITH_NV_SPINLOCK(_logSP);
         bufPtr = &_outStrings[tid];
     }
 
@@ -195,7 +195,7 @@ auto LogManager::get_mem_buffer() -> fmt::memory_buffer& {
     // We must add the mem buffer:
     fmt::memory_buffer* bufPtr = nullptr;
     {
-        WITH_SPINLOCK(_logSP);
+        WITH_NV_SPINLOCK(_logSP);
         bufPtr = &_memBuffers[tid];
     }
 
@@ -331,8 +331,8 @@ void LogManager::do_log(U32 lvl, const char* data, size_t size) {
 
     // lock the logging spinlock:
     // Note: on emscripten it seems preferable to use a regular mutex instead of
-    // a spinlock. WITH_SPINLOCK(_logSP);
-    WITH_MUTEXLOCK(_logMutex);
+    // a spinlock. WITH_NV_SPINLOCK(_logSP);
+    WITH_NV_MUTEXLOCK(_logMutex);
     output_message(lvl, str);
 #endif
 
