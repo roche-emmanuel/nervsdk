@@ -845,4 +845,8 @@ auto virtual_file_exists(const String& fname, bool forceAllowSystem) -> bool {
                                                            forceAllowSystem);
 }
 
+auto get_file_last_write_time(const String& fname) -> std::time_t {
+    return ResourceManager::instance().get_file_last_write_time(fname);
+}
+
 } // namespace nv

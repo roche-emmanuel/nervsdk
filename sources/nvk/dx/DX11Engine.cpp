@@ -558,11 +558,7 @@ void DX11Engine::check_live_reload(DX11Program& prog) {
     // Iterate on all the files needed for this shader and check their time:
     for (const auto& filename : prog.files) {
         // Next we check if the file time changed:
-        auto currentFileTime = std::filesystem::last_write_time(filename);
-        auto systemTime =
-            std::chrono::clock_cast<std::chrono::system_clock>(currentFileTime);
-        auto fileTime = std::chrono::system_clock::to_time_t(systemTime);
-
+        auto fileTime = nv::get_file_last_write_time(filename);
         if (fileTime > prog.lastUpdateTime) {
             // We should try a live reload of this program:
             logDEBUG("Reloading HLSL program from {}", prog.filename);

@@ -199,8 +199,14 @@ static auto get_system_file_last_write_time(const String& fname)
 
 auto ResourceManager::get_file_last_write_time(const String& fname)
     -> std::time_t {
-    if (_useSystemFiles && system_file_exists(fname)) {
-        return get_system_file_last_write_time(fname);
+    if (_useSystemFiles) {
+        if (system_file_exists(fname)) {
+            return get_system_file_last_write_time(fname);
+        }
+        String f_path = get_path(get_root_path(), fname);
+        if (system_file_exists(f_path)) {
+            return get_system_file_last_write_time(f_path);
+        }
     }
 
     // Iterate on the data packs:

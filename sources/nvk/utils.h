@@ -38,6 +38,8 @@ auto system_dir_exists(const char* path) -> bool;
 auto virtual_file_exists(const String& fname, bool forceAllowSystem = false)
     -> bool;
 
+auto get_file_last_write_time(const String& fname) -> std::time_t;
+
 auto is_absolute_path(const String& path) -> bool;
 auto get_absolute_path(const String& path) -> String;
 
