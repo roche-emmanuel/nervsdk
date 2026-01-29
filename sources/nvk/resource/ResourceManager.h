@@ -21,7 +21,7 @@ class ResourceManager {
 
     virtual auto check_live_reload() -> bool { return false; };
 
-    virtual auto get_root_path() -> String { return {}; };
+    [[nodiscard]] virtual auto get_root_path() const -> String { return {}; };
 
     /** Check if we have a given resource pack */
     [[nodiscard]] auto has_resource_pack(const String& packFile) const -> bool;

@@ -47,6 +47,14 @@ auto read_system_binary_file(const char* fname) -> U8Vector;
 auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
     -> String;
 
+void write_file(const char* fname, const String& content,
+                bool createFolders = true);
+
+void write_binary_file(const char* fname, const U8Vector& content,
+                       bool createFolders = true);
+
+void remove_file(const char* fname);
+
 auto read_json_string(const String& content) -> Json;
 
 auto read_json_file(const String& fname, bool forceAllowSystem = false) -> Json;

@@ -102,10 +102,15 @@ auto ResourceManager::search_resource_path(StringID category, String& full_path,
 
 auto ResourceManager::virtual_file_exists(const String& fname,
                                           bool forceAllowSystem) const -> bool {
-    if ((_useSystemFiles || forceAllowSystem) && system_file_exists(fname)) {
-        // Search for a real file first as this will be overriding the packs
-        // content:
-        return true;
+    if ((_useSystemFiles || forceAllowSystem)) {
+        if (system_file_exists(fname)) {
+            return true;
+        }
+
+        String f_path = get_path(get_root_path(), fname);
+        if (system_file_exists(f_path)) {
+            return true;
+        }
     }
 
     // logDEBUG("Searching for file {}", fname);

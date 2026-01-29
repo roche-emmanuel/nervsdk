@@ -34,20 +34,18 @@ class ShaderIncludeHandler : public ID3DInclude {
                                                LPCVOID* data,
                                                UINT* bytes) override {
         std::string fullPath = _includeDir + "/" + fileName;
-        std::ifstream file(fullPath, std::ios::binary);
-        if (!file) {
+        if (!nv::virtual_file_exists(fullPath)) {
+            logERROR("Missing source file {}", fullPath);
             return E_FAIL;
         }
 
-        file.seekg(0, std::ios::end);
-        size_t fileSize = file.tellg();
-        file.seekg(0, std::ios::beg);
+        auto content = nv::read_virtual_file(fullPath);
 
-        char* buffer = new char[fileSize];
-        file.read(buffer, fileSize);
+        char* buffer = new char[content.size()];
+        memcpy(buffer, content.data(), content.size());
 
         *data = buffer;
-        *bytes = static_cast<UINT>(fileSize);
+        *bytes = static_cast<UINT>(content.size());
         return S_OK;
     }
 

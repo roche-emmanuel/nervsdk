@@ -61,6 +61,42 @@ auto read_virtual_file(const String& fname, bool forceAllowSystem) -> String {
                                                          forceAllowSystem);
 }
 
+// write file content as string:
+void write_file(const char* fname, const String& content, bool createFolders) {
+    if (createFolders) {
+        auto folder = get_parent_folder(fname);
+        NVCHK(create_folders(folder), "Could not create folder {}", folder);
+    }
+    std::ofstream t(fname, std::ios::out | std::ios::binary);
+    NVCHK(t.is_open(), "Cannot write file {}", fname);
+
+    t << content;
+    t.close();
+}
+
+void write_binary_file(const char* fname, const U8Vector& content,
+                       bool createFolders) {
+    if (createFolders) {
+        auto folder = get_parent_folder(fname);
+        NVCHK(create_folders(folder), "Could not create folder {}", folder);
+    }
+    std::ofstream t(fname, std::ios::out | std::ios::binary);
+    NVCHK(t.is_open(), "Cannot write file {}", fname);
+
+    t.write(reinterpret_cast<const char*>(content.data()), content.size());
+    t.close();
+}
+
+void remove_file(const char* fname) {
+    if (!system_file_exists(fname)) {
+        logWARN("Cannot remove non existing file {}", fname);
+        return;
+    }
+
+    int ret = remove(fname);
+    NVCHK(ret == 0, "Could not remove file {} properly.", fname);
+}
+
 void replace_all(String& str, const String& old_value,
                  const String& new_value) {
     size_t pos = 0;
