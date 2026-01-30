@@ -759,8 +759,14 @@ auto DX11Engine::createTextureCube(const std::string& folder,
         int channels = 0;
         // Read from the full path:
         std::string full_path = folder + "/" + filenames[i];
-        unsigned char* data = stbi_load(full_path.c_str(), &width, &height,
-                                        &channels, 4); // Force RGBA
+
+        auto content = nv::read_virtual_file(full_path);
+        unsigned char* data = stbi_load_from_memory(
+            (const stbi_uc*)content.data(), (int)content.size(), &width,
+            &height, &channels, 4);
+
+        // unsigned char* data = stbi_load(full_path.c_str(), &width, &height,
+        //                                 &channels, 4); // Force RGBA
         if (data == nullptr) {
             // Handle error
             return nullptr;
