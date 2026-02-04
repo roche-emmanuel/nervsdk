@@ -631,6 +631,11 @@ template <typename T> class Quaternion {
         return result;
     }
 
+    static auto slerp(const Vec3<value_t>& from, const Vec3<value_t>& to,
+                      value_t t) -> Quaternion {
+        return slerp(Quaternion{}, Quaternion(from, to), t);
+    }
+
     /** Rotate a vector by this quaternion.*/
     auto operator*(const Vec3f& v) const -> Vec3f {
         // nVidia SDK implementation
