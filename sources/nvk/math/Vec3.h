@@ -453,6 +453,15 @@ inline auto operator<<(std::ostream& os, const nv::Vec3u& vec)
     return os;
 }
 
+template <> struct hash<nv::Vec3i> {
+    auto operator()(const nv::Vec3i& vec) const noexcept -> size_t {
+        // Simple prime number multiplication approach
+        return static_cast<size_t>(vec.x()) * 73856093U ^
+               static_cast<size_t>(vec.y()) * 19349663U ^
+               static_cast<size_t>(vec.z()) * 83492791U;
+    }
+};
+
 } // namespace std
 
 template <> struct fmt::formatter<nv::Vec3f> {
