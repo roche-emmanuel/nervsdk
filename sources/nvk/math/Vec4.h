@@ -183,6 +183,11 @@ template <typename T> struct Vec4 {
                 _v[3] * rhs._v[3]};
     }
 
+    [[nodiscard]] inline auto dot(const Vec4& rhs) const -> value_t {
+        return _v[0] * rhs._v[0] + _v[1] * rhs._v[1] + _v[2] * rhs._v[2] +
+               _v[3] * rhs._v[3];
+    }
+
     /** Multiply by scalar. */
     inline auto operator*(value_t rhs) const -> Vec4 {
         return {_v[0] * rhs, _v[1] * rhs, _v[2] * rhs, _v[3] * rhs};

@@ -571,6 +571,28 @@ template <typename T> class Quaternion {
         get_rotate(angle, vec.x(), vec.y(), vec.z());
     }
 
+    auto normalize() -> value_t {
+        value_t len =
+            sqrt(_v[0] * _v[0] + _v[1] * _v[1] + _v[2] * _v[2] + _v[3] * _v[3]);
+
+        if (len > value_t(0.0)) {
+            value_t inv_len = value_t(1.0) / len;
+            _v[0] *= inv_len;
+            _v[1] *= inv_len;
+            _v[2] *= inv_len;
+            _v[3] *= inv_len;
+        }
+
+        return len;
+    }
+
+    // Return normalized copy without modifying original
+    [[nodiscard]] auto normalized() const -> Quaternion {
+        Quaternion result(*this);
+        result.normalize();
+        return result;
+    }
+
     /** Spherical Linear Interpolation.
     As t goes from 0 to 1, the Quat object goes from "from" to "to". */
     /// Spherical Linear Interpolation
@@ -578,39 +600,35 @@ template <typename T> class Quaternion {
     /// Reference: Shoemake at SIGGRAPH 89
     /// See also
     /// http://www.gamasutra.com/features/programming/19980703/quaternions_01.htm
-    void slerp(value_t t, const Quaternion& from, const Quaternion& to) {
-        const double epsilon = 0.00001;
-        double omega, cosomega, sinomega, scale_from, scale_to;
+    static auto slerp(const Quaternion& from, const Quaternion& to, value_t t)
+        -> Quaternion {
+        const value_t epsilon =
+            std::numeric_limits<value_t>::epsilon() * value_t(10.0);
 
-        Quaternion quatTo(to);
-        // this is a dot product
+        value_t cosomega = from.as_vec4().dot(to.as_vec4());
 
-        cosomega = from.as_vec4() * to.as_vec4();
-
-        if (cosomega < 0.0) {
+        Quaternion quatTo = to;
+        if (cosomega < value_t(0.0)) {
             cosomega = -cosomega;
             quatTo = -to;
         }
 
-        if ((1.0 - cosomega) > epsilon) {
-            omega = acos(cosomega); // 0 <= omega <= Pi (see man acos)
-            sinomega = sin(omega);  // this sinomega should always be +ve so
-            // could try sinomega=sqrt(1-cosomega*cosomega) to avoid a sin()?
-            scale_from = sin((1.0 - t) * omega) / sinomega;
+        value_t scale_from;
+        value_t scale_to;
+
+        if ((value_t(1.0) - cosomega) > epsilon) {
+            value_t omega = acos(cosomega);
+            value_t sinomega = sin(omega);
+            scale_from = sin((value_t(1.0) - t) * omega) / sinomega;
             scale_to = sin(t * omega) / sinomega;
         } else {
-            /* --------------------------------------------------
-               The ends of the vectors are very close
-               we can use simple linear interpolation - no need
-               to worry about the "spherical" interpolation
-               -------------------------------------------------- */
-            scale_from = 1.0 - t;
+            scale_from = value_t(1.0) - t;
             scale_to = t;
         }
 
-        *this = (from * scale_from) + (quatTo * scale_to);
-
-        // so that we get a Vec4
+        Quaternion result = (from * scale_from) + (quatTo * scale_to);
+        result.normalize();
+        return result;
     }
 
     /** Rotate a vector by this quaternion.*/
