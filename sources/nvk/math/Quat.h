@@ -64,6 +64,10 @@ template <typename T> class Quaternion {
         make_rotate(angle1, axis1, angle2, axis2, angle3, axis3);
     }
 
+    Quaternion(const Vec3<T>& vec1, const Vec3<T>& vec2) {
+        make_rotate(vec1, vec2);
+    }
+
     ~Quaternion() = default;
 
     inline auto operator=(const Quaternion& v) -> Quaternion& {
@@ -459,6 +463,8 @@ template <typename T> class Quaternion {
 
     @author Nicolas Brodu
     */
+
+#if 0
     void make_rotate(const Vec3<T>& vec1, const Vec3<T>& vec2) {
 
         // This routine takes any vector as argument but normalized
@@ -540,6 +546,63 @@ template <typename T> class Quaternion {
             _v[3] = s;
         }
     }
+#else
+    void make_rotate(const Vec3<T>& vec1, const Vec3<T>& vec2) {
+        // Normalize inputs
+        Vec3<T> sourceVector = vec1;
+        Vec3<T> targetVector = vec2;
+
+        const value_t fromLen2 = vec1.length2();
+        const value_t toLen2 = vec2.length2();
+
+        // Use appropriate epsilon based on type
+        const value_t epsilon = std::numeric_limits<value_t>::epsilon() * 10;
+
+        if (fromLen2 > epsilon)
+            sourceVector /= sqrt(fromLen2);
+        if (toLen2 > epsilon)
+            targetVector /= sqrt(toLen2);
+
+        // Dot product test
+        const value_t dotProdPlus1 = 1.0 + sourceVector.dot(targetVector);
+
+        // Degenerate case: vectors point in opposite directions
+        if (dotProdPlus1 < epsilon) {
+            // Find orthogonal axis
+            if (fabs(sourceVector.x()) < value_t(0.6)) {
+                const value_t norm =
+                    sqrt(1.0 - sourceVector.x() * sourceVector.x());
+                _v[0] = 0.0;
+                _v[1] = sourceVector.z() / norm;
+                _v[2] = -sourceVector.y() / norm;
+                _v[3] = 0.0;
+            } else if (fabs(sourceVector.y()) < value_t(0.6)) {
+                const value_t norm =
+                    sqrt(1.0 - sourceVector.y() * sourceVector.y());
+                _v[0] = -sourceVector.z() / norm;
+                _v[1] = 0.0;
+                _v[2] = sourceVector.x() / norm;
+                _v[3] = 0.0;
+            } else {
+                const value_t norm =
+                    sqrt(1.0 - sourceVector.z() * sourceVector.z());
+                _v[0] = sourceVector.y() / norm;
+                _v[1] = -sourceVector.x() / norm;
+                _v[2] = 0.0;
+                _v[3] = 0.0;
+            }
+        } else {
+            // Standard case
+            const value_t s = sqrt(value_t(0.5) * dotProdPlus1);
+            const Vec3<T> tmp =
+                (sourceVector ^ targetVector) / (value_t(2.0) * s);
+            _v[0] = tmp.x();
+            _v[1] = tmp.y();
+            _v[2] = tmp.z();
+            _v[3] = s;
+        }
+    }
+#endif
 
     /** Return the angle and vector components represented by the quaternion.*/
     // Get the angle of rotation and axis of this Quat object.
