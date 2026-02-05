@@ -21,7 +21,7 @@ class GLTFValidationException : public GLTFException {
 };
 
 // Main asset class
-class GLTFAsset {
+class GLTFAsset : public RefObject {
   public:
     // Construction
     GLTFAsset();
@@ -30,7 +30,7 @@ class GLTFAsset {
         : GLTFAsset(path.c_str(), load_buffers) {}
 
     // Move-only semantics
-    ~GLTFAsset();
+    ~GLTFAsset() override;
     GLTFAsset(const GLTFAsset&) = delete;
     auto operator=(const GLTFAsset&) -> GLTFAsset& = delete;
     GLTFAsset(GLTFAsset&& other) noexcept;
@@ -48,6 +48,8 @@ class GLTFAsset {
     void save(const char* path) const;
     void validate() const;
 
+    static auto create() -> RefPtr<GLTFAsset>;
+
     auto get_gltf_buffer(U32 idx) -> cgltf_buffer&;
     [[nodiscard]] auto get_gltf_buffer(U32 idx) const -> const cgltf_buffer&;
 
@@ -56,71 +58,31 @@ class GLTFAsset {
 
     auto add_buffer(size_t size = 0) -> GLTFBuffer&;
 
-    // Read access to existing elements
-    [[nodiscard]] auto meshes() const -> std::span<const GLTFMesh>;
-    [[nodiscard]] auto nodes() const -> std::span<const GLTFNode>;
-    [[nodiscard]] auto scenes() const -> std::span<const GLTFScene>;
-    [[nodiscard]] auto buffers() const -> std::span<const GLTFBuffer>;
-    [[nodiscard]] auto buffer_views() const -> std::span<const GLTFBufferView>;
-    [[nodiscard]] auto accessors() const -> std::span<const GLTFAccessor>;
-    [[nodiscard]] auto materials() const -> std::span<const GLTFMaterial>;
-    [[nodiscard]] auto textures() const -> std::span<const GLTFTexture>;
-    [[nodiscard]] auto images() const -> std::span<const GLTFImage>;
-    [[nodiscard]] auto animations() const -> std::span<const GLTFAnimation>;
-    [[nodiscard]] auto skins() const -> std::span<const GLTFSkin>;
-    [[nodiscard]] auto cameras() const -> std::span<const GLTFCamera>;
-
-    // Mutable access
-    auto meshes() -> std::span<GLTFMesh>;
-    auto nodes() -> std::span<GLTFNode>;
-    auto scenes() -> std::span<GLTFScene>;
-    auto buffers() -> std::span<GLTFBuffer>;
-    auto buffer_views() -> std::span<GLTFBufferView>;
-    auto accessors() -> std::span<GLTFAccessor>;
-    auto materials() -> std::span<GLTFMaterial>;
-    auto textures() -> std::span<GLTFTexture>;
-    auto images() -> std::span<GLTFImage>;
-    auto animations() -> std::span<GLTFAnimation>;
-    auto skins() -> std::span<GLTFSkin>;
-    auto cameras() -> std::span<GLTFCamera>;
-
-    // Add new elements
-    auto add_mesh(std::string_view name = "") -> GLTFMesh&;
-    auto add_node(std::string_view name = "") -> GLTFNode&;
-    auto add_scene(std::string_view name = "") -> GLTFScene&;
-
-    auto add_buffer_view(size_t buffer_index, size_t offset, size_t length)
-        -> GLTFBufferView&;
-    auto add_accessor(cgltf_type type, cgltf_component_type component_type,
-                      size_t count) -> GLTFAccessor&;
-    auto add_material(std::string_view name = "") -> GLTFMaterial&;
-    auto add_texture() -> GLTFTexture&;
-    auto add_image(std::string_view uri = "") -> GLTFImage&;
-    auto add_animation(std::string_view name = "") -> GLTFAnimation&;
-    auto add_skin(std::string_view name = "") -> GLTFSkin&;
-    auto add_camera(std::string_view name = "") -> GLTFCamera&;
-
     // Scene management
     [[nodiscard]] auto default_scene() const -> std::optional<GLTFScene>;
     void set_default_scene(size_t scene_index);
 
     // Asset metadata
-    [[nodiscard]] auto generator() const -> std::string_view;
-    [[nodiscard]] auto version() const -> std::string_view;
-    [[nodiscard]] auto copyright() const -> std::string_view;
-    void set_generator(std::string_view gen);
-    void set_copyright(std::string_view copyright);
+    [[nodiscard]] auto generator() const -> const String&;
+    [[nodiscard]] auto version() const -> const String&;
+    [[nodiscard]] auto copyright() const -> const String&;
+    void set_generator(String gen);
+    void set_copyright(String copyright);
 
     // Direct access (use with caution)
-    auto data() -> cgltf_data* { return _data; }
-    [[nodiscard]] auto data() const -> const cgltf_data* { return _data; }
+    // auto data() -> cgltf_data* { return _data; }
+    // [[nodiscard]] auto data() const -> const cgltf_data* { return _data; }
 
     // Utility
-    [[nodiscard]] auto empty() const -> bool { return _data == nullptr; }
+    [[nodiscard]] auto empty() const -> bool { return _numElements == 0; }
     void clear();
 
   private:
-    cgltf_data* _data{nullptr};
+    String _generator{"NervSDK GLTF Asset"};
+    String _version{"2.0"};
+    String _copyright;
+
+    I32 _numElements{0};
 
     Vector<cgltf_buffer> _rawBuffers;
     Vector<RefPtr<GLTFBuffer>> _buffers;
@@ -152,11 +114,7 @@ class GLTFAsset {
         Vector<Vector<uint8_t>> buffer_data;
     } _owned;
 
-    // Track which elements came from file vs. were added
-    bool _loaded_from_file;
-
     void _rebuild_pointers();
-    void initialize_empty();
     auto intern_string(std::string_view str) -> char*;
 };
 
