@@ -38,9 +38,6 @@ class ResourcePacker : public RefObject {
     // Encrypt data using AES-256
     auto encrypt_data(const U8Vector& input) -> U8Vector;
 
-    void set_package_version(I64 version);
-    void set_metadata(const String& meta);
-
   public:
     explicit ResourcePacker(const String& outPath, const U8Vector& key,
                             const U8Vector& iv)
@@ -51,6 +48,9 @@ class ResourcePacker : public RefObject {
 
     // Create the pack file
     void pack();
+
+    void set_package_version(I64 version);
+    void set_metadata(const String& meta);
 };
 
 // Resource unpacker for the game engine
@@ -73,9 +73,6 @@ class ResourceUnpacker : public RefObject {
     // Decrypt data using AES-256
     auto decrypt_data(const U8Vector& input) -> U8Vector;
 
-    auto get_package_version() const -> I64;
-    auto get_metadata() const -> const String&;
-
     // Calculate a checksum
     template <typename Container>
     auto calculate_checksum(const Container& data) -> U32 {
@@ -97,6 +94,9 @@ class ResourceUnpacker : public RefObject {
             packFile.close();
         }
     }
+
+    auto get_package_version() const -> I64;
+    auto get_metadata() const -> const String&;
 
     // Retrieve the pack filename:
     auto get_filename() const -> const String&;
