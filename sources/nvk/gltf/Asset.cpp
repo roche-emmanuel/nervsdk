@@ -1,4 +1,8 @@
 #include <nvk/gltf/Asset.h>
+#include <nvk/gltf/Mesh.h>
+#include <nvk/gltf/Node.h>
+#include <nvk/gltf/Primitive.h>
+
 
 #define CGLTF_IMPLEMENTATION
 // #include <external/cgltf.h>
