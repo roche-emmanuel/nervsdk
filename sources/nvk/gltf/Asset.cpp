@@ -1,8 +1,12 @@
+#include <nvk/gltf/Accessor.h>
 #include <nvk/gltf/Asset.h>
+#include <nvk/gltf/Buffer.h>
+#include <nvk/gltf/BufferView.h>
+#include <nvk/gltf/Material.h>
 #include <nvk/gltf/Mesh.h>
 #include <nvk/gltf/Node.h>
 #include <nvk/gltf/Primitive.h>
-
+#include <nvk/gltf/Scene.h>
 
 #define CGLTF_IMPLEMENTATION
 // #include <external/cgltf.h>
