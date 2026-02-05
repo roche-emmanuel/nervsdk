@@ -36,10 +36,25 @@ class GLTFAsset {
     GLTFAsset(GLTFAsset&& other) noexcept;
     auto operator=(GLTFAsset&& other) noexcept -> GLTFAsset&;
 
+    [[nodiscard]] auto decode_data_uri(const String& uri,
+                                       size_t expected_size) const -> U8Vector;
+    [[nodiscard]] auto load_external_buffer(const String& uri,
+                                            size_t expected_size) const
+        -> U8Vector;
+    [[nodiscard]] auto resolve_path(const String& uri) const -> String;
+
     // File I/O
     void load(const char* path, bool load_buffers = true);
     void save(const char* path) const;
     void validate() const;
+
+    auto get_gltf_buffer(U32 idx) -> cgltf_buffer&;
+    [[nodiscard]] auto get_gltf_buffer(U32 idx) const -> const cgltf_buffer&;
+
+    auto get_buffer(U32 idx) -> GLTFBuffer&;
+    [[nodiscard]] auto get_buffer(U32 idx) const -> const GLTFBuffer&;
+
+    auto add_buffer(size_t size = 0) -> GLTFBuffer&;
 
     // Read access to existing elements
     [[nodiscard]] auto meshes() const -> std::span<const GLTFMesh>;
@@ -73,7 +88,7 @@ class GLTFAsset {
     auto add_mesh(std::string_view name = "") -> GLTFMesh&;
     auto add_node(std::string_view name = "") -> GLTFNode&;
     auto add_scene(std::string_view name = "") -> GLTFScene&;
-    auto add_buffer(size_t size = 0) -> GLTFBuffer&;
+
     auto add_buffer_view(size_t buffer_index, size_t offset, size_t length)
         -> GLTFBufferView&;
     auto add_accessor(cgltf_type type, cgltf_component_type component_type,
@@ -105,43 +120,44 @@ class GLTFAsset {
     void clear();
 
   private:
-    cgltf_data* _data;
+    cgltf_data* _data{nullptr};
+
+    Vector<cgltf_buffer> _rawBuffers;
+    Vector<RefPtr<GLTFBuffer>> _buffers;
 
     // Storage for dynamically allocated elements
     struct OwnedElements {
-        std::vector<cgltf_buffer> buffers;
-        std::vector<cgltf_buffer_view> buffer_views;
-        std::vector<cgltf_accessor> accessors;
-        std::vector<cgltf_mesh> meshes;
-        std::vector<cgltf_node> nodes;
-        std::vector<cgltf_scene> scenes;
-        std::vector<cgltf_material> materials;
-        std::vector<cgltf_texture> textures;
-        std::vector<cgltf_image> images;
-        std::vector<cgltf_sampler> samplers;
-        std::vector<cgltf_animation> animations;
-        std::vector<cgltf_skin> skins;
-        std::vector<cgltf_camera> cameras;
-        std::vector<cgltf_primitive> primitives;
-        std::vector<cgltf_attribute> attributes;
-        std::vector<cgltf_morph_target> morph_targets;
-        std::vector<cgltf_animation_sampler> animation_samplers;
-        std::vector<cgltf_animation_channel> animation_channels;
+        Vector<cgltf_buffer_view> buffer_views;
+        Vector<cgltf_accessor> accessors;
+        Vector<cgltf_mesh> meshes;
+        Vector<cgltf_node> nodes;
+        Vector<cgltf_scene> scenes;
+        Vector<cgltf_material> materials;
+        Vector<cgltf_texture> textures;
+        Vector<cgltf_image> images;
+        Vector<cgltf_sampler> samplers;
+        Vector<cgltf_animation> animations;
+        Vector<cgltf_skin> skins;
+        Vector<cgltf_camera> cameras;
+        Vector<cgltf_primitive> primitives;
+        Vector<cgltf_attribute> attributes;
+        Vector<cgltf_morph_target> morph_targets;
+        Vector<cgltf_animation_sampler> animation_samplers;
+        Vector<cgltf_animation_channel> animation_channels;
 
         // String storage (for names, URIs, etc.)
-        std::vector<std::string> strings;
+        Vector<std::string> strings;
 
         // Binary data storage for buffers
-        std::vector<std::vector<uint8_t>> buffer_data;
+        Vector<Vector<uint8_t>> buffer_data;
     } _owned;
 
     // Track which elements came from file vs. were added
     bool _loaded_from_file;
 
     void _rebuild_pointers();
-    void _initialize_empty();
-    auto _intern_string(std::string_view str) -> char*;
-    void _reserve_capacity(size_t estimate);
+    void initialize_empty();
+    auto intern_string(std::string_view str) -> char*;
 };
 
 } // namespace nv

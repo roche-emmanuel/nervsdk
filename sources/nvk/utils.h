@@ -9,6 +9,10 @@
 
 namespace nv {
 
+auto base64_encode(const U8* data, size_t len) -> String;
+auto base64_encode(const Vector<U8>& data) -> String;
+auto base64_decode(const String& encoded_string) -> Vector<U8>;
+
 // Helper function to convert glob pattern to regex
 auto glob_to_regex(const String& pattern) -> String;
 

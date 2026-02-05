@@ -24,9 +24,46 @@ namespace nv {
 //==============================================================================
 // GLTFAsset Implementation
 //==============================================================================
+auto GLTFAsset::decode_data_uri(const String& uri, size_t expected_size) const
+    -> U8Vector {
+    // Find the base64 data after "data:application/octet-stream;base64,"
+    size_t comma_pos = uri.find(',');
+    if (comma_pos == String::npos) {
+        throw std::runtime_error("Invalid data URI format");
+    }
+
+    String base64_data = uri.substr(comma_pos + 1);
+    U8Vector decoded = base64_decode(base64_data);
+
+    if (decoded.size() != expected_size) {
+        throw std::runtime_error("Decoded data size mismatch");
+    }
+
+    return decoded;
+}
+
+auto GLTFAsset::load_external_buffer(const String& uri,
+                                     size_t expected_size) const -> U8Vector {
+    // Resolve path relative to glTF file location
+    String full_path = resolve_path(uri);
+
+    std::ifstream file(full_path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Failed to open buffer file: " + full_path);
+    }
+
+    U8Vector data(expected_size);
+    file.read(reinterpret_cast<char*>(data.data()), expected_size);
+
+    if (file.gcount() != static_cast<std::streamsize>(expected_size)) {
+        throw std::runtime_error("Buffer file size mismatch");
+    }
+
+    return data;
+}
 
 GLTFAsset::GLTFAsset() : _data(nullptr), _loaded_from_file(false) {
-    _initialize_empty();
+    initialize_empty();
 }
 
 GLTFAsset::GLTFAsset(const char* path, bool load_buffers)
@@ -116,18 +153,18 @@ void GLTFAsset::clear() {
     _loaded_from_file = false;
 }
 
-void GLTFAsset::_initialize_empty() {
+void GLTFAsset::initialize_empty() {
     _data = new cgltf_data();
     std::memset(_data, 0, sizeof(cgltf_data));
 
     // Set required asset info
-    _data->asset.version = _intern_string("2.0");
-    _data->asset.generator = _intern_string("GLTFAsset");
+    _data->asset.version = intern_string("2.0");
+    _data->asset.generator = intern_string("GLTFAsset");
 
     _loaded_from_file = false;
 }
 
-auto GLTFAsset::_intern_string(std::string_view str) -> char* {
+auto GLTFAsset::intern_string(std::string_view str) -> char* {
     if (str.empty())
         return nullptr;
     _owned.strings.emplace_back(str);
@@ -148,8 +185,8 @@ void GLTFAsset::_rebuild_pointers() {
     _data->scenes = _owned.scenes.empty() ? nullptr : _owned.scenes.data();
     _data->scenes_count = _owned.scenes.size();
 
-    _data->buffers = _owned.buffers.empty() ? nullptr : _owned.buffers.data();
-    _data->buffers_count = _owned.buffers.size();
+    // _data->buffers = _owned.buffers.empty() ? nullptr :
+    // _owned.buffers.data(); _data->buffers_count = _owned.buffers.size();
 
     _data->buffer_views =
         _owned.buffer_views.empty() ? nullptr : _owned.buffer_views.data();
@@ -185,31 +222,20 @@ void GLTFAsset::_rebuild_pointers() {
     _data->cameras_count = _owned.cameras.size();
 }
 
-void GLTFAsset::_reserve_capacity(size_t estimate) {
-    _owned.meshes.reserve(estimate);
-    _owned.nodes.reserve(estimate * 2);
-    _owned.scenes.reserve(std::max(size_t(1), estimate / 10));
-    _owned.buffers.reserve(estimate);
-    _owned.buffer_views.reserve(estimate * 2);
-    _owned.accessors.reserve(estimate * 3);
-    _owned.materials.reserve(estimate);
-    _owned.strings.reserve(estimate * 5);
-}
-
 //==============================================================================
 // Add element methods
 //==============================================================================
 
 auto GLTFAsset::add_mesh(std::string_view name) -> GLTFMesh& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.meshes.emplace_back();
     cgltf_mesh& mesh = _owned.meshes.back();
     std::memset(&mesh, 0, sizeof(cgltf_mesh));
 
     if (!name.empty()) {
-        mesh.name = _intern_string(name);
+        mesh.name = intern_string(name);
     }
 
     _rebuild_pointers();
@@ -218,14 +244,14 @@ auto GLTFAsset::add_mesh(std::string_view name) -> GLTFMesh& {
 
 auto GLTFAsset::add_node(std::string_view name) -> GLTFNode& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.nodes.emplace_back();
     cgltf_node& node = _owned.nodes.back();
     std::memset(&node, 0, sizeof(cgltf_node));
 
     if (!name.empty()) {
-        node.name = _intern_string(name);
+        node.name = intern_string(name);
     }
 
     // Initialize default transform (identity)
@@ -238,14 +264,14 @@ auto GLTFAsset::add_node(std::string_view name) -> GLTFNode& {
 
 auto GLTFAsset::add_scene(std::string_view name) -> GLTFScene& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.scenes.emplace_back();
     cgltf_scene& scene = _owned.scenes.back();
     std::memset(&scene, 0, sizeof(cgltf_scene));
 
     if (!name.empty()) {
-        scene.name = _intern_string(name);
+        scene.name = intern_string(name);
     }
 
     // If this is the first scene, make it default
@@ -258,29 +284,23 @@ auto GLTFAsset::add_scene(std::string_view name) -> GLTFScene& {
 }
 
 auto GLTFAsset::add_buffer(size_t size) -> GLTFBuffer& {
-    if (!_data)
-        _initialize_empty();
-
-    _owned.buffers.emplace_back();
-    cgltf_buffer& buffer = _owned.buffers.back();
+    _rawBuffers.emplace_back();
+    cgltf_buffer& buffer = _rawBuffers.back();
     std::memset(&buffer, 0, sizeof(cgltf_buffer));
 
-    buffer.size = size;
+    auto buf = nv::create<GLTFBuffer>(*this, U32(_rawBuffers.size() - 1));
+    _buffers.emplace_back(buf);
 
-    // Allocate buffer data storage
-    _owned.buffer_data.emplace_back(size, 0);
-    buffer.data = _owned.buffer_data.back().data();
-
-    _rebuild_pointers();
-    return *reinterpret_cast<GLTFBuffer*>(&buffer);
+    buf->resize(size);
+    return *buf;
 }
 
 auto GLTFAsset::add_buffer_view(size_t buffer_index, size_t offset,
                                 size_t length) -> GLTFBufferView& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
-    if (buffer_index >= _owned.buffers.size()) {
+    if (buffer_index >= _buffers.size()) {
         throw GLTFException("Buffer index out of range");
     }
 
@@ -288,7 +308,7 @@ auto GLTFAsset::add_buffer_view(size_t buffer_index, size_t offset,
     cgltf_buffer_view& view = _owned.buffer_views.back();
     std::memset(&view, 0, sizeof(cgltf_buffer_view));
 
-    view.buffer = &_owned.buffers[buffer_index];
+    // view.buffer = &_owned.buffers[buffer_index];
     view.offset = offset;
     view.size = length;
 
@@ -300,7 +320,7 @@ auto GLTFAsset::add_accessor(cgltf_type type,
                              cgltf_component_type component_type, size_t count)
     -> GLTFAccessor& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.accessors.emplace_back();
     cgltf_accessor& accessor = _owned.accessors.back();
@@ -316,14 +336,14 @@ auto GLTFAsset::add_accessor(cgltf_type type,
 
 auto GLTFAsset::add_material(std::string_view name) -> GLTFMaterial& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.materials.emplace_back();
     cgltf_material& material = _owned.materials.back();
     std::memset(&material, 0, sizeof(cgltf_material));
 
     if (!name.empty()) {
-        material.name = _intern_string(name);
+        material.name = intern_string(name);
     }
 
     // Initialize with defaults
@@ -343,7 +363,7 @@ auto GLTFAsset::add_material(std::string_view name) -> GLTFMaterial& {
 
 auto GLTFAsset::add_texture() -> GLTFTexture& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.textures.emplace_back();
     cgltf_texture& texture = _owned.textures.back();
@@ -355,14 +375,14 @@ auto GLTFAsset::add_texture() -> GLTFTexture& {
 
 auto GLTFAsset::add_image(std::string_view uri) -> GLTFImage& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.images.emplace_back();
     cgltf_image& image = _owned.images.back();
     std::memset(&image, 0, sizeof(cgltf_image));
 
     if (!uri.empty()) {
-        image.uri = _intern_string(uri);
+        image.uri = intern_string(uri);
     }
 
     _rebuild_pointers();
@@ -371,14 +391,14 @@ auto GLTFAsset::add_image(std::string_view uri) -> GLTFImage& {
 
 auto GLTFAsset::add_animation(std::string_view name) -> GLTFAnimation& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.animations.emplace_back();
     cgltf_animation& animation = _owned.animations.back();
     std::memset(&animation, 0, sizeof(cgltf_animation));
 
     if (!name.empty()) {
-        animation.name = _intern_string(name);
+        animation.name = intern_string(name);
     }
 
     _rebuild_pointers();
@@ -387,14 +407,14 @@ auto GLTFAsset::add_animation(std::string_view name) -> GLTFAnimation& {
 
 auto GLTFAsset::add_skin(std::string_view name) -> GLTFSkin& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.skins.emplace_back();
     cgltf_skin& skin = _owned.skins.back();
     std::memset(&skin, 0, sizeof(cgltf_skin));
 
     if (!name.empty()) {
-        skin.name = _intern_string(name);
+        skin.name = intern_string(name);
     }
 
     _rebuild_pointers();
@@ -403,14 +423,14 @@ auto GLTFAsset::add_skin(std::string_view name) -> GLTFSkin& {
 
 auto GLTFAsset::add_camera(std::string_view name) -> GLTFCamera& {
     if (!_data)
-        _initialize_empty();
+        initialize_empty();
 
     _owned.cameras.emplace_back();
     cgltf_camera& camera = _owned.cameras.back();
     std::memset(&camera, 0, sizeof(cgltf_camera));
 
     if (!name.empty()) {
-        camera.name = _intern_string(name);
+        camera.name = intern_string(name);
     }
 
     _rebuild_pointers();
@@ -580,13 +600,13 @@ auto GLTFAsset::copyright() const -> std::string_view {
 
 void GLTFAsset::set_generator(std::string_view gen) {
     if (_data) {
-        _data->asset.generator = _intern_string(gen);
+        _data->asset.generator = intern_string(gen);
     }
 }
 
 void GLTFAsset::set_copyright(std::string_view copyright) {
     if (_data) {
-        _data->asset.copyright = _intern_string(copyright);
+        _data->asset.copyright = intern_string(copyright);
     }
 }
 
@@ -607,5 +627,37 @@ void GLTFAsset::set_default_scene(size_t scene_index) {
     }
     _data->scene = &_data->scenes[scene_index];
 }
+
+auto GLTFAsset::get_gltf_buffer(U32 idx) -> cgltf_buffer& {
+    if (_data != nullptr) {
+        NVCHK(idx < _data->buffers_count, "Out of range buffer index {} >= {}",
+              idx, _data->buffers_count);
+        return _data->buffers[idx];
+    }
+
+    NVCHK(idx < _rawBuffers.size(), "Out of range buffer index {} >= {}", idx,
+          _data->buffers_count);
+    return _rawBuffers[idx];
+}
+auto GLTFAsset::get_gltf_buffer(U32 idx) const -> const cgltf_buffer& {
+    if (_data != nullptr) {
+        NVCHK(idx < _data->buffers_count, "Out of range buffer index {} >= {}",
+              idx, _data->buffers_count);
+        return _data->buffers[idx];
+    }
+
+    NVCHK(idx < _rawBuffers.size(), "Out of range buffer index {} >= {}", idx,
+          _data->buffers_count);
+    return _rawBuffers[idx];
+}
+auto GLTFAsset::get_buffer(U32 idx) -> GLTFBuffer& {
+    NVCHK(idx < _buffers.size(), "Out of range buffer index {}", idx);
+    return *_buffers[idx];
+}
+auto GLTFAsset::get_buffer(U32 idx) const -> const GLTFBuffer& {
+    NVCHK(idx < _buffers.size(), "Out of range buffer index {}", idx);
+    return *_buffers[idx];
+}
+auto GLTFAsset::resolve_path(const String& uri) const -> String { return uri; };
 
 } // namespace nv

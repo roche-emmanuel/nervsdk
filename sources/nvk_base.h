@@ -52,6 +52,7 @@ class PointArray;
 class PCGPoint;
 class PCGPointRef;
 
+class GLTFAsset;
 class GLTFMesh;
 class GLTFNode;
 class GLTFScene;
