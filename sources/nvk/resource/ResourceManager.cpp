@@ -2,6 +2,8 @@
 
 #include <nvk/resource/ResourceManager.h>
 
+#include <algorithm>
+
 namespace nv {
 
 NV_IMPLEMENT_CUSTOM_INSTANCE(ResourceManager)
@@ -24,6 +26,9 @@ void ResourceManager::add_resource_pack(const String& packFile) {
 
     auto up = nv::create<ResourceUnpacker>(packFile, _aesKey, _aesIV);
     _unpackers.push_back(up);
+
+    // Sort the resource packs by version number:
+    sort_resource_packs();
 }
 
 auto ResourceManager::has_resource_pack(const String& packFile) const -> bool {
@@ -287,5 +292,12 @@ auto ResourceManager::get_files(const String& directory,
     StringVector result(uniqueFiles.begin(), uniqueFiles.end());
     return result;
 }
+
+void ResourceManager::sort_resource_packs() {
+    std::ranges::sort(_unpackers, [](const RefPtr<ResourceUnpacker>& a,
+                                     const RefPtr<ResourceUnpacker>& b) {
+        return a->get_package_version() > b->get_package_version();
+    });
+};
 
 } // namespace nv

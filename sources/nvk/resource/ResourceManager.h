@@ -88,6 +88,8 @@ class ResourceManager {
 
     /** flag for resource dirty state */
     bool _dirtyResourcePacks{true};
+
+    void sort_resource_packs();
 };
 
 } // namespace nv
