@@ -94,6 +94,8 @@ auto get_parent_folder(const char* fname) -> String;
 
 auto get_parent_folder(const String& fname) -> String;
 
+auto get_filename(const String& full_path) -> String;
+
 // Convert wide string to String:
 auto toString(const std::wstring& wstr) -> String;
 
