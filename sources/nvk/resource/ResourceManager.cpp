@@ -237,4 +237,55 @@ void ResourceManager::register_resource_packs(const StringVector& packFiles) {
     resourcesReady.emit();
 }
 
+auto ResourceManager::get_files(const String& directory,
+                                const std::regex& pattern, bool recursive)
+    -> StringVector {
+    Set<String> uniqueFiles;
+
+    // Search in system files if enabled
+    if (_useSystemFiles) {
+        // Check relative to root path
+        String sys_dir = directory.empty()
+                             ? get_root_path()
+                             : get_path(get_root_path(), directory);
+        auto result = nv::get_files(sys_dir, pattern, recursive);
+        uniqueFiles.insert(result.begin(), result.end());
+    }
+
+    auto dir = directory;
+    if (!dir.empty() && dir.back() != '/') {
+        dir += '/';
+    }
+
+    // Search in resource packs
+    for (const auto& up : _unpackers) {
+        auto all_files = up->list_files();
+
+        for (const auto& file : all_files) {
+
+            if (!dir.empty() && !file.starts_with(dir)) {
+                // Not in the correct folder.
+                continue;
+            }
+
+            // For non-recursive, ensure no subdirectories
+            if (!recursive) {
+                String relative_path =
+                    dir.empty() ? file : file.substr(dir.length());
+                if (relative_path.find('/') != String::npos) {
+                    // File is in a subdirectory
+                    continue;
+                }
+            }
+
+            if (std::regex_match(file, pattern)) {
+                uniqueFiles.insert(file);
+            }
+        }
+    }
+
+    StringVector result(uniqueFiles.begin(), uniqueFiles.end());
+    return result;
+}
+
 } // namespace nv

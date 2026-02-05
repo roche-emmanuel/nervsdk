@@ -849,4 +849,9 @@ auto get_file_last_write_time(const String& fname) -> std::time_t {
     return ResourceManager::instance().get_file_last_write_time(fname);
 }
 
+auto get_virtual_files(const String& directory, const std::regex& pattern,
+                       bool recursive) -> Vector<String> {
+    return ResourceManager::instance().get_files(directory, pattern, recursive);
+};
+
 } // namespace nv

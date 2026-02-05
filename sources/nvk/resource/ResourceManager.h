@@ -66,6 +66,9 @@ class ResourceManager {
 
     void register_resource_packs(const StringVector& packFiles);
 
+    auto get_files(const String& directory, const std::regex& pattern,
+                   bool recursive) -> StringVector;
+
     Signal<> resourcesReady;
 
   protected:
