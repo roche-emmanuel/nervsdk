@@ -26,6 +26,9 @@ class ResourcePacker : public RefObject {
     Vector<FileEntry> fileEntries;
     String outputPath;
 
+    I64 packageVersion{0};
+    String metadata;
+
     // Calculate a simple checksum
     auto calculate_checksum(const U8Vector& data) -> U32;
 
@@ -34,6 +37,9 @@ class ResourcePacker : public RefObject {
 
     // Encrypt data using AES-256
     auto encrypt_data(const U8Vector& input) -> U8Vector;
+
+    void set_package_version(I64 version);
+    void set_metadata(const String& meta);
 
   public:
     explicit ResourcePacker(const String& outPath, const U8Vector& key,
@@ -57,12 +63,18 @@ class ResourceUnpacker : public RefObject {
     U8Vector AES_KEY; // Should be 32 bytes
     U8Vector AES_IV;  // Should be 16 bytes
 
+    I64 packageVersion{0};
+    String metadata;
+
     // Decompress data using zlib
     void decompress_data(const U8Vector& input, U8* destData,
                          size_t originalSize);
 
     // Decrypt data using AES-256
     auto decrypt_data(const U8Vector& input) -> U8Vector;
+
+    auto get_package_version() const -> I64;
+    auto get_metadata() const -> const String&;
 
     // Calculate a checksum
     template <typename Container>

@@ -130,15 +130,32 @@ void ResourcePacker::pack() {
         return;
     }
 
-    // Write header: magic number and file count
-    const char* magic = "NVPCK";
+    // Write header: magic number (v2 format with metadata support)
+    const char* magic = "NVPKX";
     out.write(magic, 5);
 
+    // Write package version
+    out.write(reinterpret_cast<const char*>(&packageVersion),
+              sizeof(packageVersion));
+
+    // Encrypt and write metadata
+    U8Vector metadataBytes(metadata.begin(), metadata.end());
+    U8Vector encryptedMetadata = encrypt_data(metadataBytes);
+
+    U32 metadataLength = encryptedMetadata.size();
+    out.write(reinterpret_cast<const char*>(&metadataLength),
+              sizeof(metadataLength));
+    out.write(reinterpret_cast<const char*>(encryptedMetadata.data()),
+              metadataLength);
+
+    // Write file count
     U32 fileCount = fileEntries.size();
-    out.write(reinterpret_cast<char*>(&fileCount), sizeof(fileCount));
+    out.write(reinterpret_cast<const char*>(&fileCount), sizeof(fileCount));
 
     // Calculate offset for the first file data block
-    U32 currentOffset = 5 + sizeof(fileCount);
+    U32 currentOffset = 5 + // magic
+                        sizeof(packageVersion) + sizeof(metadataLength) +
+                        metadataLength + sizeof(fileCount);
 
     // Compute the total offset for the file table:
     for (auto& entry : fileEntries) {
@@ -262,7 +279,39 @@ ResourceUnpacker::ResourceUnpacker(const String& packFilePath,
     // Read and verify header
     char magic[5];
     packFile.read(magic, 5);
-    NVCHK(String(magic, 5) == "NVPCK", "Invalid pack file format.");
+    String magicStr(magic, 5);
+
+    NVCHK(magicStr == "NVPCK" || magicStr == "NVPKX",
+          "Invalid pack file format: {}", magicStr);
+
+    bool isV2Format = (magicStr == "NVPKX");
+
+    if (isV2Format) {
+        // Read package version
+        packFile.read(reinterpret_cast<char*>(&packageVersion),
+                      sizeof(packageVersion));
+
+        // Read encrypted metadata
+        U32 encryptedMetadataLength;
+        packFile.read(reinterpret_cast<char*>(&encryptedMetadataLength),
+                      sizeof(encryptedMetadataLength));
+
+        U8Vector encryptedMetadata(encryptedMetadataLength);
+        packFile.read(reinterpret_cast<char*>(encryptedMetadata.data()),
+                      encryptedMetadataLength);
+
+        // Decrypt metadata
+        U8Vector decryptedMetadata = decrypt_data(encryptedMetadata);
+        metadata = String(decryptedMetadata.begin(), decryptedMetadata.end());
+
+        logDEBUG("Pack version: {}, metadata length: {}", packageVersion,
+                 metadata.length());
+    } else {
+        // Version 1 format - no version/metadata
+        packageVersion = 0;
+        metadata = "";
+        logDEBUG("Loading legacy v1 format pack");
+    }
 
     // Read file count
     U32 fileCount;
@@ -270,7 +319,7 @@ ResourceUnpacker::ResourceUnpacker(const String& packFilePath,
 
     logDEBUG("Reading file table with {} entries.", fileCount);
 
-    // Read file table
+    // Read file table (same for both versions)
     for (U32 i = 0; i < fileCount; i++) {
         U32 nameLength;
         packFile.read(reinterpret_cast<char*>(&nameLength), sizeof(nameLength));
@@ -279,7 +328,6 @@ ResourceUnpacker::ResourceUnpacker(const String& packFilePath,
         packFile.read(nameBuffer.data(), nameLength);
         String name(nameBuffer.data(), nameLength);
 
-        // logDEBUG("Processing entry {}...", name);
         FileEntry entry;
         entry.name = name;
 
@@ -296,8 +344,6 @@ ResourceUnpacker::ResourceUnpacker(const String& packFilePath,
 
         fileTable[name] = entry;
     }
-
-    // logDEBUG("Done reading file table.");
 }
 
 auto ResourceUnpacker::get_file_info(const String& fileName) -> FileEntry {
@@ -396,5 +442,15 @@ auto ResourceUnpacker::list_files() -> Vector<String> {
 
 auto ResourceUnpacker::get_filename() const -> const String& {
     return _filename;
+}
+void ResourcePacker::set_package_version(I64 version) {
+    packageVersion = version;
+}
+void ResourcePacker::set_metadata(const String& meta) { metadata = meta; }
+auto ResourceUnpacker::get_package_version() const -> I64 {
+    return packageVersion;
+}
+auto ResourceUnpacker::get_metadata() const -> const String& {
+    return metadata;
 }
 } // namespace nv
