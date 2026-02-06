@@ -222,4 +222,5 @@ auto GLTFNode::write() const -> Json {
     return json;
 }
 
+GLTFNode::GLTFNode(GLTFAsset& parent, U32 index) : GLTFElement(parent, index) {}
 } // namespace nv

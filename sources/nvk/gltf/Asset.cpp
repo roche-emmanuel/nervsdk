@@ -320,6 +320,18 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
             add_node().read(desc);
         }
     }
+
+    if (asset.contains("scenes")) {
+        // Create the scenes:
+        for (const auto& desc : asset["scenes"]) {
+            add_scene().read(desc);
+        }
+
+        if (asset.contains("scene")) {
+            U32 idx = asset["scene"].get<U32>();
+            _defaultScene = &get_scene(idx);
+        }
+    }
 }
 
 void GLTFAsset::save(const char* path) const {
@@ -378,6 +390,19 @@ void GLTFAsset::save(const char* path) const {
             nodes.push_back(node->write());
         }
         data["nodes"] = std::move(nodes);
+    }
+
+    // Write the scenes:
+    if (!_scenes.empty()) {
+        Json scenes;
+        for (const auto& scene : _scenes) {
+            scenes.push_back(scene->write());
+        }
+        data["scenes"] = std::move(scenes);
+
+        if (_defaultScene != nullptr) {
+            data["scene"] = _defaultScene->index();
+        }
     }
 
     nv::write_json_file(path, data);
@@ -514,4 +539,25 @@ auto GLTFAsset::get_node(U32 idx) const -> const GLTFNode& {
     return *_nodes[idx];
 };
 
+auto GLTFAsset::add_scene(String name) -> GLTFScene& {
+    auto obj = nv::create<GLTFScene>(*this, _scenes.size());
+    obj->set_name(std::move(name));
+    _scenes.emplace_back(obj);
+    return *obj;
+};
+
+auto GLTFAsset::get_scene(U32 idx) -> GLTFScene& {
+    NVCHK(idx < _scenes.size(), "Out of range scene index {}", idx);
+    return *_scenes[idx];
+};
+
+auto GLTFAsset::get_scene(U32 idx) const -> const GLTFScene& {
+    NVCHK(idx < _scenes.size(), "Out of range scene index {}", idx);
+    return *_scenes[idx];
+};
+
+auto GLTFAsset::default_scene() const -> RefPtr<GLTFScene> {
+    return _defaultScene;
+}
+void GLTFAsset::set_default_scene(GLTFScene* scene) { _defaultScene = scene; }
 } // namespace nv

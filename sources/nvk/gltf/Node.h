@@ -7,8 +7,7 @@ namespace nv {
 
 class GLTFNode : public GLTFElement {
   public:
-    explicit GLTFNode(GLTFAsset& parent, U32 index)
-        : GLTFElement(parent, index) {}
+    explicit GLTFNode(GLTFAsset& parent, U32 index);
 
     // Name accessors
     [[nodiscard]] auto name() const -> const String&;
