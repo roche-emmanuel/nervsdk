@@ -313,6 +313,13 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
             add_mesh().read(desc);
         }
     }
+
+    if (asset.contains("nodes")) {
+        // Create the nodes:
+        for (const auto& desc : asset["nodes"]) {
+            add_node().read(desc);
+        }
+    }
 }
 
 void GLTFAsset::save(const char* path) const {
@@ -362,6 +369,15 @@ void GLTFAsset::save(const char* path) const {
             meshes.push_back(mesh->write());
         }
         data["meshes"] = std::move(meshes);
+    }
+
+    // Write the nodes:
+    if (!_nodes.empty()) {
+        Json nodes;
+        for (const auto& node : _nodes) {
+            nodes.push_back(node->write());
+        }
+        data["nodes"] = std::move(nodes);
     }
 
     nv::write_json_file(path, data);
@@ -479,6 +495,23 @@ auto GLTFAsset::get_mesh(U32 idx) -> GLTFMesh& {
 auto GLTFAsset::get_mesh(U32 idx) const -> const GLTFMesh& {
     NVCHK(idx < _meshes.size(), "Out of range mesh index {}", idx);
     return *_meshes[idx];
+};
+
+auto GLTFAsset::add_node(String name) -> GLTFNode& {
+    auto obj = nv::create<GLTFNode>(*this, _nodes.size());
+    obj->set_name(std::move(name));
+    _nodes.emplace_back(obj);
+    return *obj;
+};
+
+auto GLTFAsset::get_node(U32 idx) -> GLTFNode& {
+    NVCHK(idx < _nodes.size(), "Out of range node index {}", idx);
+    return *_nodes[idx];
+};
+
+auto GLTFAsset::get_node(U32 idx) const -> const GLTFNode& {
+    NVCHK(idx < _nodes.size(), "Out of range node index {}", idx);
+    return *_nodes[idx];
 };
 
 } // namespace nv

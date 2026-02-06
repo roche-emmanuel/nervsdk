@@ -85,6 +85,10 @@ class GLTFAsset : public RefObject {
     auto get_mesh(U32 idx) -> GLTFMesh&;
     [[nodiscard]] auto get_mesh(U32 idx) const -> const GLTFMesh&;
 
+    auto add_node(String name = {}) -> GLTFNode&;
+    auto get_node(U32 idx) -> GLTFNode&;
+    [[nodiscard]] auto get_node(U32 idx) const -> const GLTFNode&;
+
     // Scene management
     [[nodiscard]] auto default_scene() const -> std::optional<GLTFScene>;
     void set_default_scene(size_t scene_index);
@@ -111,6 +115,7 @@ class GLTFAsset : public RefObject {
     Vector<RefPtr<GLTFBufferView>> _bufferViews;
     Vector<RefPtr<GLTFAccessor>> _accessors;
     Vector<RefPtr<GLTFMesh>> _meshes;
+    Vector<RefPtr<GLTFNode>> _nodes;
 
     // Storage for dynamically allocated elements
     struct OwnedElements {
