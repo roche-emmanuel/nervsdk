@@ -11,6 +11,9 @@ class GLTFElement : public RefObject {
   public:
     explicit GLTFElement(GLTFAsset& parent, U32 index);
 
+    auto parent() const -> GLTFAsset& { return _parent; }
+    auto index() const -> U32 { return _index; }
+
   protected:
     GLTFAsset& _parent;
     U32 _index;

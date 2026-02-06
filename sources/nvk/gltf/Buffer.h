@@ -27,7 +27,7 @@ class GLTFBuffer : public GLTFElement {
     void resize(size_t new_size);
 
     void read(const Json& desc);
-    void write(Json& desc) const;
+    auto write() const -> Json;
 };
 
 } // namespace nv

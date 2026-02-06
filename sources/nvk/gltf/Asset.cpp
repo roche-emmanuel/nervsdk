@@ -84,30 +84,22 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
         _copyright = asset["copyright"];
     }
 
-    // cgltf_options options = {};
-    // cgltf_result result = cgltf_parse_file(&options, path, &_data);
+    if (asset.contains("buffers")) {
+        // Create the buffers:
+        for (const auto& desc : asset["buffers"]) {
+            add_buffer().read(desc);
+        }
+    }
 
-    // if (result != cgltf_result_success) {
-    //     throw GLTFLoadException("Failed to parse GLTF file: " +
-    //                             std::string(path));
-    // }
-
-    // if (load_buffers) {
-    //     result = cgltf_load_buffers(&options, _data, path);
-    //     if (result != cgltf_result_success) {
-    //         cgltf_free(_data);
-    //         _data = nullptr;
-    //         throw GLTFLoadException("Failed to load buffers for GLTF file: "
-    //         +
-    //                                 std::string(path));
-    //     }
-    // }
-
-    // _loaded_from_file = true;
+    if (asset.contains("bufferViews")) {
+        // Create the bufferViews:
+        for (const auto& desc : asset["bufferViews"]) {
+            add_bufferview().read(desc);
+        }
+    }
 }
 
 void GLTFAsset::save(const char* path) const {
-
     // Asset component:
     Json asset{{"version", _version}};
     if (!_generator.empty()) {
@@ -120,19 +112,25 @@ void GLTFAsset::save(const char* path) const {
     // Prepare a json object
     Json data{{"asset", std::move(asset)}};
 
+    // Write the buffers:
+    if (!_buffers.empty()) {
+        Json buffers;
+        for (const auto& buf : _buffers) {
+            buffers.push_back(buf->write());
+        }
+        data["buffers"] = std::move(buffers);
+    }
+
+    // Write the bufferViews:
+    if (!_bufferViews.empty()) {
+        Json views;
+        for (const auto& view : _bufferViews) {
+            views.push_back(view->write());
+        }
+        data["bufferViews"] = std::move(views);
+    }
+
     nv::write_json_file(path, data);
-
-    // if (_data == nullptr) {
-    //     throw GLTFException("Cannot save empty GLTF asset");
-    // }
-
-    // cgltf_options options = {};
-    // cgltf_result result = cgltf_write_file(&options, path, _data);
-
-    // if (result != cgltf_result_success) {
-    //     throw GLTFException("Failed to write GLTF file: " +
-    //     std::string(path));
-    // }
 }
 
 auto GLTFAsset::intern_string(std::string_view str) -> char* {
@@ -143,13 +141,8 @@ auto GLTFAsset::intern_string(std::string_view str) -> char* {
 }
 
 auto GLTFAsset::add_buffer(size_t size) -> GLTFBuffer& {
-    _rawBuffers.emplace_back();
-    cgltf_buffer& buffer = _rawBuffers.back();
-    std::memset(&buffer, 0, sizeof(cgltf_buffer));
-
-    auto buf = nv::create<GLTFBuffer>(*this, U32(_rawBuffers.size() - 1));
+    auto buf = nv::create<GLTFBuffer>(*this, _buffers.size());
     _buffers.emplace_back(buf);
-
     buf->resize(size);
     return *buf;
 }
@@ -158,6 +151,7 @@ auto GLTFAsset::get_buffer(U32 idx) -> GLTFBuffer& {
     NVCHK(idx < _buffers.size(), "Out of range buffer index {}", idx);
     return *_buffers[idx];
 }
+
 auto GLTFAsset::get_buffer(U32 idx) const -> const GLTFBuffer& {
     NVCHK(idx < _buffers.size(), "Out of range buffer index {}", idx);
     return *_buffers[idx];
@@ -178,4 +172,27 @@ auto GLTFAsset::generator() const -> const String& { return _generator; };
 void GLTFAsset::clear() {
     logDEBUG("GLTFAsset: Should clear everything here.");
 };
+
+auto GLTFAsset::add_bufferview() -> GLTFBufferView& {
+    auto view = nv::create<GLTFBufferView>(*this, _bufferViews.size());
+    _bufferViews.emplace_back(view);
+    return *view;
+};
+
+auto GLTFAsset::add_bufferview(GLTFBuffer& buf) -> GLTFBufferView& {
+    auto& view = add_bufferview();
+    view.set_buffer(buf);
+    return view;
+};
+
+auto GLTFAsset::get_bufferview(U32 idx) -> GLTFBufferView& {
+    NVCHK(idx < _bufferViews.size(), "Out of range buffer index {}", idx);
+    return *_bufferViews[idx];
+};
+
+auto GLTFAsset::get_bufferview(U32 idx) const -> const GLTFBufferView& {
+    NVCHK(idx < _bufferViews.size(), "Out of range buffer index {}", idx);
+    return *_bufferViews[idx];
+};
+
 } // namespace nv

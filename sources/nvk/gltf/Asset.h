@@ -50,13 +50,14 @@ class GLTFAsset : public RefObject {
 
     static auto create() -> RefPtr<GLTFAsset>;
 
-    auto get_gltf_buffer(U32 idx) -> cgltf_buffer&;
-    [[nodiscard]] auto get_gltf_buffer(U32 idx) const -> const cgltf_buffer&;
-
+    auto add_buffer(size_t size = 0) -> GLTFBuffer&;
     auto get_buffer(U32 idx) -> GLTFBuffer&;
     [[nodiscard]] auto get_buffer(U32 idx) const -> const GLTFBuffer&;
 
-    auto add_buffer(size_t size = 0) -> GLTFBuffer&;
+    auto add_bufferview() -> GLTFBufferView&;
+    auto add_bufferview(GLTFBuffer& buf) -> GLTFBufferView&;
+    auto get_bufferview(U32 idx) -> GLTFBufferView&;
+    [[nodiscard]] auto get_bufferview(U32 idx) const -> const GLTFBufferView&;
 
     // Scene management
     [[nodiscard]] auto default_scene() const -> std::optional<GLTFScene>;
@@ -69,10 +70,6 @@ class GLTFAsset : public RefObject {
     void set_generator(String gen);
     void set_copyright(String copyright);
 
-    // Direct access (use with caution)
-    // auto data() -> cgltf_data* { return _data; }
-    // [[nodiscard]] auto data() const -> const cgltf_data* { return _data; }
-
     // Utility
     [[nodiscard]] auto empty() const -> bool { return _numElements == 0; }
     void clear();
@@ -84,8 +81,8 @@ class GLTFAsset : public RefObject {
 
     I32 _numElements{0};
 
-    Vector<cgltf_buffer> _rawBuffers;
     Vector<RefPtr<GLTFBuffer>> _buffers;
+    Vector<RefPtr<GLTFBufferView>> _bufferViews;
 
     // Storage for dynamically allocated elements
     struct OwnedElements {

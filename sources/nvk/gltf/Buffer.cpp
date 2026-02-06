@@ -75,7 +75,9 @@ void GLTFBuffer::read(const Json& desc) {
     }
 }
 
-void GLTFBuffer::write(Json& desc) const {
+auto GLTFBuffer::write() const -> Json {
+    Json desc;
+
     // Required: byteLength
     desc["byteLength"] = _data.size();
 
@@ -94,6 +96,7 @@ void GLTFBuffer::write(Json& desc) const {
     // - A separate .bin file (referenced by uri)
     // - GLB binary chunk (no uri)
     // - Data URI (base64 encoded in uri)
+    return desc;
 }
 
 } // namespace nv
