@@ -107,6 +107,21 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
 }
 
 void GLTFAsset::save(const char* path) const {
+
+    // Asset component:
+    Json asset{{"version", _version}};
+    if (!_generator.empty()) {
+        asset["generator"] = _generator;
+    }
+    if (!_copyright.empty()) {
+        asset["copyright"] = _copyright;
+    }
+
+    // Prepare a json object
+    Json data{{"asset", std::move(asset)}};
+
+    nv::write_json_file(path, data);
+
     // if (_data == nullptr) {
     //     throw GLTFException("Cannot save empty GLTF asset");
     // }
