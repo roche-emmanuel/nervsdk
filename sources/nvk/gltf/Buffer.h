@@ -28,6 +28,8 @@ class GLTFBuffer : public GLTFElement {
 
     void read(const Json& desc);
     auto write() const -> Json;
+
+    auto add_bufferview(U32 offset = 0, U32 size = 0) -> GLTFBufferView&;
 };
 
 } // namespace nv

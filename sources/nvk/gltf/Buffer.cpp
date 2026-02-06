@@ -104,4 +104,8 @@ auto GLTFBuffer::write() const -> Json {
     return desc;
 }
 
+auto GLTFBuffer::add_bufferview(U32 offset, U32 size) -> GLTFBufferView& {
+    return _parent.add_bufferview(*this, offset, size);
+}
+
 } // namespace nv

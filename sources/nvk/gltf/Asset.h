@@ -25,8 +25,13 @@ auto to_string(GLTFElementType type) -> std::string_view;
 auto to_element_type(std::string_view str) -> GLTFElementType;
 // Helper to determine number of components based on element type
 auto get_element_component_count(GLTFElementType type) -> size_t;
+
 auto get_attribute_size(GLTFElementType type, GLTFComponentType ctype)
     -> size_t;
+
+auto to_string(GLTFAttributeType type) -> std::string_view;
+auto to_attribute_type(std::string_view str) -> GLTFAttributeType;
+
 } // namespace gltf
 
 // Main asset class
@@ -59,22 +64,26 @@ class GLTFAsset : public RefObject {
 
     static auto create() -> RefPtr<GLTFAsset>;
 
-    auto add_buffer(size_t size = 0) -> GLTFBuffer&;
+    auto add_buffer(size_t size = 0, String name = {}) -> GLTFBuffer&;
     auto get_buffer(U32 idx) -> GLTFBuffer&;
     [[nodiscard]] auto get_buffer(U32 idx) const -> const GLTFBuffer&;
 
-    auto add_bufferview() -> GLTFBufferView&;
+    auto add_bufferview(String name = {}) -> GLTFBufferView&;
     auto add_bufferview(GLTFBuffer& buf, U32 offset = 0, U32 size = 0)
         -> GLTFBufferView&;
     auto get_bufferview(U32 idx) -> GLTFBufferView&;
     [[nodiscard]] auto get_bufferview(U32 idx) const -> const GLTFBufferView&;
 
-    auto add_accessor() -> GLTFAccessor&;
+    auto add_accessor(String name = {}) -> GLTFAccessor&;
     auto add_accessor(GLTFBufferView& view, GLTFElementType etype,
                       GLTFComponentType ctype, U32 count, U32 offset = 0)
         -> GLTFAccessor&;
     auto get_accessor(U32 idx) -> GLTFAccessor&;
     [[nodiscard]] auto get_accessor(U32 idx) const -> const GLTFAccessor&;
+
+    auto add_mesh(String name = {}) -> GLTFMesh&;
+    auto get_mesh(U32 idx) -> GLTFMesh&;
+    [[nodiscard]] auto get_mesh(U32 idx) const -> const GLTFMesh&;
 
     // Scene management
     [[nodiscard]] auto default_scene() const -> std::optional<GLTFScene>;
@@ -101,11 +110,10 @@ class GLTFAsset : public RefObject {
     Vector<RefPtr<GLTFBuffer>> _buffers;
     Vector<RefPtr<GLTFBufferView>> _bufferViews;
     Vector<RefPtr<GLTFAccessor>> _accessors;
+    Vector<RefPtr<GLTFMesh>> _meshes;
 
     // Storage for dynamically allocated elements
     struct OwnedElements {
-        Vector<cgltf_buffer_view> buffer_views;
-        Vector<cgltf_accessor> accessors;
         Vector<cgltf_mesh> meshes;
         Vector<cgltf_node> nodes;
         Vector<cgltf_scene> scenes;

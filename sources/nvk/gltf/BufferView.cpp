@@ -84,4 +84,9 @@ GLTFBufferView::GLTFBufferView(GLTFAsset& parent, U32 index)
     : GLTFElement(parent, index) {}
 auto GLTFBufferView::stride() const -> U32 { return _stride; };
 void GLTFBufferView::set_stride(U32 stride) { _stride = stride; };
+auto GLTFBufferView::add_accessor(GLTFElementType etype,
+                                  GLTFComponentType ctype, U32 count,
+                                  U32 offset) -> GLTFAccessor& {
+    return _parent.add_accessor(*this, etype, ctype, count, offset);
+};
 } // namespace nv

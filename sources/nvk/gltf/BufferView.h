@@ -76,6 +76,9 @@ class GLTFBufferView : public GLTFElement {
     void read(const Json& desc);
     auto write() const -> Json;
 
+    auto add_accessor(GLTFElementType etype, GLTFComponentType ctype, U32 count,
+                      U32 offset = 0) -> GLTFAccessor&;
+
   protected:
     String _name;
     RefPtr<GLTFBuffer> _buffer;

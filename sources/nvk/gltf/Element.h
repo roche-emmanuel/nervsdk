@@ -1,7 +1,6 @@
 #ifndef _GLTF_OBJECT_H_
 #define _GLTF_OBJECT_H_
 
-#include <external/cgltf.h>
 #include <nvk_common.h>
 
 namespace nv {

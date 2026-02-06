@@ -1,36 +1,58 @@
 #ifndef _GLTF_MESH_H_
 #define _GLTF_MESH_H_
 
-#include <external/cgltf.h>
-#include <nvk_common.h>
+#include <nvk/gltf/Element.h>
 
 namespace nv {
 
-class GLTFMesh {
-    friend class GLTFAsset;
-    cgltf_mesh* _mesh;
-
-    explicit GLTFMesh(cgltf_mesh* m) : _mesh(m) {}
-
+class GLTFMesh : public GLTFElement {
   public:
-    [[nodiscard]] auto name() const -> std::string_view;
+    explicit GLTFMesh(GLTFAsset& parent, U32 index);
 
-    void set_name(std::string_view name);
+    // Name accessors
+    [[nodiscard]] auto name() const -> const String&;
+    void set_name(String name);
 
-    [[nodiscard]] auto primitives() const -> std::span<const GLTFPrimitive>;
-    auto primitives() -> std::span<GLTFPrimitive>;
+    // Primitives accessors
+    [[nodiscard]] auto primitives_count() const -> U32;
 
-    auto add_primitive() -> GLTFPrimitive&;
+    [[nodiscard]] auto primitives() const
+        -> const Vector<RefPtr<GLTFPrimitive>>&;
 
-    [[nodiscard]] auto primitive_count() const -> size_t;
+    [[nodiscard]] auto primitives() -> Vector<RefPtr<GLTFPrimitive>>&;
 
-    // Weights for morph targets
-    [[nodiscard]] auto weights() const -> std::span<const float>;
+    [[nodiscard]] auto get_primitive(U32 index) const -> const GLTFPrimitive&;
 
-    auto handle() -> cgltf_mesh*;
-    [[nodiscard]] auto handle() const -> const cgltf_mesh*;
+    [[nodiscard]] auto get_primitive(U32 index) -> GLTFPrimitive&;
+
+    auto add_primitive(GLTFPrimitiveType ptype = GLTF_PRIM_TRIANGLES)
+        -> GLTFPrimitive&;
+
+    void clear_primitives();
+
+    // Weights accessors
+    [[nodiscard]] auto weights_count() const -> U32;
+
+    [[nodiscard]] auto weights() const -> const F32Vector&;
+
+    [[nodiscard]] auto weights() -> F32Vector&;
+
+    void set_weights(F32Vector weights);
+
+    void clear_weights();
+
+    // Serialization
+    void read(const Json& desc);
+
+    [[nodiscard]] auto write() const -> Json;
+
+  protected:
+    String _name;
+    Vector<RefPtr<GLTFPrimitive>> _primitives;
+    F32Vector _weights;
+    // StringVector _targetNames; // Uncomment and add accessors if needed
 };
 
 } // namespace nv
 
-#endif // _GLTF_ASSET_H_
+#endif // _GLTF_MESH_H_

@@ -77,6 +77,81 @@ auto to_element_type(std::string_view str) -> GLTFElementType {
     return it->second;
 }
 
+auto to_string(GLTFAttributeType type) -> std::string_view {
+    switch (type) {
+    case GLTF_ATTR_POSITION:
+        return "POSITION";
+    case GLTF_ATTR_NORMAL:
+        return "NORMAL";
+    case GLTF_ATTR_TANGENT:
+        return "TANGENT";
+    case GLTF_ATTR_TEXCOORD0:
+        return "TEXCOORD_0";
+    case GLTF_ATTR_TEXCOORD1:
+        return "TEXCOORD_1";
+    case GLTF_ATTR_TEXCOORD2:
+        return "TEXCOORD_2";
+    case GLTF_ATTR_TEXCOORD3:
+        return "TEXCOORD_3";
+    case GLTF_ATTR_COLOR0:
+        return "COLOR_0";
+    case GLTF_ATTR_COLOR1:
+        return "COLOR_1";
+    case GLTF_ATTR_COLOR2:
+        return "COLOR_2";
+    case GLTF_ATTR_COLOR3:
+        return "COLOR_3";
+    case GLTF_ATTR_JOINTS0:
+        return "JOINTS_0";
+    case GLTF_ATTR_JOINTS1:
+        return "JOINTS_1";
+    case GLTF_ATTR_JOINTS2:
+        return "JOINTS_2";
+    case GLTF_ATTR_JOINTS3:
+        return "JOINTS_3";
+    case GLTF_ATTR_WEIGHTS0:
+        return "WEIGHTS_0";
+    case GLTF_ATTR_WEIGHTS1:
+        return "WEIGHTS_1";
+    case GLTF_ATTR_WEIGHTS2:
+        return "WEIGHTS_2";
+    case GLTF_ATTR_WEIGHTS3:
+        return "WEIGHTS_3";
+    case GLTF_ATTR_UNKNOWN:
+    default:
+        return "UNKNOWN";
+    }
+}
+
+auto to_attribute_type(std::string_view str) -> GLTFAttributeType {
+    static const std::unordered_map<std::string_view, GLTFAttributeType> map = {
+        {"POSITION", GLTF_ATTR_POSITION},
+        {"NORMAL", GLTF_ATTR_NORMAL},
+        {"TANGENT", GLTF_ATTR_TANGENT},
+        {"TEXCOORD_0", GLTF_ATTR_TEXCOORD0},
+        {"TEXCOORD_1", GLTF_ATTR_TEXCOORD1},
+        {"TEXCOORD_2", GLTF_ATTR_TEXCOORD2},
+        {"TEXCOORD_3", GLTF_ATTR_TEXCOORD3},
+        {"COLOR_0", GLTF_ATTR_COLOR0},
+        {"COLOR_1", GLTF_ATTR_COLOR1},
+        {"COLOR_2", GLTF_ATTR_COLOR2},
+        {"COLOR_3", GLTF_ATTR_COLOR3},
+        {"JOINTS_0", GLTF_ATTR_JOINTS0},
+        {"JOINTS_1", GLTF_ATTR_JOINTS1},
+        {"JOINTS_2", GLTF_ATTR_JOINTS2},
+        {"JOINTS_3", GLTF_ATTR_JOINTS3},
+        {"WEIGHTS_0", GLTF_ATTR_WEIGHTS0},
+        {"WEIGHTS_1", GLTF_ATTR_WEIGHTS1},
+        {"WEIGHTS_2", GLTF_ATTR_WEIGHTS2},
+        {"WEIGHTS_3", GLTF_ATTR_WEIGHTS3},
+    };
+
+    auto it = map.find(str);
+    NVCHK(it != map.end(), "Invalid GLTF attribute string: {}", str);
+    // return (it != map.end()) ? it->second : GLTF_ATTR_UNKNOWN;
+    return it->second;
+}
+
 auto get_element_component_count(GLTFElementType type) -> size_t {
     switch (type) {
     case GLTF_ELEM_SCALAR:
@@ -231,6 +306,13 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
             add_accessor().read(desc);
         }
     }
+
+    if (asset.contains("meshes")) {
+        // Create the meshes:
+        for (const auto& desc : asset["meshes"]) {
+            add_mesh().read(desc);
+        }
+    }
 }
 
 void GLTFAsset::save(const char* path) const {
@@ -273,6 +355,15 @@ void GLTFAsset::save(const char* path) const {
         data["accessors"] = std::move(accs);
     }
 
+    // Write the meshes:
+    if (!_meshes.empty()) {
+        Json meshes;
+        for (const auto& mesh : _meshes) {
+            meshes.push_back(mesh->write());
+        }
+        data["meshes"] = std::move(meshes);
+    }
+
     nv::write_json_file(path, data);
 }
 
@@ -283,9 +374,10 @@ auto GLTFAsset::intern_string(std::string_view str) -> char* {
     return (char*)_owned.strings.back().c_str();
 }
 
-auto GLTFAsset::add_buffer(size_t size) -> GLTFBuffer& {
+auto GLTFAsset::add_buffer(size_t size, String name) -> GLTFBuffer& {
     auto buf = nv::create<GLTFBuffer>(*this, _buffers.size());
     _buffers.emplace_back(buf);
+    buf->set_name(std::move(name));
     buf->resize(size);
     return *buf;
 }
@@ -316,8 +408,9 @@ void GLTFAsset::clear() {
     logDEBUG("GLTFAsset: Should clear everything here.");
 };
 
-auto GLTFAsset::add_bufferview() -> GLTFBufferView& {
+auto GLTFAsset::add_bufferview(String name) -> GLTFBufferView& {
     auto view = nv::create<GLTFBufferView>(*this, _bufferViews.size());
+    view->set_name(std::move(name));
     _bufferViews.emplace_back(view);
     return *view;
 };
@@ -344,8 +437,9 @@ auto GLTFAsset::get_bufferview(U32 idx) const -> const GLTFBufferView& {
     return *_bufferViews[idx];
 };
 
-auto GLTFAsset::add_accessor() -> GLTFAccessor& {
+auto GLTFAsset::add_accessor(String name) -> GLTFAccessor& {
     auto obj = nv::create<GLTFAccessor>(*this, _accessors.size());
+    obj->set_name(std::move(name));
     _accessors.emplace_back(obj);
     return *obj;
 };
@@ -369,4 +463,22 @@ auto GLTFAsset::add_accessor(GLTFBufferView& view, GLTFElementType etype,
     acc.set_offset(offset);
     return acc;
 };
+
+auto GLTFAsset::add_mesh(String name) -> GLTFMesh& {
+    auto obj = nv::create<GLTFMesh>(*this, _meshes.size());
+    obj->set_name(std::move(name));
+    _meshes.emplace_back(obj);
+    return *obj;
+};
+
+auto GLTFAsset::get_mesh(U32 idx) -> GLTFMesh& {
+    NVCHK(idx < _meshes.size(), "Out of range mesh index {}", idx);
+    return *_meshes[idx];
+};
+
+auto GLTFAsset::get_mesh(U32 idx) const -> const GLTFMesh& {
+    NVCHK(idx < _meshes.size(), "Out of range mesh index {}", idx);
+    return *_meshes[idx];
+};
+
 } // namespace nv
