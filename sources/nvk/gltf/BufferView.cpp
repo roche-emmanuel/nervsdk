@@ -25,6 +25,9 @@ void GLTFBufferView::read(const Json& desc) {
     // Optional byteOffset (defaults to 0)
     _offset = desc.value("byteOffset", 0U);
 
+    // Optional byteStride (defaults to 0)
+    _stride = desc.value("byteStride", 0U);
+
     // Required byteLength
     _size = desc.at("byteLength").get<U32>();
 
@@ -64,6 +67,10 @@ auto GLTFBufferView::write() const -> Json {
         desc["byteOffset"] = _offset;
     }
 
+    if (_stride != 0) {
+        desc["byteStride"] = _stride;
+    }
+
     // Optional target
     if (_type != BUFFER_VIEW_UNKNOWN) {
         desc["target"] = _type;
@@ -75,4 +82,6 @@ auto GLTFBufferView::write() const -> Json {
 void GLTFBufferView::set_buffer(GLTFBuffer& buf) { _buffer = &buf; }
 GLTFBufferView::GLTFBufferView(GLTFAsset& parent, U32 index)
     : GLTFElement(parent, index) {}
+auto GLTFBufferView::stride() const -> U32 { return _stride; };
+void GLTFBufferView::set_stride(U32 stride) { _stride = stride; };
 } // namespace nv

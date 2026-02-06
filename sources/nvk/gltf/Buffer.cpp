@@ -89,6 +89,11 @@ auto GLTFBuffer::write() const -> Json {
     // Optional: uri
     if (!_uri.empty()) {
         desc["uri"] = _uri;
+    } else {
+        // Encode the data as base64:
+        String data = "data:application/octet-stream;base64,";
+        data += base64_encode(_data);
+        desc["uri"] = data;
     }
 
     // Note: The actual binary data is NOT written to JSON

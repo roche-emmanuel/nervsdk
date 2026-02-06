@@ -71,6 +71,9 @@ class GLTFBufferView : public GLTFElement {
     [[nodiscard]] auto size() const -> U32;
     void set_size(U32 size);
 
+    [[nodiscard]] auto stride() const -> U32;
+    void set_stride(U32 stride);
+
     [[nodiscard]] auto type() const -> U32;
     void set_type(U32 type);
 
@@ -84,7 +87,7 @@ class GLTFBufferView : public GLTFElement {
     RefPtr<GLTFBuffer> _buffer;
     U32 _offset;
     U32 _size;
-    // U32 _stride;
+    U32 _stride;
     U32 _type;
     // U8Vector _override;
 };

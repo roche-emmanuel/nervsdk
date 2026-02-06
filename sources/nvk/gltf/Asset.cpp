@@ -179,9 +179,15 @@ auto GLTFAsset::add_bufferview() -> GLTFBufferView& {
     return *view;
 };
 
-auto GLTFAsset::add_bufferview(GLTFBuffer& buf) -> GLTFBufferView& {
+auto GLTFAsset::add_bufferview(GLTFBuffer& buf, U32 offset, U32 size)
+    -> GLTFBufferView& {
     auto& view = add_bufferview();
     view.set_buffer(buf);
+    view.set_offset(offset);
+    if (size == 0) {
+        size = buf.size() - offset;
+    }
+    view.set_size(size);
     return view;
 };
 

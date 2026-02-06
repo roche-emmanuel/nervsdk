@@ -55,7 +55,8 @@ class GLTFAsset : public RefObject {
     [[nodiscard]] auto get_buffer(U32 idx) const -> const GLTFBuffer&;
 
     auto add_bufferview() -> GLTFBufferView&;
-    auto add_bufferview(GLTFBuffer& buf) -> GLTFBufferView&;
+    auto add_bufferview(GLTFBuffer& buf, U32 offset = 0, U32 size = 0)
+        -> GLTFBufferView&;
     auto get_bufferview(U32 idx) -> GLTFBufferView&;
     [[nodiscard]] auto get_bufferview(U32 idx) const -> const GLTFBufferView&;
 
