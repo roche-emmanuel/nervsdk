@@ -52,12 +52,6 @@ namespace nv {
 // cgltf_size extensions_count;
 // cgltf_extension* extensions;
 
-enum GLTFBufferViewType {
-    BUFFER_VIEW_UNKNOWN = 0,
-    BUFFER_VIEW_VERTICES = 34962,
-    BUFFER_VIEW_INDICES = 34963,
-};
-
 class GLTFBufferView : public GLTFElement {
   public:
     explicit GLTFBufferView(GLTFAsset& parent, U32 index);

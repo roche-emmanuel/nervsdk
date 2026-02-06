@@ -53,6 +53,33 @@ enum AnchorType {
     ANCHOR_TOP_RIGHT,
 };
 
+enum GLTFBufferViewType {
+    BUFFER_VIEW_UNKNOWN = 0,
+    BUFFER_VIEW_VERTICES = 34962,
+    BUFFER_VIEW_INDICES = 34963,
+};
+
+enum GLTFComponentType {
+    GLTF_COMP_UNKNOWN = 0,
+    GLTF_COMP_I8 = 5120,
+    GLTF_COMP_U8 = 5121,
+    GLTF_COMP_I16 = 5122,
+    GLTF_COMP_U16 = 5123,
+    GLTF_COMP_U32 = 5125,
+    GLTF_COMP_F32 = 5126,
+};
+
+enum GLTFElementType {
+    GLTF_ELEM_UNKNOWN = 0,
+    GLTF_ELEM_SCALAR,
+    GLTF_ELEM_VEC2,
+    GLTF_ELEM_VEC3,
+    GLTF_ELEM_VEC4,
+    GLTF_ELEM_MAT2,
+    GLTF_ELEM_MAT3,
+    GLTF_ELEM_MAT4,
+};
+
 } // namespace nv
 
 #endif

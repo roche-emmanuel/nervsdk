@@ -21,9 +21,60 @@
 
 namespace nv {
 
-//==============================================================================
-// GLTFAsset Implementation
-//==============================================================================
+auto gltf::to_string(GLTFElementType type) -> std::string_view {
+    switch (type) {
+    case GLTF_ELEM_SCALAR:
+        return "SCALAR";
+    case GLTF_ELEM_VEC2:
+        return "VEC2";
+    case GLTF_ELEM_VEC3:
+        return "VEC3";
+    case GLTF_ELEM_VEC4:
+        return "VEC4";
+    case GLTF_ELEM_MAT2:
+        return "MAT2";
+    case GLTF_ELEM_MAT3:
+        return "MAT3";
+    case GLTF_ELEM_MAT4:
+        return "MAT4";
+    case GLTF_ELEM_UNKNOWN:
+    default:
+        return ""; // or throw if you prefer
+    }
+}
+
+// Convert string to enum
+auto gltf::to_element_type(std::string_view str) -> GLTFElementType {
+    // if (str == "SCALAR")
+    //     return GLTF_ELEM_SCALAR;
+    // if (str == "VEC2")
+    //     return GLTF_ELEM_VEC2;
+    // if (str == "VEC3")
+    //     return GLTF_ELEM_VEC3;
+    // if (str == "VEC4")
+    //     return GLTF_ELEM_VEC4;
+    // if (str == "MAT2")
+    //     return GLTF_ELEM_MAT2;
+    // if (str == "MAT3")
+    //     return GLTF_ELEM_MAT3;
+    // if (str == "MAT4")
+    //     return GLTF_ELEM_MAT4;
+
+    // THROW_MSG("Invalid GLTF element string: {}", str);
+    // return GLTF_ELEM_UNKNOWN;
+    static const std::unordered_map<std::string_view, GLTFElementType> map = {
+        {"SCALAR", GLTF_ELEM_SCALAR}, {"VEC2", GLTF_ELEM_VEC2},
+        {"VEC3", GLTF_ELEM_VEC3},     {"VEC4", GLTF_ELEM_VEC4},
+        {"MAT2", GLTF_ELEM_MAT2},     {"MAT3", GLTF_ELEM_MAT3},
+        {"MAT4", GLTF_ELEM_MAT4},
+    };
+
+    auto it = map.find(str);
+    NVCHK(it != map.end(), "Invalid GLTF element string: {}", str);
+    // return (it != map.end()) ? it->second : GLTF_ELEM_UNKNOWN;
+    return it->second;
+}
+
 auto GLTFAsset::decode_data_uri(const String& uri, size_t expected_size) const
     -> U8Vector {
     // Find the base64 data after "data:application/octet-stream;base64,"

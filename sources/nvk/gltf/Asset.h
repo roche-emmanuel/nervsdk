@@ -20,6 +20,11 @@ class GLTFValidationException : public GLTFException {
     using GLTFException::GLTFException;
 };
 
+namespace gltf {
+auto to_string(GLTFElementType type) -> std::string_view;
+auto to_element_type(std::string_view str) -> GLTFElementType;
+} // namespace gltf
+
 // Main asset class
 class GLTFAsset : public RefObject {
   public:
