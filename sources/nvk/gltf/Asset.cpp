@@ -96,6 +96,59 @@ auto get_element_component_count(GLTFElementType type) -> size_t {
         return 0;
     }
 }
+
+auto get_attribute_size(GLTFElementType type, GLTFComponentType ctype)
+    -> size_t {
+    // Get component size in bytes
+    size_t component_size = 0;
+    switch (ctype) {
+    case GLTF_COMP_I8:
+    case GLTF_COMP_U8:
+        component_size = 1;
+        break;
+    case GLTF_COMP_I16:
+    case GLTF_COMP_U16:
+        component_size = 2;
+        break;
+    case GLTF_COMP_U32:
+    case GLTF_COMP_F32:
+        component_size = 4;
+        break;
+    case GLTF_COMP_UNKNOWN:
+    default:
+        return 0;
+    }
+
+    // Get number of components
+    size_t num_components = 0;
+    switch (type) {
+    case GLTF_ELEM_SCALAR:
+        num_components = 1;
+        break;
+    case GLTF_ELEM_VEC2:
+        num_components = 2;
+        break;
+    case GLTF_ELEM_VEC3:
+        num_components = 3;
+        break;
+    case GLTF_ELEM_VEC4:
+    case GLTF_ELEM_MAT2:
+        num_components = 4;
+        break;
+    case GLTF_ELEM_MAT3:
+        num_components = 9; // 3x3 = 9
+        break;
+    case GLTF_ELEM_MAT4:
+        num_components = 16; // 4x4 = 16
+        break;
+    case GLTF_ELEM_UNKNOWN:
+    default:
+        return 0;
+    }
+
+    return component_size * num_components;
+}
+
 } // namespace gltf
 
 auto GLTFAsset::decode_data_uri(const String& uri, size_t expected_size) const
@@ -171,6 +224,13 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
             add_bufferview().read(desc);
         }
     }
+
+    if (asset.contains("accessors")) {
+        // Create the accessors:
+        for (const auto& desc : asset["accessors"]) {
+            add_accessor().read(desc);
+        }
+    }
 }
 
 void GLTFAsset::save(const char* path) const {
@@ -202,6 +262,15 @@ void GLTFAsset::save(const char* path) const {
             views.push_back(view->write());
         }
         data["bufferViews"] = std::move(views);
+    }
+
+    // Write the accessors:
+    if (!_accessors.empty()) {
+        Json accs;
+        for (const auto& acc : _accessors) {
+            accs.push_back(acc->write());
+        }
+        data["accessors"] = std::move(accs);
     }
 
     nv::write_json_file(path, data);
@@ -266,13 +335,38 @@ auto GLTFAsset::add_bufferview(GLTFBuffer& buf, U32 offset, U32 size)
 };
 
 auto GLTFAsset::get_bufferview(U32 idx) -> GLTFBufferView& {
-    NVCHK(idx < _bufferViews.size(), "Out of range buffer index {}", idx);
+    NVCHK(idx < _bufferViews.size(), "Out of range bufferview index {}", idx);
     return *_bufferViews[idx];
 };
 
 auto GLTFAsset::get_bufferview(U32 idx) const -> const GLTFBufferView& {
-    NVCHK(idx < _bufferViews.size(), "Out of range buffer index {}", idx);
+    NVCHK(idx < _bufferViews.size(), "Out of range bufferview index {}", idx);
     return *_bufferViews[idx];
 };
 
+auto GLTFAsset::add_accessor() -> GLTFAccessor& {
+    auto obj = nv::create<GLTFAccessor>(*this, _accessors.size());
+    _accessors.emplace_back(obj);
+    return *obj;
+};
+auto GLTFAsset::get_accessor(U32 idx) -> GLTFAccessor& {
+    NVCHK(idx < _accessors.size(), "Out of range accessor index {}", idx);
+    return *_accessors[idx];
+};
+auto GLTFAsset::get_accessor(U32 idx) const -> const GLTFAccessor& {
+    NVCHK(idx < _accessors.size(), "Out of range accessor index {}", idx);
+    return *_accessors[idx];
+};
+
+auto GLTFAsset::add_accessor(GLTFBufferView& view, GLTFElementType etype,
+                             GLTFComponentType ctype, U32 count, U32 offset)
+    -> GLTFAccessor& {
+    auto& acc = add_accessor();
+    acc.set_buffer_view(view);
+    acc.set_element_type(etype);
+    acc.set_component_type(ctype);
+    acc.set_count(count);
+    acc.set_offset(offset);
+    return acc;
+};
 } // namespace nv

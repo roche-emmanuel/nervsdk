@@ -25,6 +25,8 @@ auto to_string(GLTFElementType type) -> std::string_view;
 auto to_element_type(std::string_view str) -> GLTFElementType;
 // Helper to determine number of components based on element type
 auto get_element_component_count(GLTFElementType type) -> size_t;
+auto get_attribute_size(GLTFElementType type, GLTFComponentType ctype)
+    -> size_t;
 } // namespace gltf
 
 // Main asset class
@@ -67,6 +69,13 @@ class GLTFAsset : public RefObject {
     auto get_bufferview(U32 idx) -> GLTFBufferView&;
     [[nodiscard]] auto get_bufferview(U32 idx) const -> const GLTFBufferView&;
 
+    auto add_accessor() -> GLTFAccessor&;
+    auto add_accessor(GLTFBufferView& view, GLTFElementType etype,
+                      GLTFComponentType ctype, U32 count, U32 offset = 0)
+        -> GLTFAccessor&;
+    auto get_accessor(U32 idx) -> GLTFAccessor&;
+    [[nodiscard]] auto get_accessor(U32 idx) const -> const GLTFAccessor&;
+
     // Scene management
     [[nodiscard]] auto default_scene() const -> std::optional<GLTFScene>;
     void set_default_scene(size_t scene_index);
@@ -91,6 +100,7 @@ class GLTFAsset : public RefObject {
 
     Vector<RefPtr<GLTFBuffer>> _buffers;
     Vector<RefPtr<GLTFBufferView>> _bufferViews;
+    Vector<RefPtr<GLTFAccessor>> _accessors;
 
     // Storage for dynamically allocated elements
     struct OwnedElements {
