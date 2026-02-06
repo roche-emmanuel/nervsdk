@@ -33,27 +33,31 @@ class GLTFAccessor : public GLTFElement {
     [[nodiscard]] auto count() const -> U32;
     void set_count(U32 count);
 
-    // Stride accessors
-    [[nodiscard]] auto stride() const -> U32;
-    void set_stride(U32 stride);
-
     void set_buffer_view(GLTFBufferView& view);
 
     // Min/Max accessors
     [[nodiscard]] auto has_min() const -> bool;
-    [[nodiscard]] auto min() const -> const std::array<F32, 16>&;
-    void set_min(const std::array<F32, 16>& min);
+    [[nodiscard]] auto min() const -> const F32Vector&;
+    void set_min(const F32Vector& min);
+    void set_min(const Vec3f& vec);
     void clear_min();
 
     [[nodiscard]] auto has_max() const -> bool;
-    [[nodiscard]] auto max() const -> const std::array<F32, 16>&;
-    void set_max(const std::array<F32, 16>& max);
+    [[nodiscard]] auto max() const -> const F32Vector&;
+    void set_max(const F32Vector& max);
+    void set_max(const Vec3f& vec);
     void clear_max();
 
     // Serialization
     void read(const Json& desc);
 
     [[nodiscard]] auto write() const -> Json;
+
+    auto get_data_type() const -> DataType;
+
+    void update_bounds();
+    auto data() -> U8*;
+    auto data() const -> const U8*;
 
   protected:
     String _name;
@@ -65,9 +69,9 @@ class GLTFAccessor : public GLTFElement {
     U32 _stride{0};
     RefPtr<GLTFBufferView> _bufferView;
     bool _hasMin{false};
-    std::array<F32, 16> _min{};
+    F32Vector _min;
     bool _hasMax{false};
-    std::array<F32, 16> _max{};
+    F32Vector _max;
 };
 
 } // namespace nv

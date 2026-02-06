@@ -23,21 +23,19 @@ auto GLTFAccessor::offset() const -> U32 { return _offset; }
 void GLTFAccessor::set_offset(U32 offset) { _offset = offset; }
 auto GLTFAccessor::count() const -> U32 { return _count; }
 void GLTFAccessor::set_count(U32 count) { _count = count; }
-auto GLTFAccessor::stride() const -> U32 { return _stride; }
-void GLTFAccessor::set_stride(U32 stride) { _stride = stride; }
 void GLTFAccessor::set_buffer_view(GLTFBufferView& view) {
     _bufferView = &view;
 }
 auto GLTFAccessor::has_min() const -> bool { return _hasMin; }
-auto GLTFAccessor::min() const -> const std::array<F32, 16>& { return _min; }
-void GLTFAccessor::set_min(const std::array<F32, 16>& min) {
+auto GLTFAccessor::min() const -> const F32Vector& { return _min; }
+void GLTFAccessor::set_min(const F32Vector& min) {
     _min = min;
     _hasMin = true;
 }
 void GLTFAccessor::clear_min() { _hasMin = false; }
 auto GLTFAccessor::has_max() const -> bool { return _hasMax; }
-auto GLTFAccessor::max() const -> const std::array<F32, 16>& { return _max; }
-void GLTFAccessor::set_max(const std::array<F32, 16>& max) {
+auto GLTFAccessor::max() const -> const F32Vector& { return _max; }
+void GLTFAccessor::set_max(const F32Vector& max) {
     _max = max;
     _hasMax = true;
 }
@@ -72,22 +70,24 @@ void GLTFAccessor::read(const Json& desc) {
     _offset = desc.value("byteOffset", 0U);
 
     // Optional min values
+    _min.clear();
     if (desc.contains("min")) {
         const auto& minArray = desc["min"];
         _hasMin = true;
         for (size_t i = 0; i < minArray.size() && i < 16; ++i) {
-            _min[i] = minArray[i].get<F32>();
+            _min.push_back(minArray[i].get<F32>());
         }
     } else {
         _hasMin = false;
     }
 
     // Optional max values
+    _max.clear();
     if (desc.contains("max")) {
         const auto& maxArray = desc["max"];
         _hasMax = true;
         for (size_t i = 0; i < maxArray.size() && i < 16; ++i) {
-            _max[i] = maxArray[i].get<F32>();
+            _max.push_back(maxArray[i].get<F32>());
         }
     } else {
         _hasMax = false;
@@ -120,26 +120,72 @@ auto GLTFAccessor::write() const -> Json {
 
     // Min/Max arrays
     if (_hasMin) {
-        Json minArray = Json::array();
+        // Json minArray = Json::array();
         const size_t numComponents =
             gltf::get_element_component_count(_elementType);
-        for (size_t i = 0; i < numComponents; ++i) {
-            minArray.push_back(_min[i]);
-        }
-        desc["min"] = std::move(minArray);
+        NVCHK(numComponents == _min.size(), "Unexpected _min size.");
+        // for (size_t i = 0; i < numComponents; ++i) {
+        //     minArray.push_back(_min[i]);
+        // }
+        // desc["min"] = std::move(minArray);
+        desc["min"] = _min;
     }
 
     if (_hasMax) {
-        Json maxArray = Json::array();
+        // Json maxArray = Json::array();
         const size_t numComponents =
             gltf::get_element_component_count(_elementType);
-        for (size_t i = 0; i < numComponents; ++i) {
-            maxArray.push_back(_max[i]);
-        }
-        desc["max"] = std::move(maxArray);
+        NVCHK(numComponents == _max.size(), "Unexpected _max size.");
+        // for (size_t i = 0; i < numComponents; ++i) {
+        //     maxArray.push_back(_max[i]);
+        // }
+        // desc["max"] = std::move(maxArray);
+        desc["max"] = _max;
     }
 
     return desc;
 }
+
+auto GLTFAccessor::data() -> U8* {
+    NVCHK(_bufferView != nullptr, "Invalid bufferView to get data.");
+    return _bufferView->data() + _offset;
+}
+
+auto GLTFAccessor::data() const -> const U8* {
+    NVCHK(_bufferView != nullptr, "Invalid bufferView to get data.");
+    return _bufferView->data() + _offset;
+};
+
+void GLTFAccessor::update_bounds() {
+    if (get_data_type() != DTYPE_VEC3F) {
+        // Can only compute the bounds with Vec3f data.
+        return;
+    }
+
+    U32 stride = _bufferView->stride();
+    NVCHK(stride > 0, "Invalid bufferview stride.");
+    U8* ptr = data();
+    Box3f bb;
+
+    for (I32 i = 0; i < _count; ++i) {
+        bb.extendTo(*((Vec3f*)ptr));
+        ptr += stride;
+    }
+    set_min(bb.minimum());
+    set_max(bb.maximum());
+};
+
+auto GLTFAccessor::get_data_type() const -> DataType {
+    return gltf::get_data_type(_elementType, _componentType);
+};
+
+void GLTFAccessor::set_min(const Vec3f& vec) {
+    _hasMin = true;
+    _min = {vec.x(), vec.y(), vec.z()};
+};
+void GLTFAccessor::set_max(const Vec3f& vec) {
+    _hasMax = true;
+    _max = {vec.x(), vec.y(), vec.z()};
+};
 
 } // namespace nv

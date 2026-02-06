@@ -89,4 +89,15 @@ auto GLTFBufferView::add_accessor(GLTFElementType etype,
                                   U32 offset) -> GLTFAccessor& {
     return _parent.add_accessor(*this, etype, ctype, count, offset);
 };
+
+auto GLTFBufferView::data() -> U8* {
+    NVCHK(_buffer != nullptr, "Invalid buffer to get data.");
+    return _buffer->data() + _offset;
+}
+
+auto GLTFBufferView::data() const -> const U8* {
+    NVCHK(_buffer != nullptr, "Invalid buffer to get data.");
+    return _buffer->data() + _offset;
+};
+
 } // namespace nv

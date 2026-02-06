@@ -224,6 +224,45 @@ auto get_attribute_size(GLTFElementType type, GLTFComponentType ctype)
     return component_size * num_components;
 }
 
+auto get_data_type(GLTFElementType type, GLTFComponentType ctype) -> DataType {
+    if (ctype == GLTF_COMP_F32) {
+        switch (type) {
+        case GLTF_ELEM_SCALAR:
+            return DTYPE_F32;
+        case GLTF_ELEM_VEC2:
+            return DTYPE_VEC2F;
+        case GLTF_ELEM_VEC3:
+            return DTYPE_VEC3F;
+        case GLTF_ELEM_VEC4:
+            return DTYPE_VEC4F;
+        case GLTF_ELEM_MAT2:
+            return DTYPE_MAT2F;
+        case GLTF_ELEM_MAT3:
+            return DTYPE_MAT3F;
+        case GLTF_ELEM_MAT4:
+            return DTYPE_MAT4F;
+        default:
+            return DTYPE_UNKNOWN;
+        }
+    }
+    if (ctype == GLTF_COMP_U32) {
+        switch (type) {
+        case GLTF_ELEM_SCALAR:
+            return DTYPE_U32;
+        case GLTF_ELEM_VEC2:
+            return DTYPE_VEC2U;
+        case GLTF_ELEM_VEC3:
+            return DTYPE_VEC3U;
+        case GLTF_ELEM_VEC4:
+            return DTYPE_VEC4U;
+        default:
+            return DTYPE_UNKNOWN;
+        }
+    }
+
+    return DTYPE_UNKNOWN;
+}
+
 } // namespace gltf
 
 auto GLTFAsset::decode_data_uri(const String& uri, size_t expected_size) const
@@ -334,7 +373,16 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
     }
 }
 
+void GLTFAsset::update_all_position_bounds() const {
+    for (const auto& mesh : _meshes) {
+        mesh->update_position_bounds();
+    }
+}
+
 void GLTFAsset::save(const char* path) const {
+    // Compute the position bounds:
+    update_all_position_bounds();
+
     // Asset component:
     Json asset{{"version", _version}};
     if (!_generator.empty()) {

@@ -32,6 +32,7 @@ auto get_attribute_size(GLTFElementType type, GLTFComponentType ctype)
 auto to_string(GLTFAttributeType type) -> std::string_view;
 auto to_attribute_type(std::string_view str) -> GLTFAttributeType;
 
+auto get_data_type(GLTFElementType type, GLTFComponentType ctype) -> DataType;
 } // namespace gltf
 
 // Main asset class
@@ -107,6 +108,8 @@ class GLTFAsset : public RefObject {
     // Utility
     [[nodiscard]] auto empty() const -> bool { return _numElements == 0; }
     void clear();
+
+    void update_all_position_bounds() const;
 
   private:
     String _generator{"NervSDK GLTF Asset"};

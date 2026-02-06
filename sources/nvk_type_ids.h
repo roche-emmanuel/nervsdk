@@ -34,6 +34,10 @@ NV_DEFINE_TYPE_ID(nv::Vec4i);
 NV_DEFINE_TYPE_ID(nv::Vec4u);
 NV_DEFINE_TYPE_ID(nv::Quatf);
 NV_DEFINE_TYPE_ID(nv::Quatd);
+NV_DEFINE_TYPE_ID(nv::Mat2f);
+NV_DEFINE_TYPE_ID(nv::Mat2d);
+NV_DEFINE_TYPE_ID(nv::Mat3f);
+NV_DEFINE_TYPE_ID(nv::Mat3d);
 NV_DEFINE_TYPE_ID(nv::Mat4f);
 NV_DEFINE_TYPE_ID(nv::Mat4d);
 
@@ -63,6 +67,10 @@ enum DataType : U64 {
     DTYPE_VEC4U = NV_TYPE_ID(Vec4u),
     DTYPE_VEC4F = NV_TYPE_ID(Vec4f),
     DTYPE_VEC4D = NV_TYPE_ID(Vec4d),
+    DTYPE_MAT2F = NV_TYPE_ID(Mat2f),
+    DTYPE_MAT2D = NV_TYPE_ID(Mat2d),
+    DTYPE_MAT3F = NV_TYPE_ID(Mat3f),
+    DTYPE_MAT3D = NV_TYPE_ID(Mat3d),
     DTYPE_MAT4F = NV_TYPE_ID(Mat4f),
     DTYPE_MAT4D = NV_TYPE_ID(Mat4d),
 };

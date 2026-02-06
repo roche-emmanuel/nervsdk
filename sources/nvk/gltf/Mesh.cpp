@@ -82,4 +82,12 @@ auto GLTFMesh::write() const -> Json {
 
     return json;
 }
+void GLTFMesh::update_position_bounds() const {
+    for (const auto& prim : _primitives) {
+        if (prim->has_attribute(GLTF_ATTR_POSITION)) {
+            prim->attribute(GLTF_ATTR_POSITION).update_bounds();
+        }
+    }
+}
+
 } // namespace nv

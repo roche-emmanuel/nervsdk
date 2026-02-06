@@ -46,6 +46,8 @@ class GLTFMesh : public GLTFElement {
 
     [[nodiscard]] auto write() const -> Json;
 
+    void update_position_bounds() const;
+
   protected:
     String _name;
     Vector<RefPtr<GLTFPrimitive>> _primitives;
