@@ -23,6 +23,8 @@ class GLTFValidationException : public GLTFException {
 namespace gltf {
 auto to_string(GLTFElementType type) -> std::string_view;
 auto to_element_type(std::string_view str) -> GLTFElementType;
+// Helper to determine number of components based on element type
+auto get_element_component_count(GLTFElementType type) -> size_t;
 } // namespace gltf
 
 // Main asset class

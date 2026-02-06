@@ -21,7 +21,9 @@
 
 namespace nv {
 
-auto gltf::to_string(GLTFElementType type) -> std::string_view {
+namespace gltf {
+
+auto to_string(GLTFElementType type) -> std::string_view {
     switch (type) {
     case GLTF_ELEM_SCALAR:
         return "SCALAR";
@@ -44,7 +46,7 @@ auto gltf::to_string(GLTFElementType type) -> std::string_view {
 }
 
 // Convert string to enum
-auto gltf::to_element_type(std::string_view str) -> GLTFElementType {
+auto to_element_type(std::string_view str) -> GLTFElementType {
     // if (str == "SCALAR")
     //     return GLTF_ELEM_SCALAR;
     // if (str == "VEC2")
@@ -74,6 +76,27 @@ auto gltf::to_element_type(std::string_view str) -> GLTFElementType {
     // return (it != map.end()) ? it->second : GLTF_ELEM_UNKNOWN;
     return it->second;
 }
+
+auto get_element_component_count(GLTFElementType type) -> size_t {
+    switch (type) {
+    case GLTF_ELEM_SCALAR:
+        return 1;
+    case GLTF_ELEM_VEC2:
+        return 2;
+    case GLTF_ELEM_VEC3:
+        return 3;
+    case GLTF_ELEM_VEC4:
+    case GLTF_ELEM_MAT2:
+        return 4;
+    case GLTF_ELEM_MAT3:
+        return 9;
+    case GLTF_ELEM_MAT4:
+        return 16;
+    default:
+        return 0;
+    }
+}
+} // namespace gltf
 
 auto GLTFAsset::decode_data_uri(const String& uri, size_t expected_size) const
     -> U8Vector {
