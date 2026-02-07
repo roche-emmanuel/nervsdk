@@ -2,23 +2,9 @@
 #ifndef _GLTF_ASSET_H_
 #define _GLTF_ASSET_H_
 
-#include <external/cgltf.h>
 #include <nvk_common.h>
 
 namespace nv {
-
-// Exception types
-class GLTFException : public std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
-class GLTFLoadException : public GLTFException {
-    using GLTFException::GLTFException;
-};
-
-class GLTFValidationException : public GLTFException {
-    using GLTFException::GLTFException;
-};
 
 namespace gltf {
 auto to_string(GLTFElementType type) -> std::string_view;
@@ -125,34 +111,6 @@ class GLTFAsset : public RefObject {
     Vector<RefPtr<GLTFNode>> _nodes;
     Vector<RefPtr<GLTFScene>> _scenes;
     RefPtr<GLTFScene> _defaultScene;
-
-    // Storage for dynamically allocated elements
-    struct OwnedElements {
-        Vector<cgltf_mesh> meshes;
-        Vector<cgltf_node> nodes;
-        Vector<cgltf_scene> scenes;
-        Vector<cgltf_material> materials;
-        Vector<cgltf_texture> textures;
-        Vector<cgltf_image> images;
-        Vector<cgltf_sampler> samplers;
-        Vector<cgltf_animation> animations;
-        Vector<cgltf_skin> skins;
-        Vector<cgltf_camera> cameras;
-        Vector<cgltf_primitive> primitives;
-        Vector<cgltf_attribute> attributes;
-        Vector<cgltf_morph_target> morph_targets;
-        Vector<cgltf_animation_sampler> animation_samplers;
-        Vector<cgltf_animation_channel> animation_channels;
-
-        // String storage (for names, URIs, etc.)
-        Vector<std::string> strings;
-
-        // Binary data storage for buffers
-        Vector<Vector<uint8_t>> buffer_data;
-    } _owned;
-
-    void _rebuild_pointers();
-    auto intern_string(std::string_view str) -> char*;
 };
 
 } // namespace nv

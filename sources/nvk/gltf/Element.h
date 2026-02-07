@@ -1,5 +1,5 @@
-#ifndef _GLTF_OBJECT_H_
-#define _GLTF_OBJECT_H_
+#ifndef _GLTF_ELEMENT_H_
+#define _GLTF_ELEMENT_H_
 
 #include <nvk_common.h>
 

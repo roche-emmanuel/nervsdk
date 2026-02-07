@@ -13,12 +13,6 @@
 #include <nvk/gltf/Skin.h>
 #include <nvk/gltf/Texture.h>
 
-#define CGLTF_IMPLEMENTATION
-// #include <external/cgltf.h>
-
-#define CGLTF_WRITE_IMPLEMENTATION
-#include <external/cgltf_write.h>
-
 namespace nv {
 
 namespace gltf {
@@ -456,13 +450,6 @@ void GLTFAsset::save(const char* path) const {
     nv::write_json_file(path, data);
 }
 
-auto GLTFAsset::intern_string(std::string_view str) -> char* {
-    if (str.empty())
-        return nullptr;
-    _owned.strings.emplace_back(str);
-    return (char*)_owned.strings.back().c_str();
-}
-
 auto GLTFAsset::add_buffer(size_t size, String name) -> GLTFBuffer& {
     auto buf = nv::create<GLTFBuffer>(*this, _buffers.size());
     _buffers.emplace_back(buf);
@@ -494,7 +481,19 @@ auto GLTFAsset::version() const -> const String& { return _version; };
 auto GLTFAsset::generator() const -> const String& { return _generator; };
 
 void GLTFAsset::clear() {
-    logDEBUG("GLTFAsset: Should clear everything here.");
+    _generator = "NervSDK GLTF Asset";
+    _version = "2.0";
+    _copyright = "";
+
+    _numElements = 0;
+
+    _defaultScene.reset();
+    _scenes.clear();
+    _nodes.clear();
+    _meshes.clear();
+    _accessors.clear();
+    _bufferViews.clear();
+    _buffers.clear();
 };
 
 auto GLTFAsset::add_bufferview(String name) -> GLTFBufferView& {
