@@ -373,7 +373,7 @@ void GLTFAsset::update_all_position_bounds() const {
     }
 }
 
-void GLTFAsset::save(const char* path) const {
+auto GLTFAsset::write_json() const -> Json {
     // Compute the position bounds:
     update_all_position_bounds();
 
@@ -447,8 +447,18 @@ void GLTFAsset::save(const char* path) const {
         }
     }
 
+    return data;
+}
+
+void GLTFAsset::save(const char* path) const {
+    auto data = write_json();
     nv::write_json_file(path, data);
 }
+
+auto GLTFAsset::save_to_memory() const -> String {
+    auto data = write_json();
+    return data.dump();
+};
 
 auto GLTFAsset::add_buffer(size_t size, String name) -> GLTFBuffer& {
     auto buf = nv::create<GLTFBuffer>(*this, _buffers.size());

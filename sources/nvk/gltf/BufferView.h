@@ -84,10 +84,10 @@ class GLTFBufferView : public GLTFElement {
   protected:
     String _name;
     RefPtr<GLTFBuffer> _buffer;
-    U32 _offset;
-    U32 _size;
-    U32 _stride;
-    U32 _type;
+    U32 _offset{0};
+    U32 _size{0};
+    U32 _stride{0};
+    U32 _type{0};
     // U8Vector _override;
 };
 

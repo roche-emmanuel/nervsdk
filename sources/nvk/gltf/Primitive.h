@@ -79,7 +79,7 @@ class GLTFPrimitive : public RefObject {
   protected:
     GLTFAsset& _parent;
     GLTFMesh* _mesh;
-    U32 _index;
+    U32 _index{0};
     GLTFPrimitiveType _type{GLTF_PRIM_TRIANGLES};
     RefPtr<GLTFMaterial> _material{nullptr};
     RefPtr<GLTFAccessor> _indices{nullptr};

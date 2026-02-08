@@ -46,7 +46,9 @@ class GLTFAsset : public RefObject {
 
     // File I/O
     void load(const char* path, bool load_buffers = true);
+    auto write_json() const -> Json;
     void save(const char* path) const;
+    auto save_to_memory() const -> String;
     void validate() const;
 
     static auto create() -> RefPtr<GLTFAsset>;

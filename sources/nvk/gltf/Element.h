@@ -15,7 +15,7 @@ class GLTFElement : public RefObject {
 
   protected:
     GLTFAsset& _parent;
-    U32 _index;
+    U32 _index{0};
 };
 
 } // namespace nv
