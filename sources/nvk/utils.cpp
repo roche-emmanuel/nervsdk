@@ -975,4 +975,49 @@ auto get_filename(const String& full_path) -> String {
     return std::filesystem::path(full_path).filename().string();
 }
 
+auto toHex(const U8Vector& data) -> String {
+    static const char hexChars[] = "0123456789abcdef";
+
+    String result;
+    result.reserve(data.size() * 2);
+
+    for (U8 byte : data) {
+        result.push_back(hexChars[byte >> 4]);
+        result.push_back(hexChars[byte & 0x0F]);
+    }
+
+    return result;
+};
+
+auto fromHex(const String& hex) -> U8Vector {
+    U8Vector bytes;
+
+    NVCHK(hex.length() % 2 == 0,
+          "Hex string must have an even number of characters");
+
+    bytes.reserve(hex.length() / 2);
+
+    auto hexCharToValue = [](char c) -> int {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1; // Invalid
+    };
+
+    for (size_t i = 0; i < hex.length(); i += 2) {
+        int high = hexCharToValue(hex[i]);
+        int low = hexCharToValue(hex[i + 1]);
+
+        NVCHK(high >= 0 && low >= 0, "Invalid hex character in string");
+
+        auto byte = static_cast<uint8_t>((high << 4) | low);
+        bytes.push_back(byte);
+    }
+
+    return bytes;
+};
+
 } // namespace nv
