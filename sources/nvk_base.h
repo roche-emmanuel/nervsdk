@@ -14,6 +14,7 @@
 #include <list>
 #include <map>
 #include <mutex>
+#include <queue>
 #include <random>
 #include <regex>
 #include <set>
