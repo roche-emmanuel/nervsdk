@@ -53,6 +53,21 @@ class PointArray;
 class PCGPoint;
 class PCGPointRef;
 
+class GLTFAsset;
+class GLTFMesh;
+class GLTFNode;
+class GLTFScene;
+class GLTFBuffer;
+class GLTFBufferView;
+class GLTFAccessor;
+class GLTFMaterial;
+class GLTFTexture;
+class GLTFImage;
+class GLTFAnimation;
+class GLTFSkin;
+class GLTFCamera;
+class GLTFPrimitive;
+
 } // namespace nv
 
 #endif

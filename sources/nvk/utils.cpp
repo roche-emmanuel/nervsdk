@@ -32,6 +32,123 @@ namespace fs = std::filesystem;
 
 namespace nv {
 
+// Base64 encoding table
+static const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                   "abcdefghijklmnopqrstuvwxyz"
+                                   "0123456789+/";
+
+// Helper function to check if a character is base64
+namespace {
+
+auto is_base64(unsigned char c) -> bool {
+    return ((isalnum(c) != 0) || (c == '+') || (c == '/'));
+}
+
+} // namespace
+
+auto base64_decode(const String& encoded_string) -> Vector<U8> {
+    size_t in_len = encoded_string.size();
+    size_t i = 0;
+    size_t j = 0;
+    size_t in_ = 0;
+    unsigned char char_array_4[4];
+    unsigned char char_array_3[3];
+    Vector<U8> ret;
+
+    while (in_len-- && (encoded_string[in_] != '=') &&
+           is_base64(encoded_string[in_])) {
+        char_array_4[i++] = encoded_string[in_];
+        in_++;
+        if (i == 4) {
+            for (i = 0; i < 4; i++) {
+                char_array_4[i] = static_cast<unsigned char>(
+                    std::strchr(base64_chars, char_array_4[i]) - base64_chars);
+            }
+
+            char_array_3[0] =
+                (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) +
+                              ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; i < 3; i++) {
+                ret.push_back(char_array_3[i]);
+            }
+            i = 0;
+        }
+    }
+
+    if (i) {
+        for (j = 0; j < i; j++) {
+            char_array_4[j] = static_cast<unsigned char>(
+                std::strchr(base64_chars, char_array_4[j]) - base64_chars);
+        }
+
+        char_array_3[0] =
+            (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] =
+            ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+
+        for (j = 0; j < i - 1; j++) {
+            ret.push_back(char_array_3[j]);
+        }
+    }
+
+    return ret;
+}
+
+auto base64_encode(const U8* data, size_t len) -> String {
+    String ret;
+    int i = 0;
+    int j = 0;
+    unsigned char char_array_3[3];
+    unsigned char char_array_4[4];
+
+    while (len--) {
+        char_array_3[i++] = *(data++);
+        if (i == 3) {
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) +
+                              ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) +
+                              ((char_array_3[2] & 0xc0) >> 6);
+            char_array_4[3] = char_array_3[2] & 0x3f;
+
+            for (i = 0; i < 4; i++) {
+                ret += base64_chars[char_array_4[i]];
+            }
+            i = 0;
+        }
+    }
+
+    if (i) {
+        for (j = i; j < 3; j++) {
+            char_array_3[j] = '\0';
+        }
+
+        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+        char_array_4[1] =
+            ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] =
+            ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+
+        for (j = 0; j < i + 1; j++) {
+            ret += base64_chars[char_array_4[j]];
+        }
+
+        while (i++ < 3) {
+            ret += '=';
+        }
+    }
+
+    return ret;
+}
+
+// Convenience overload for Vector<U8>
+auto base64_encode(const Vector<U8>& data) -> String {
+    return base64_encode(data.data(), data.size());
+}
+
 void sleep_s(U32 secs) {
     std::this_thread::sleep_for(std::chrono::seconds(secs));
 }
@@ -857,5 +974,50 @@ auto get_virtual_files(const String& directory, const std::regex& pattern,
 auto get_filename(const String& full_path) -> String {
     return std::filesystem::path(full_path).filename().string();
 }
+
+auto toHex(const U8Vector& data) -> String {
+    static const char hexChars[] = "0123456789abcdef";
+
+    String result;
+    result.reserve(data.size() * 2);
+
+    for (U8 byte : data) {
+        result.push_back(hexChars[byte >> 4]);
+        result.push_back(hexChars[byte & 0x0F]);
+    }
+
+    return result;
+};
+
+auto fromHex(const String& hex) -> U8Vector {
+    U8Vector bytes;
+
+    NVCHK(hex.length() % 2 == 0,
+          "Hex string must have an even number of characters");
+
+    bytes.reserve(hex.length() / 2);
+
+    auto hexCharToValue = [](char c) -> int {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1; // Invalid
+    };
+
+    for (size_t i = 0; i < hex.length(); i += 2) {
+        int high = hexCharToValue(hex[i]);
+        int low = hexCharToValue(hex[i + 1]);
+
+        NVCHK(high >= 0 && low >= 0, "Invalid hex character in string");
+
+        auto byte = static_cast<uint8_t>((high << 4) | low);
+        bytes.push_back(byte);
+    }
+
+    return bytes;
+};
 
 } // namespace nv
