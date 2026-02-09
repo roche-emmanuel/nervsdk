@@ -340,6 +340,13 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
         }
     }
 
+    if (asset.contains("materials")) {
+        // Create the materials:
+        for (const auto& desc : asset["materials"]) {
+            add_material().read(desc);
+        }
+    }
+
     if (asset.contains("meshes")) {
         // Create the meshes:
         for (const auto& desc : asset["meshes"]) {
@@ -414,6 +421,15 @@ auto GLTFAsset::write_json() const -> Json {
             accs.push_back(acc->write());
         }
         data["accessors"] = std::move(accs);
+    }
+
+    // Write the materials:
+    if (!_materials.empty()) {
+        Json mats;
+        for (const auto& mat : _materials) {
+            mats.push_back(mat->write());
+        }
+        data["materials"] = std::move(mats);
     }
 
     // Write the meshes:
@@ -617,4 +633,39 @@ auto GLTFAsset::default_scene() const -> RefPtr<GLTFScene> {
     return _defaultScene;
 }
 void GLTFAsset::set_default_scene(GLTFScene* scene) { _defaultScene = scene; }
+
+auto GLTFAsset::add_material(String name) -> GLTFMaterial& {
+    auto obj = nv::create<GLTFMaterial>(*this, _materials.size());
+    obj->set_name(std::move(name));
+    _materials.emplace_back(obj);
+    return *obj;
+};
+
+auto GLTFAsset::get_material(U32 idx) -> GLTFMaterial& {
+    NVCHK(idx < _materials.size(), "Out of range material index {}", idx);
+    return *_materials[idx];
+};
+
+auto GLTFAsset::get_material(U32 idx) const -> const GLTFMaterial& {
+    NVCHK(idx < _materials.size(), "Out of range material index {}", idx);
+    return *_materials[idx];
+};
+
+auto GLTFAsset::add_texture(String name) -> GLTFTexture& {
+    auto obj = nv::create<GLTFTexture>(*this, _textures.size());
+    obj->set_name(std::move(name));
+    _textures.emplace_back(obj);
+    return *obj;
+};
+
+auto GLTFAsset::get_texture(U32 idx) -> GLTFTexture& {
+    NVCHK(idx < _textures.size(), "Out of range texture index {}", idx);
+    return *_textures[idx];
+};
+
+auto GLTFAsset::get_texture(U32 idx) const -> const GLTFTexture& {
+    NVCHK(idx < _textures.size(), "Out of range texture index {}", idx);
+    return *_textures[idx];
+};
+
 } // namespace nv

@@ -49,9 +49,8 @@ void GLTFPrimitive::read(const Json& desc) {
 
     // Read material reference
     if (desc.contains("material")) {
-        THROW_MSG("Should add material here.");
-        // U32 materialIndex = desc["material"].get<U32>();
-        // _material = &_parent.material(materialIndex);
+        U32 materialIndex = desc["material"].get<U32>();
+        _material = &_parent.get_material(materialIndex);
     }
 
     // Read indices reference
@@ -93,13 +92,12 @@ auto GLTFPrimitive::write() const -> Json {
     }
 
     // Write material reference
-    if (_material) {
-        // desc["material"] = _material->index();
-        THROW_MSG("Should add material here.");
+    if (_material != nullptr) {
+        desc["material"] = _material->index();
     }
 
     // Write indices reference
-    if (_indices) {
+    if (_indices != nullptr) {
         desc["indices"] = _indices->index();
     }
 

@@ -82,6 +82,14 @@ class GLTFAsset : public RefObject {
     auto get_scene(U32 idx) -> GLTFScene&;
     [[nodiscard]] auto get_scene(U32 idx) const -> const GLTFScene&;
 
+    auto add_material(String name = {}) -> GLTFMaterial&;
+    auto get_material(U32 idx) -> GLTFMaterial&;
+    [[nodiscard]] auto get_material(U32 idx) const -> const GLTFMaterial&;
+
+    auto add_texture(String name = {}) -> GLTFTexture&;
+    auto get_texture(U32 idx) -> GLTFTexture&;
+    [[nodiscard]] auto get_texture(U32 idx) const -> const GLTFTexture&;
+
     // Scene management
     [[nodiscard]] auto default_scene() const -> RefPtr<GLTFScene>;
     void set_default_scene(GLTFScene* scene);
@@ -112,6 +120,8 @@ class GLTFAsset : public RefObject {
     Vector<RefPtr<GLTFMesh>> _meshes;
     Vector<RefPtr<GLTFNode>> _nodes;
     Vector<RefPtr<GLTFScene>> _scenes;
+    Vector<RefPtr<GLTFMaterial>> _materials;
+    Vector<RefPtr<GLTFTexture>> _textures;
     RefPtr<GLTFScene> _defaultScene;
 };
 
