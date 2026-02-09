@@ -14,8 +14,10 @@
 #include <nvk/gltf/Mesh.h>
 #include <nvk/gltf/Node.h>
 #include <nvk/gltf/Primitive.h>
+#include <nvk/gltf/Sampler.h>
 #include <nvk/gltf/Scene.h>
 #include <nvk/gltf/Skin.h>
 #include <nvk/gltf/Texture.h>
+
 
 #endif

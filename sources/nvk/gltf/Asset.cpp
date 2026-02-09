@@ -1,17 +1,4 @@
-#include <nvk/gltf/Accessor.h>
-#include <nvk/gltf/Animation.h>
-#include <nvk/gltf/Asset.h>
-#include <nvk/gltf/Buffer.h>
-#include <nvk/gltf/BufferView.h>
-#include <nvk/gltf/Camera.h>
-#include <nvk/gltf/Image.h>
-#include <nvk/gltf/Material.h>
-#include <nvk/gltf/Mesh.h>
-#include <nvk/gltf/Node.h>
-#include <nvk/gltf/Primitive.h>
-#include <nvk/gltf/Scene.h>
-#include <nvk/gltf/Skin.h>
-#include <nvk/gltf/Texture.h>
+#include <nvk_gltf.h>
 
 namespace nv {
 
@@ -514,6 +501,11 @@ void GLTFAsset::clear() {
     _numElements = 0;
 
     _defaultScene.reset();
+
+    _images.clear();
+    _samplers.clear();
+    _textures.clear();
+    _materials.clear();
     _scenes.clear();
     _nodes.clear();
     _meshes.clear();
@@ -666,6 +658,37 @@ auto GLTFAsset::get_texture(U32 idx) -> GLTFTexture& {
 auto GLTFAsset::get_texture(U32 idx) const -> const GLTFTexture& {
     NVCHK(idx < _textures.size(), "Out of range texture index {}", idx);
     return *_textures[idx];
+};
+
+auto GLTFAsset::add_sampler(String name) -> GLTFSampler& {
+    auto obj = nv::create<GLTFSampler>(*this, _samplers.size());
+    obj->set_name(std::move(name));
+    _samplers.emplace_back(obj);
+    return *obj;
+};
+auto GLTFAsset::get_sampler(U32 idx) -> GLTFSampler& {
+    NVCHK(idx < _samplers.size(), "Out of range sampler index {}", idx);
+    return *_samplers[idx];
+};
+auto GLTFAsset::get_sampler(U32 idx) const -> const GLTFSampler& {
+    NVCHK(idx < _samplers.size(), "Out of range sampler index {}", idx);
+    return *_samplers[idx];
+};
+auto GLTFAsset::add_image(String name) -> GLTFImage& {
+    auto obj = nv::create<GLTFImage>(*this, _images.size());
+    obj->set_name(std::move(name));
+    _images.emplace_back(obj);
+    return *obj;
+};
+
+auto GLTFAsset::get_image(U32 idx) -> GLTFImage& {
+    NVCHK(idx < _images.size(), "Out of range image index {}", idx);
+    return *_images[idx];
+};
+
+auto GLTFAsset::get_image(U32 idx) const -> const GLTFImage& {
+    NVCHK(idx < _images.size(), "Out of range image index {}", idx);
+    return *_images[idx];
 };
 
 } // namespace nv

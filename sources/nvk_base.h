@@ -65,6 +65,7 @@ class GLTFTexture;
 class GLTFImage;
 class GLTFAnimation;
 class GLTFSkin;
+class GLTFSampler;
 class GLTFCamera;
 class GLTFPrimitive;
 
