@@ -26,6 +26,7 @@ class GLTFTexture : public GLTFElement {
     [[nodiscard]] auto source() -> GLTFImage&;
     void set_source(GLTFImage& image);
     void clear_source();
+    auto add_source() -> GLTFImage&;
 
     // Serialization
     void read(const Json& desc);

@@ -327,6 +327,20 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
         }
     }
 
+    if (asset.contains("images")) {
+        // Create the images:
+        for (const auto& desc : asset["images"]) {
+            add_image().read(desc);
+        }
+    }
+
+    if (asset.contains("textures")) {
+        // Create the textures:
+        for (const auto& desc : asset["textures"]) {
+            add_texture().read(desc);
+        }
+    }
+
     if (asset.contains("materials")) {
         // Create the materials:
         for (const auto& desc : asset["materials"]) {
@@ -408,6 +422,24 @@ auto GLTFAsset::write_json() const -> Json {
             accs.push_back(acc->write());
         }
         data["accessors"] = std::move(accs);
+    }
+
+    // Write the images:
+    if (!_images.empty()) {
+        Json imgs;
+        for (const auto& img : _images) {
+            imgs.push_back(img->write());
+        }
+        data["images"] = std::move(imgs);
+    }
+
+    // Write the textures:
+    if (!_textures.empty()) {
+        Json texs;
+        for (const auto& tex : _textures) {
+            texs.push_back(tex->write());
+        }
+        data["textures"] = std::move(texs);
     }
 
     // Write the materials:

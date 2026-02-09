@@ -128,4 +128,9 @@ auto GLTFPrimitive::write() const -> Json {
 
     return desc;
 }
+auto GLTFPrimitive::add_material(String name) -> GLTFMaterial& {
+    auto& mat = _parent.add_material(std::move(name));
+    set_material(mat);
+    return mat;
+};
 } // namespace nv

@@ -75,4 +75,10 @@ auto GLTFTexture::write() const -> Json {
     return json;
 }
 
+auto GLTFTexture::add_source() -> GLTFImage& {
+    auto& img = _parent.add_image();
+    set_source(img);
+    return img;
+};
+
 } // namespace nv

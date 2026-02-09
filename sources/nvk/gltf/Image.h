@@ -26,11 +26,11 @@ class GLTFImage : public GLTFElement {
     void clear_mime_type();
 
     // Buffer view accessors (for embedded images)
-    [[nodiscard]] auto has_buffer_view() const -> bool;
-    [[nodiscard]] auto buffer_view() const -> const GLTFBufferView&;
-    [[nodiscard]] auto buffer_view() -> GLTFBufferView&;
-    void set_buffer_view(GLTFBufferView& view);
-    void clear_buffer_view();
+    [[nodiscard]] auto has_bufferview() const -> bool;
+    [[nodiscard]] auto bufferview() const -> const GLTFBufferView&;
+    [[nodiscard]] auto bufferview() -> GLTFBufferView&;
+    void set_bufferview(GLTFBufferView& view);
+    void clear_bufferview();
 
     // Serialization
     void read(const Json& desc);

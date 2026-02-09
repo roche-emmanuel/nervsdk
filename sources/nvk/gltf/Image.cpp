@@ -37,23 +37,23 @@ void GLTFImage::clear_mime_type() {
     _hasMimeType = false;
 }
 
-auto GLTFImage::has_buffer_view() const -> bool {
+auto GLTFImage::has_bufferview() const -> bool {
     return _bufferView != nullptr;
 }
 
-auto GLTFImage::buffer_view() const -> const GLTFBufferView& {
+auto GLTFImage::bufferview() const -> const GLTFBufferView& {
     NVCHK(_bufferView != nullptr, "Image has no buffer view");
     return *_bufferView;
 }
 
-auto GLTFImage::buffer_view() -> GLTFBufferView& {
+auto GLTFImage::bufferview() -> GLTFBufferView& {
     NVCHK(_bufferView != nullptr, "Image has no buffer view");
     return *_bufferView;
 }
 
-void GLTFImage::set_buffer_view(GLTFBufferView& view) { _bufferView = &view; }
+void GLTFImage::set_bufferview(GLTFBufferView& view) { _bufferView = &view; }
 
-void GLTFImage::clear_buffer_view() { _bufferView = nullptr; }
+void GLTFImage::clear_bufferview() { _bufferView = nullptr; }
 
 void GLTFImage::read(const Json& desc) {
     if (desc.contains("name") && desc["name"].is_string()) {

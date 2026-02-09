@@ -314,4 +314,17 @@ auto GLTFMaterial::write() const -> Json {
     return json;
 }
 
+auto GLTFMaterial::add_base_color_texture() -> GLTFTexture& {
+    _hasPbrMetallicRoughness = true;
+    auto& tex = _parent.add_texture();
+    _pbrMetallicRoughness.baseColorTexture.texture = &tex;
+    return tex;
+};
+
+auto GLTFMaterial::add_metal_roughness_texture() -> GLTFTexture& {
+    _hasPbrMetallicRoughness = true;
+    auto& tex = _parent.add_texture();
+    _pbrMetallicRoughness.metallicRoughnessTexture.texture = &tex;
+    return tex;
+};
 } // namespace nv

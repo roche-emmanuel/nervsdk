@@ -24,6 +24,7 @@ class GLTFPrimitive : public RefObject {
     [[nodiscard]] auto material() const -> GLTFMaterial&;
     void set_material(GLTFMaterial& material);
     void clear_material();
+    auto add_material(String name = {}) -> GLTFMaterial&;
 
     // Indices accessor
     [[nodiscard]] auto has_indices() const -> bool;

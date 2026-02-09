@@ -61,6 +61,8 @@ class GLTFMaterial : public GLTFElement {
     [[nodiscard]] auto pbr_metallic_roughness() -> GLTFPBRMetallicRoughness&;
     void set_pbr_metallic_roughness(const GLTFPBRMetallicRoughness& pbr);
     void clear_pbr_metallic_roughness();
+    auto add_base_color_texture() -> GLTFTexture&;
+    auto add_metal_roughness_texture() -> GLTFTexture&;
 
     // Normal texture
     [[nodiscard]] auto has_normal_texture() const -> bool;
