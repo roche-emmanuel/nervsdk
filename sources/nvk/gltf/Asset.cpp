@@ -287,212 +287,144 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
     }
 }
 
-void GLTFAsset::load_gltf(const char* path, bool load_buffers) {
-    clear();
-
-    auto data = read_json_file(path);
+void GLTFAsset::load_from_json(const Json& data, U8Vector* glb_bin_chunk) {
     auto asset = data["asset"];
     _version = asset["version"];
 
-    if (asset.contains("generator")) {
+    if (asset.contains("generator"))
         _generator = asset["generator"];
-    }
-    if (asset.contains("copyright")) {
+
+    if (asset.contains("copyright"))
         _copyright = asset["copyright"];
-    }
 
-    if (asset.contains("buffers")) {
-        // Create the buffers:
-        for (const auto& desc : asset["buffers"]) {
-            add_buffer().read(desc);
-        }
-    }
-
-    if (asset.contains("bufferViews")) {
-        // Create the bufferViews:
-        for (const auto& desc : asset["bufferViews"]) {
-            add_bufferview().read(desc);
-        }
-    }
-
-    if (asset.contains("accessors")) {
-        // Create the accessors:
-        for (const auto& desc : asset["accessors"]) {
-            add_accessor().read(desc);
-        }
-    }
-
-    if (asset.contains("images")) {
-        // Create the images:
-        for (const auto& desc : asset["images"]) {
-            add_image().read(desc);
-        }
-    }
-
-    if (asset.contains("textures")) {
-        // Create the textures:
-        for (const auto& desc : asset["textures"]) {
-            add_texture().read(desc);
-        }
-    }
-
-    if (asset.contains("materials")) {
-        // Create the materials:
-        for (const auto& desc : asset["materials"]) {
-            add_material().read(desc);
-        }
-    }
-
-    if (asset.contains("meshes")) {
-        // Create the meshes:
-        for (const auto& desc : asset["meshes"]) {
-            add_mesh().read(desc);
-        }
-    }
-
-    if (asset.contains("nodes")) {
-        // Create the nodes:
-        for (const auto& desc : asset["nodes"]) {
-            add_node().read(desc);
-        }
-    }
-
-    if (asset.contains("scenes")) {
-        // Create the scenes:
-        for (const auto& desc : asset["scenes"]) {
-            add_scene().read(desc);
-        }
-
-        if (asset.contains("scene")) {
-            U32 idx = asset["scene"].get<U32>();
-            _defaultScene = &get_scene(idx);
-        }
-    }
-}
-
-void GLTFAsset::load_glb(const char* path) {
-    clear();
-
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        throw std::runtime_error("Failed to open GLB file");
-    }
-
-    // Read GLB header
-    GLBHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(GLBHeader));
-
-    if (header.magic != GLB_MAGIC) {
-        throw std::runtime_error("Invalid GLB magic number");
-    }
-    if (header.version != GLB_VERSION) {
-        throw std::runtime_error("Unsupported GLB version");
-    }
-
-    // Read JSON chunk
-    GLBChunkHeader json_chunk;
-    file.read(reinterpret_cast<char*>(&json_chunk), sizeof(GLBChunkHeader));
-
-    if (json_chunk.type != GLB_CHUNK_JSON) {
-        throw std::runtime_error("Expected JSON chunk");
-    }
-
-    std::vector<char> json_data(json_chunk.length);
-    file.read(json_data.data(), json_chunk.length);
-
-    // Parse JSON
-    Json data = Json::parse(json_data.begin(), json_data.end());
-    auto asset = data["asset"];
-    _version = asset["version"];
-
-    if (asset.contains("generator")) {
-        _generator = asset["generator"];
-    }
-    if (asset.contains("copyright")) {
-        _copyright = asset["copyright"];
-    }
-
-    // Read BIN chunk if present
-    U8Vector bin_data;
-    if (file.peek() != EOF) {
-        GLBChunkHeader bin_chunk;
-        file.read(reinterpret_cast<char*>(&bin_chunk), sizeof(GLBChunkHeader));
-
-        if (bin_chunk.type == GLB_CHUNK_BIN) {
-            bin_data.resize(bin_chunk.length);
-            file.read(reinterpret_cast<char*>(bin_data.data()),
-                      bin_chunk.length);
-        }
-    }
-
-    // Process buffers - first buffer is the GLB binary chunk
+    // Buffers
     if (data.contains("buffers")) {
         bool first_buffer = true;
+
         for (const auto& desc : data["buffers"]) {
             auto& buffer = add_buffer();
             buffer.read(desc);
 
-            // First buffer gets data from BIN chunk
-            if (first_buffer && !bin_data.empty()) {
-                buffer.set_data(std::move(bin_data));
+            // If this is a GLB and we have BIN data
+            if (first_buffer) {
+                if (glb_bin_chunk != nullptr && !glb_bin_chunk->empty()) {
+                    buffer.set_data(std::move(*glb_bin_chunk));
+                }
                 first_buffer = false;
             }
         }
     }
 
-    // Load remaining data structures
-    if (data.contains("bufferViews")) {
-        for (const auto& desc : data["bufferViews"]) {
+    if (data.contains("bufferViews"))
+        for (const auto& desc : data["bufferViews"])
             add_bufferview().read(desc);
-        }
-    }
 
-    if (data.contains("accessors")) {
-        for (const auto& desc : data["accessors"]) {
+    if (data.contains("accessors"))
+        for (const auto& desc : data["accessors"])
             add_accessor().read(desc);
-        }
-    }
 
-    if (data.contains("images")) {
-        for (const auto& desc : data["images"]) {
+    if (data.contains("images"))
+        for (const auto& desc : data["images"])
             add_image().read(desc);
-        }
-    }
 
-    if (data.contains("textures")) {
-        for (const auto& desc : data["textures"]) {
+    if (data.contains("textures"))
+        for (const auto& desc : data["textures"])
             add_texture().read(desc);
-        }
-    }
 
-    if (data.contains("materials")) {
-        for (const auto& desc : data["materials"]) {
+    if (data.contains("materials"))
+        for (const auto& desc : data["materials"])
             add_material().read(desc);
-        }
-    }
 
-    if (data.contains("meshes")) {
-        for (const auto& desc : data["meshes"]) {
+    if (data.contains("meshes"))
+        for (const auto& desc : data["meshes"])
             add_mesh().read(desc);
-        }
-    }
 
-    if (data.contains("nodes")) {
-        for (const auto& desc : data["nodes"]) {
+    if (data.contains("nodes"))
+        for (const auto& desc : data["nodes"])
             add_node().read(desc);
-        }
-    }
 
     if (data.contains("scenes")) {
-        for (const auto& desc : data["scenes"]) {
+        for (const auto& desc : data["scenes"])
             add_scene().read(desc);
-        }
 
         if (data.contains("scene")) {
             U32 idx = data["scene"].get<U32>();
             _defaultScene = &get_scene(idx);
         }
     }
+}
+
+void GLTFAsset::load_gltf(const char* path, bool load_buffers) {
+    clear();
+
+    auto data = read_json_file(path);
+    load_from_json(data);
+}
+
+void GLTFAsset::load_glb(const char* path) {
+    clear();
+
+    U8Vector content = nv::read_virtual_binary_file(path);
+
+    NVCHK(content.size() >= sizeof(GLBHeader),
+          "File too small to be valid GLB");
+
+    const uint8_t* ptr = content.data();
+    const uint8_t* end = ptr + content.size();
+
+    // --- Read header ---
+    const GLBHeader* header = reinterpret_cast<const GLBHeader*>(ptr);
+
+    NVCHK(header->magic == GLB_MAGIC, "Invalid GLB magic number");
+
+    NVCHK(header->version == GLB_VERSION, "Unsupported GLB version");
+
+    ptr += sizeof(GLBHeader);
+
+    // --- Read JSON chunk header ---
+    NVCHK(ptr + sizeof(GLBChunkHeader) <= end,
+          "Unexpected end of file (JSON chunk header)");
+
+    const GLBChunkHeader* json_chunk =
+        reinterpret_cast<const GLBChunkHeader*>(ptr);
+
+    NVCHK(json_chunk->type == GLB_CHUNK_JSON, "Expected JSON chunk");
+
+    ptr += sizeof(GLBChunkHeader);
+
+    // --- Read JSON chunk data ---
+    NVCHK(ptr + json_chunk->length <= end,
+          "Unexpected end of file (JSON chunk data)");
+
+    const char* json_begin = reinterpret_cast<const char*>(ptr);
+    const char* json_end = json_begin + json_chunk->length;
+
+    Json data = Json::parse(json_begin, json_end);
+
+    ptr += json_chunk->length;
+
+    // --- Read BIN chunk (optional) ---
+    U8Vector bin_data;
+
+    if (ptr + sizeof(GLBChunkHeader) <= end) {
+        const GLBChunkHeader* bin_chunk =
+            reinterpret_cast<const GLBChunkHeader*>(ptr);
+
+        ptr += sizeof(GLBChunkHeader);
+
+        if (bin_chunk->type == GLB_CHUNK_BIN) {
+            NVCHK((ptr + bin_chunk->length) <= end,
+                  "Unexpected end of file (BIN chunk)");
+
+            bin_data.resize(bin_chunk->length);
+            std::memcpy(bin_data.data(), ptr, bin_chunk->length);
+
+            ptr += bin_chunk->length;
+        }
+    }
+
+    // --- Unified JSON loading ---
+    load_from_json(data, bin_data.empty() ? nullptr : &bin_data);
 }
 
 void GLTFAsset::update_all_position_bounds() const {

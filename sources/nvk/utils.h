@@ -56,6 +56,9 @@ auto read_system_binary_file(const char* fname) -> U8Vector;
 auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
     -> String;
 
+auto read_virtual_binary_file(const String& fname,
+                              bool forceAllowSystem = false) -> U8Vector;
+
 auto get_virtual_files(const String& directory, const std::regex& pattern,
                        bool recursive) -> Vector<String>;
 

@@ -156,6 +156,8 @@ class GLTFAsset : public RefObject {
     static constexpr uint32_t GLB_VERSION = 2;
     static constexpr uint32_t GLB_CHUNK_JSON = 0x4E4F534A;
     static constexpr uint32_t GLB_CHUNK_BIN = 0x004E4942;
+
+    void load_from_json(const Json& data, U8Vector* glb_bin_chunk = nullptr);
 };
 
 } // namespace nv

@@ -178,6 +178,12 @@ auto read_virtual_file(const String& fname, bool forceAllowSystem) -> String {
                                                          forceAllowSystem);
 }
 
+auto read_virtual_binary_file(const String& fname, bool forceAllowSystem)
+    -> U8Vector {
+    return ResourceManager::instance().read_virtual_binary_file(
+        fname, forceAllowSystem);
+}
+
 // write file content as string:
 void write_file(const char* fname, const String& content, bool createFolders) {
     if (createFolders) {
