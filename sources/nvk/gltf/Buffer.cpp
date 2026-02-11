@@ -69,9 +69,9 @@ void GLTFBuffer::read(const Json& desc) {
             _data = _parent.load_external_buffer(_uri, byteLength);
         }
     } else {
-        // No URI means this buffer is in the GLB binary chunk
-        // You'll need to handle this separately when parsing GLB
-        _data.resize(byteLength);
+        // No URI means this buffer is in the GLB binary chunk.
+        // So it will be loaded afterwards.
+        // _data.resize(byteLength);
     }
 }
 
@@ -89,7 +89,7 @@ auto GLTFBuffer::write() const -> Json {
     // Optional: uri
     if (!_uri.empty()) {
         desc["uri"] = _uri;
-    } else {
+    } else if (_writeBase64) {
         // Encode the data as base64:
         String data = "data:application/octet-stream;base64,";
         data += base64_encode(_data);
@@ -108,4 +108,5 @@ auto GLTFBuffer::add_bufferview(U32 offset, U32 size) -> GLTFBufferView& {
     return _parent.add_bufferview(*this, offset, size);
 }
 
+void GLTFBuffer::set_write_base64(bool enable) { _writeBase64 = enable; }
 } // namespace nv

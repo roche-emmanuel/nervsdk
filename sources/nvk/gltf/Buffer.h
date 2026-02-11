@@ -8,6 +8,7 @@ class GLTFBuffer : public GLTFElement {
     Vector<U8> _data;
     String _name;
     String _uri;
+    bool _writeBase64{true};
 
   public:
     GLTFBuffer(GLTFAsset& parent, U32 index);
@@ -30,6 +31,8 @@ class GLTFBuffer : public GLTFElement {
     auto write() const -> Json;
 
     auto add_bufferview(U32 offset = 0, U32 size = 0) -> GLTFBufferView&;
+
+    void set_write_base64(bool enable);
 };
 
 } // namespace nv

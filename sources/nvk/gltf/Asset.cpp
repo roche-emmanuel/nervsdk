@@ -22,29 +22,13 @@ auto to_string(GLTFElementType type) -> std::string_view {
         return "MAT4";
     case GLTF_ELEM_UNKNOWN:
     default:
-        return ""; // or throw if you prefer
+        THROW_MSG("Unsupported GLTF element type: {}", (int)type);
+        return "";
     }
 }
 
 // Convert string to enum
 auto to_element_type(std::string_view str) -> GLTFElementType {
-    // if (str == "SCALAR")
-    //     return GLTF_ELEM_SCALAR;
-    // if (str == "VEC2")
-    //     return GLTF_ELEM_VEC2;
-    // if (str == "VEC3")
-    //     return GLTF_ELEM_VEC3;
-    // if (str == "VEC4")
-    //     return GLTF_ELEM_VEC4;
-    // if (str == "MAT2")
-    //     return GLTF_ELEM_MAT2;
-    // if (str == "MAT3")
-    //     return GLTF_ELEM_MAT3;
-    // if (str == "MAT4")
-    //     return GLTF_ELEM_MAT4;
-
-    // THROW_MSG("Invalid GLTF element string: {}", str);
-    // return GLTF_ELEM_UNKNOWN;
     static const std::unordered_map<std::string_view, GLTFElementType> map = {
         {"SCALAR", GLTF_ELEM_SCALAR}, {"VEC2", GLTF_ELEM_VEC2},
         {"VEC3", GLTF_ELEM_VEC3},     {"VEC4", GLTF_ELEM_VEC4},
@@ -129,7 +113,6 @@ auto to_attribute_type(std::string_view str) -> GLTFAttributeType {
 
     auto it = map.find(str);
     NVCHK(it != map.end(), "Invalid GLTF attribute string: {}", str);
-    // return (it != map.end()) ? it->second : GLTF_ATTR_UNKNOWN;
     return it->second;
 }
 
@@ -293,6 +276,18 @@ GLTFAsset::GLTFAsset(const char* path, bool load_buffers) {
 GLTFAsset::~GLTFAsset() { clear(); }
 
 void GLTFAsset::load(const char* path, bool load_buffers) {
+    String path_str(path);
+
+    // Check file extension to determine format
+    if (path_str.size() >= 4 &&
+        path_str.substr(path_str.size() - 4) == ".glb") {
+        load_glb(path);
+    } else {
+        load_gltf(path, load_buffers);
+    }
+}
+
+void GLTFAsset::load_gltf(const char* path, bool load_buffers) {
     clear();
 
     auto data = read_json_file(path);
@@ -370,6 +365,131 @@ void GLTFAsset::load(const char* path, bool load_buffers) {
 
         if (asset.contains("scene")) {
             U32 idx = asset["scene"].get<U32>();
+            _defaultScene = &get_scene(idx);
+        }
+    }
+}
+
+void GLTFAsset::load_glb(const char* path) {
+    clear();
+
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Failed to open GLB file");
+    }
+
+    // Read GLB header
+    GLBHeader header;
+    file.read(reinterpret_cast<char*>(&header), sizeof(GLBHeader));
+
+    if (header.magic != GLB_MAGIC) {
+        throw std::runtime_error("Invalid GLB magic number");
+    }
+    if (header.version != GLB_VERSION) {
+        throw std::runtime_error("Unsupported GLB version");
+    }
+
+    // Read JSON chunk
+    GLBChunkHeader json_chunk;
+    file.read(reinterpret_cast<char*>(&json_chunk), sizeof(GLBChunkHeader));
+
+    if (json_chunk.type != GLB_CHUNK_JSON) {
+        throw std::runtime_error("Expected JSON chunk");
+    }
+
+    std::vector<char> json_data(json_chunk.length);
+    file.read(json_data.data(), json_chunk.length);
+
+    // Parse JSON
+    Json data = Json::parse(json_data.begin(), json_data.end());
+    auto asset = data["asset"];
+    _version = asset["version"];
+
+    if (asset.contains("generator")) {
+        _generator = asset["generator"];
+    }
+    if (asset.contains("copyright")) {
+        _copyright = asset["copyright"];
+    }
+
+    // Read BIN chunk if present
+    U8Vector bin_data;
+    if (file.peek() != EOF) {
+        GLBChunkHeader bin_chunk;
+        file.read(reinterpret_cast<char*>(&bin_chunk), sizeof(GLBChunkHeader));
+
+        if (bin_chunk.type == GLB_CHUNK_BIN) {
+            bin_data.resize(bin_chunk.length);
+            file.read(reinterpret_cast<char*>(bin_data.data()),
+                      bin_chunk.length);
+        }
+    }
+
+    // Process buffers - first buffer is the GLB binary chunk
+    if (data.contains("buffers")) {
+        bool first_buffer = true;
+        for (const auto& desc : data["buffers"]) {
+            auto& buffer = add_buffer();
+            buffer.read(desc);
+
+            // First buffer gets data from BIN chunk
+            if (first_buffer && !bin_data.empty()) {
+                buffer.set_data(std::move(bin_data));
+                first_buffer = false;
+            }
+        }
+    }
+
+    // Load remaining data structures
+    if (data.contains("bufferViews")) {
+        for (const auto& desc : data["bufferViews"]) {
+            add_bufferview().read(desc);
+        }
+    }
+
+    if (data.contains("accessors")) {
+        for (const auto& desc : data["accessors"]) {
+            add_accessor().read(desc);
+        }
+    }
+
+    if (data.contains("images")) {
+        for (const auto& desc : data["images"]) {
+            add_image().read(desc);
+        }
+    }
+
+    if (data.contains("textures")) {
+        for (const auto& desc : data["textures"]) {
+            add_texture().read(desc);
+        }
+    }
+
+    if (data.contains("materials")) {
+        for (const auto& desc : data["materials"]) {
+            add_material().read(desc);
+        }
+    }
+
+    if (data.contains("meshes")) {
+        for (const auto& desc : data["meshes"]) {
+            add_mesh().read(desc);
+        }
+    }
+
+    if (data.contains("nodes")) {
+        for (const auto& desc : data["nodes"]) {
+            add_node().read(desc);
+        }
+    }
+
+    if (data.contains("scenes")) {
+        for (const auto& desc : data["scenes"]) {
+            add_scene().read(desc);
+        }
+
+        if (data.contains("scene")) {
+            U32 idx = data["scene"].get<U32>();
             _defaultScene = &get_scene(idx);
         }
     }
@@ -486,8 +606,83 @@ auto GLTFAsset::write_json() const -> Json {
 }
 
 void GLTFAsset::save(const char* path) const {
+    String path_str(path);
+
+    // Check file extension to determine format
+    if (path_str.size() >= 4 &&
+        path_str.substr(path_str.size() - 4) == ".glb") {
+        save_glb(path);
+    } else {
+        save_gltf(path);
+    }
+}
+
+void GLTFAsset::save_gltf(const char* path) const {
     auto data = write_json();
     nv::write_json_file(path, data);
+}
+
+void GLTFAsset::save_glb(const char* path) const {
+    // Before writing the data we should disable base64 data uri writing in the
+    // first buffer:
+    if (!_buffers.empty()) {
+        _buffers[0]->set_write_base64(false);
+    }
+
+    auto json_data = write_json();
+    String json_str = json_data.dump();
+
+    // Pad JSON to 4-byte alignment with spaces
+    while (json_str.size() % 4 != 0) {
+        json_str += ' ';
+    }
+
+    // Get binary buffer data (first buffer only for GLB)
+    U8Vector bin_data;
+    if (!_buffers.empty()) {
+        const auto& buffer = _buffers[0];
+        bin_data.assign(buffer->data(), buffer->data() + buffer->size());
+
+        // Pad BIN to 4-byte alignment with zeros
+        while (bin_data.size() % 4 != 0) {
+            bin_data.push_back(0);
+        }
+    }
+
+    // Calculate sizes
+    uint32_t json_length = static_cast<uint32_t>(json_str.size());
+    uint32_t bin_length = static_cast<uint32_t>(bin_data.size());
+    uint32_t total_length =
+        sizeof(GLBHeader) + sizeof(GLBChunkHeader) + json_length;
+
+    if (bin_length > 0) {
+        total_length += sizeof(GLBChunkHeader) + bin_length;
+    }
+
+    // Write file
+    std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Failed to create GLB file");
+    }
+
+    // Write GLB header
+    GLBHeader header{
+        .magic = GLB_MAGIC, .version = GLB_VERSION, .length = total_length};
+    file.write(reinterpret_cast<const char*>(&header), sizeof(GLBHeader));
+
+    // Write JSON chunk
+    GLBChunkHeader json_chunk{.length = json_length, .type = GLB_CHUNK_JSON};
+    file.write(reinterpret_cast<const char*>(&json_chunk),
+               sizeof(GLBChunkHeader));
+    file.write(json_str.data(), json_length);
+
+    // Write BIN chunk if we have buffer data
+    if (bin_length > 0) {
+        GLBChunkHeader bin_chunk{.length = bin_length, .type = GLB_CHUNK_BIN};
+        file.write(reinterpret_cast<const char*>(&bin_chunk),
+                   sizeof(GLBChunkHeader));
+        file.write(reinterpret_cast<const char*>(bin_data.data()), bin_length);
+    }
 }
 
 auto GLTFAsset::save_to_memory() const -> String {

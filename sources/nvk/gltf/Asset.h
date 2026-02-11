@@ -46,8 +46,13 @@ class GLTFAsset : public RefObject {
 
     // File I/O
     void load(const char* path, bool load_buffers = true);
+    void load_gltf(const char* path, bool load_buffers = true);
+    void load_glb(const char* path);
+
     auto write_json() const -> Json;
     void save(const char* path) const;
+    void save_gltf(const char* path) const;
+    void save_glb(const char* path) const;
     auto save_to_memory() const -> String;
     void validate() const;
 
@@ -134,6 +139,23 @@ class GLTFAsset : public RefObject {
     Vector<RefPtr<GLTFImage>> _images;
 
     RefPtr<GLTFScene> _defaultScene;
+
+    // GLB support
+    struct GLBHeader {
+        uint32_t magic;   // 0x46546C67 = "glTF"
+        uint32_t version; // 2
+        uint32_t length;  // Total file length
+    };
+
+    struct GLBChunkHeader {
+        uint32_t length; // Chunk data length
+        uint32_t type;   // 0x4E4F534A = "JSON" or 0x004E4942 = "BIN\0"
+    };
+
+    static constexpr uint32_t GLB_MAGIC = 0x46546C67;
+    static constexpr uint32_t GLB_VERSION = 2;
+    static constexpr uint32_t GLB_CHUNK_JSON = 0x4E4F534A;
+    static constexpr uint32_t GLB_CHUNK_BIN = 0x004E4942;
 };
 
 } // namespace nv
