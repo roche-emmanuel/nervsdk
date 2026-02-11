@@ -45,9 +45,13 @@ class GLTFAsset : public RefObject {
     [[nodiscard]] auto resolve_path(const String& uri) const -> String;
 
     // File I/O
-    void load(const char* path, bool load_buffers = true);
-    void load_gltf(const char* path, bool load_buffers = true);
-    void load_glb(const char* path);
+    void load(const char* path, bool load_buffers = true,
+              bool forceAllowSystem = false);
+    void load_gltf(const char* path, bool load_buffers = true,
+                   bool forceAllowSystem = false);
+    void load_glb(const char* path, bool forceAllowSystem = false);
+    void load_from_json(const Json& data, U8Vector* glb_bin_chunk = nullptr);
+    void load_glb_from_memory(const U8Vector& content);
 
     auto write_json() const -> Json;
     void save(const char* path) const;
@@ -156,8 +160,6 @@ class GLTFAsset : public RefObject {
     static constexpr uint32_t GLB_VERSION = 2;
     static constexpr uint32_t GLB_CHUNK_JSON = 0x4E4F534A;
     static constexpr uint32_t GLB_CHUNK_BIN = 0x004E4942;
-
-    void load_from_json(const Json& data, U8Vector* glb_bin_chunk = nullptr);
 };
 
 } // namespace nv

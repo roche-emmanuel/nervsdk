@@ -275,15 +275,16 @@ GLTFAsset::GLTFAsset(const char* path, bool load_buffers) {
 
 GLTFAsset::~GLTFAsset() { clear(); }
 
-void GLTFAsset::load(const char* path, bool load_buffers) {
+void GLTFAsset::load(const char* path, bool load_buffers,
+                     bool forceAllowSystem) {
     String path_str(path);
 
     // Check file extension to determine format
     if (path_str.size() >= 4 &&
         path_str.substr(path_str.size() - 4) == ".glb") {
-        load_glb(path);
+        load_glb(path, forceAllowSystem);
     } else {
-        load_gltf(path, load_buffers);
+        load_gltf(path, load_buffers, forceAllowSystem);
     }
 }
 
@@ -354,18 +355,16 @@ void GLTFAsset::load_from_json(const Json& data, U8Vector* glb_bin_chunk) {
     }
 }
 
-void GLTFAsset::load_gltf(const char* path, bool load_buffers) {
+void GLTFAsset::load_gltf(const char* path, bool load_buffers,
+                          bool forceAllowSystem) {
     clear();
 
-    auto data = read_json_file(path);
+    auto data = read_json_file(path, forceAllowSystem);
     load_from_json(data);
 }
 
-void GLTFAsset::load_glb(const char* path) {
+void GLTFAsset::load_glb_from_memory(const U8Vector& content) {
     clear();
-
-    U8Vector content = nv::read_virtual_binary_file(path);
-
     NVCHK(content.size() >= sizeof(GLBHeader),
           "File too small to be valid GLB");
 
@@ -425,6 +424,11 @@ void GLTFAsset::load_glb(const char* path) {
 
     // --- Unified JSON loading ---
     load_from_json(data, bin_data.empty() ? nullptr : &bin_data);
+}
+
+void GLTFAsset::load_glb(const char* path, bool forceAllowSystem) {
+    U8Vector content = nv::read_virtual_binary_file(path, forceAllowSystem);
+    load_glb_from_memory(content);
 }
 
 void GLTFAsset::update_all_position_bounds() const {
