@@ -57,7 +57,7 @@ class GLTFAsset : public RefObject {
     void save(const char* path) const;
     void save_gltf(const char* path) const;
     void save_glb(const char* path) const;
-    auto save_to_memory() const -> String;
+    auto save_to_memory(bool glbFormat) const -> String;
     void validate() const;
 
     static auto create() -> RefPtr<GLTFAsset>;
@@ -160,6 +160,8 @@ class GLTFAsset : public RefObject {
     static constexpr uint32_t GLB_VERSION = 2;
     static constexpr uint32_t GLB_CHUNK_JSON = 0x4E4F534A;
     static constexpr uint32_t GLB_CHUNK_BIN = 0x004E4942;
+
+    auto save_glb_to_memory() const -> String;
 };
 
 } // namespace nv

@@ -558,70 +558,98 @@ void GLTFAsset::save_gltf(const char* path) const {
     nv::write_json_file(path, data);
 }
 
-void GLTFAsset::save_glb(const char* path) const {
-    // Before writing the data we should disable base64 data uri writing in the
-    // first buffer:
+auto GLTFAsset::save_glb_to_memory() const -> String {
+    // Disable base64 writing for first buffer (GLB uses binary chunk)
     if (!_buffers.empty()) {
         _buffers[0]->set_write_base64(false);
     }
 
-    auto json_data = write_json();
+    // --- Serialize JSON ---
+    Json json_data = write_json();
     String json_str = json_data.dump();
 
-    // Pad JSON to 4-byte alignment with spaces
-    while (json_str.size() % 4 != 0) {
+    // Pad JSON to 4-byte alignment with spaces (per GLB spec)
+    while (json_str.size() % 4 != 0)
         json_str += ' ';
-    }
 
-    // Get binary buffer data (first buffer only for GLB)
+    uint32_t json_length = static_cast<uint32_t>(json_str.size());
+
+    // --- Get BIN data (first buffer only) ---
     U8Vector bin_data;
+
     if (!_buffers.empty()) {
         const auto& buffer = _buffers[0];
-        bin_data.assign(buffer->data(), buffer->data() + buffer->size());
 
-        // Pad BIN to 4-byte alignment with zeros
-        while (bin_data.size() % 4 != 0) {
-            bin_data.push_back(0);
+        if (buffer->size() > 0) {
+            bin_data.assign(buffer->data(), buffer->data() + buffer->size());
+
+            // Pad BIN to 4-byte alignment with zeros
+            while (bin_data.size() % 4 != 0)
+                bin_data.push_back(0);
         }
     }
 
-    // Calculate sizes
-    uint32_t json_length = static_cast<uint32_t>(json_str.size());
     uint32_t bin_length = static_cast<uint32_t>(bin_data.size());
+
+    // --- Compute total GLB size ---
     uint32_t total_length =
         sizeof(GLBHeader) + sizeof(GLBChunkHeader) + json_length;
 
-    if (bin_length > 0) {
+    if (bin_length > 0)
         total_length += sizeof(GLBChunkHeader) + bin_length;
-    }
 
-    // Write file
-    std::ofstream file(path, std::ios::binary);
-    if (!file) {
-        throw std::runtime_error("Failed to create GLB file");
-    }
+    // --- Allocate final buffer ---
+    String output;
+    output.resize(total_length);
 
-    // Write GLB header
-    GLBHeader header{
-        .magic = GLB_MAGIC, .version = GLB_VERSION, .length = total_length};
-    file.write(reinterpret_cast<const char*>(&header), sizeof(GLBHeader));
+    char* ptr = output.data();
 
-    // Write JSON chunk
-    GLBChunkHeader json_chunk{.length = json_length, .type = GLB_CHUNK_JSON};
-    file.write(reinterpret_cast<const char*>(&json_chunk),
-               sizeof(GLBChunkHeader));
-    file.write(json_str.data(), json_length);
+    // --- Write GLB Header ---
+    GLBHeader header;
+    header.magic = GLB_MAGIC;
+    header.version = GLB_VERSION;
+    header.length = total_length;
 
-    // Write BIN chunk if we have buffer data
+    std::memcpy(ptr, &header, sizeof(GLBHeader));
+    ptr += sizeof(GLBHeader);
+
+    // --- Write JSON Chunk Header ---
+    GLBChunkHeader json_chunk;
+    json_chunk.length = json_length;
+    json_chunk.type = GLB_CHUNK_JSON;
+
+    std::memcpy(ptr, &json_chunk, sizeof(GLBChunkHeader));
+    ptr += sizeof(GLBChunkHeader);
+
+    // --- Write JSON Data ---
+    std::memcpy(ptr, json_str.data(), json_length);
+    ptr += json_length;
+
+    // --- Write BIN Chunk (if present) ---
     if (bin_length > 0) {
-        GLBChunkHeader bin_chunk{.length = bin_length, .type = GLB_CHUNK_BIN};
-        file.write(reinterpret_cast<const char*>(&bin_chunk),
-                   sizeof(GLBChunkHeader));
-        file.write(reinterpret_cast<const char*>(bin_data.data()), bin_length);
+        GLBChunkHeader bin_chunk;
+        bin_chunk.length = bin_length;
+        bin_chunk.type = GLB_CHUNK_BIN;
+
+        std::memcpy(ptr, &bin_chunk, sizeof(GLBChunkHeader));
+        ptr += sizeof(GLBChunkHeader);
+
+        std::memcpy(ptr, bin_data.data(), bin_length);
+        ptr += bin_length;
     }
+
+    return output;
 }
 
-auto GLTFAsset::save_to_memory() const -> String {
+void GLTFAsset::save_glb(const char* path) const {
+    String data = save_glb_to_memory();
+    nv::write_file(path, data);
+}
+
+auto GLTFAsset::save_to_memory(bool glbFormat) const -> String {
+    if (glbFormat) {
+        return save_glb_to_memory();
+    }
     auto data = write_json();
     return data.dump();
 };

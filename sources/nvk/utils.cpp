@@ -190,11 +190,10 @@ void write_file(const char* fname, const String& content, bool createFolders) {
         auto folder = get_parent_folder(fname);
         NVCHK(create_folders(folder), "Could not create folder {}", folder);
     }
-    std::ofstream t(fname, std::ios::out | std::ios::binary);
+    std::ofstream t(fname, std::ios::binary);
     NVCHK(t.is_open(), "Cannot write file {}", fname);
 
-    t << content;
-    t.close();
+    t.write(content.data(), static_cast<std::streamsize>(content.size()));
 }
 
 void write_binary_file(const char* fname, const U8Vector& content,
