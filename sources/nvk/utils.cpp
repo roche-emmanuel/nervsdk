@@ -715,7 +715,7 @@ auto read_config_file(const String& fname, bool forceAllowSystem) -> Json {
 }
 
 auto create_folders(const String& fullpath) -> bool {
-    if (system_dir_exists(fullpath.c_str())) {
+    if (fullpath.empty() || system_dir_exists(fullpath.c_str())) {
         return true;
     }
     return std::filesystem::create_directories(fullpath.c_str());
