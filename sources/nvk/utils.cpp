@@ -396,11 +396,15 @@ auto glob_to_regex(const String& pattern) -> String {
     return regex_pattern;
 }
 
-static auto expand_single_wildcard(const String& pattern) -> Set<String> {
+static auto expand_single_wildcard(const String& sourceDir,
+                                   const String& pattern) -> Set<String> {
     Set<String> matched_files;
 
     // Normalize path separators to forward slashes
-    String normalized_pattern = pattern;
+    String base_dir = sourceDir;
+    std::ranges::replace(base_dir, '\\', '/');
+
+    String normalized_pattern = get_path(base_dir, pattern);
     std::ranges::replace(normalized_pattern, '\\', '/');
 
     // Check if pattern contains wildcards
@@ -415,7 +419,6 @@ static auto expand_single_wildcard(const String& pattern) -> Set<String> {
     bool recursive = (normalized_pattern.find("**") != String::npos);
 
     // Find base directory - the last static path before any wildcard
-    String base_dir = ".";
     size_t first_wildcard = normalized_pattern.find_first_of("*?");
 
     if (first_wildcard != String::npos) {
@@ -500,7 +503,8 @@ static auto expand_single_wildcard(const String& pattern) -> Set<String> {
 }
 
 // Main entry point that handles brace expansion first
-auto expand_files_wildcard(const String& pattern) -> Set<String> {
+auto expand_files_wildcard(const String& sourceDir, const String& pattern)
+    -> Set<String> {
     Set<String> all_matched_files;
 
     // First expand braces
@@ -508,7 +512,7 @@ auto expand_files_wildcard(const String& pattern) -> Set<String> {
 
     // Then expand wildcards for each pattern
     for (const auto& expanded_pattern : expanded_patterns) {
-        auto matched = expand_single_wildcard(expanded_pattern);
+        auto matched = expand_single_wildcard(sourceDir, expanded_pattern);
         all_matched_files.insert(matched.begin(), matched.end());
     }
 
