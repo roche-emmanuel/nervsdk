@@ -9,6 +9,7 @@ namespace nv {
 // Structure for file entry in the pack
 struct FileEntry {
     String name;
+    String sourceFile;
     U32 offset;
     U32 originalSize;
     U32 compressedSize;
@@ -44,7 +45,7 @@ class ResourcePacker : public RefObject {
         : AES_KEY(key), AES_IV(iv), outputPath(outPath) {}
 
     // Add a file to the pack
-    void add_file(const String& filePath);
+    void add_file(const String& filePath, const String& entryName);
 
     // Create the pack file
     void pack();

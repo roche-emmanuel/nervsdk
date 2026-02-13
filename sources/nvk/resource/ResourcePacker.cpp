@@ -85,7 +85,7 @@ auto ResourcePacker::encrypt_data(const U8Vector& input) -> U8Vector {
     return encrypted;
 }
 
-void ResourcePacker::add_file(const String& filePath) {
+void ResourcePacker::add_file(const String& filePath, const String& entryName) {
     std::ifstream file(filePath, std::ios::binary);
     if (!file) {
         std::cerr << "Failed to open file: " << filePath << std::endl;
@@ -100,7 +100,8 @@ void ResourcePacker::add_file(const String& filePath) {
     // Prepare file entry
     FileEntry entry;
     // entry.name = std::filesystem::path(filePath).filename().string();
-    entry.name = filePath;
+    entry.name = entryName;
+    entry.sourceFile = filePath;
     entry.originalSize = content.size();
 
     // Compress the data
@@ -191,7 +192,10 @@ void ResourcePacker::pack() {
     U32 tsize = 0;
     for (const auto& entry : fileEntries) {
         // Read original file
-        std::ifstream file(entry.name, std::ios::binary);
+        NVCHK(system_file_exists(entry.sourceFile.c_str()),
+              "Invalid source file for pack entry: {}",
+              entry.sourceFile.c_str());
+        std::ifstream file(entry.sourceFile, std::ios::binary);
         U8Vector content((std::istreambuf_iterator<char>(file)),
                          std::istreambuf_iterator<char>());
 

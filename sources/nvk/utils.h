@@ -20,8 +20,10 @@ auto fromHex(const String& hex) -> U8Vector;
 auto glob_to_regex(const String& pattern) -> String;
 
 // Helper function to expand file wildcards
-auto expand_files_wildcard(const String& sourceDir, const std::string& pattern)
+auto expand_files_wildcard(const String& sourceDir, const String& pattern)
     -> Set<String>;
+
+auto get_relative_path(const String& filepath, const String& parent) -> String;
 
 // Sleep functions
 void sleep_s(U32 secs);

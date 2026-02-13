@@ -1029,4 +1029,18 @@ auto fromHex(const String& hex) -> U8Vector {
     return bytes;
 };
 
+auto get_relative_path(const String& filepath, const String& parent) -> String {
+    namespace fs = std::filesystem;
+
+    fs::path file_path(filepath);
+    fs::path parent_path(parent);
+
+    // Get relative path
+    fs::path relative = fs::relative(file_path, parent_path);
+
+    auto res = relative.string();
+    std::ranges::replace(res, '\\', '/');
+    return res;
+}
+
 } // namespace nv
