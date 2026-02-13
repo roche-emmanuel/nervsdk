@@ -261,6 +261,20 @@ using Ranged = Range<F64>;
 using Rangei = Range<I32>;
 using Rangeu = Range<U32>;
 
+template <typename T>
+inline void to_json(nlohmann::json& j, const Range<T>& range) {
+    j = nlohmann::json{
+        {"xmin", range.xmin},
+        {"xmax", range.xmax},
+    };
+}
+
+template <typename T>
+inline void from_json(const nlohmann::json& j, Range<T>& range) {
+    j.at("xmin").get_to(range.xmin);
+    j.at("xmax").get_to(range.xmax);
+}
+
 } // end of namespace nv
 
 namespace std {
