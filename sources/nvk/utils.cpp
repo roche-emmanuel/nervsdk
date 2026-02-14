@@ -980,8 +980,12 @@ auto get_virtual_files(const String& directory, const std::regex& pattern,
     return ResourceManager::instance().get_files(directory, pattern, recursive);
 };
 
-auto get_filename(const String& full_path) -> String {
-    return std::filesystem::path(full_path).filename().string();
+auto get_filename(const String& full_path, bool withExt) -> String {
+    auto path = std::filesystem::path(full_path);
+    if (withExt) {
+        return path.filename().string();
+    }
+    return path.stem().string();
 }
 
 auto toHex(const U8Vector& data) -> String {
