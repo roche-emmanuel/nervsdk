@@ -917,6 +917,11 @@ auto get_files(const String& directory, const std::regex& pattern,
                bool recursive) -> Vector<String> {
     Vector<String> files;
 
+    if (!system_dir_exists(directory.c_str())) {
+        // Nothing to search:
+        return files;
+    }
+
     if (recursive) {
         for (const auto& entry :
              std::filesystem::recursive_directory_iterator(directory)) {
