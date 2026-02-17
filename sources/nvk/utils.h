@@ -9,6 +9,9 @@
 
 namespace nv {
 
+// Returns current physical RAM usage in bytes, or 0 on failure.
+auto get_current_rss() -> U64;
+
 auto base64_encode(const U8* data, size_t len) -> String;
 auto base64_encode(const Vector<U8>& data) -> String;
 auto base64_decode(const String& encoded_string) -> Vector<U8>;

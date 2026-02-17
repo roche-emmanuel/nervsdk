@@ -7,6 +7,22 @@
 #include <charconv>
 #include <codecvt>
 
+#include <cstddef>
+
+#if defined(_WIN32)
+#include <psapi.h>
+#include <windows.h>
+#pragma comment(lib, "psapi.lib")
+
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+
+#elif defined(__linux__)
+#include <fstream>
+#include <string>
+
+#endif
+
 namespace YAML {
 #if !NV_USE_STD_MEMORY
 template <> struct convert<nv::String> {
@@ -31,6 +47,43 @@ namespace fs = std::filesystem;
 #define BUFSIZE 4096
 
 namespace nv {
+
+auto get_current_rss() -> U64 {
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS_EX pmc{};
+    pmc.cb = sizeof(pmc);
+    if (!GetProcessMemoryInfo(GetCurrentProcess(),
+                              reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc),
+                              sizeof(pmc)))
+        return 0;
+    return pmc.WorkingSetSize;
+
+#elif defined(__APPLE__)
+    mach_task_basic_info info{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                  reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS)
+        return 0;
+    return info.resident_size;
+
+#elif defined(__linux__)
+    // /proc/self/smaps_rollup gives PSS — proportional set size.
+    // Unlike RSS, shared pages (libc, etc.) are divided by the number of
+    // processes sharing them, so this reflects your process's true RAM cost.
+    // smaps_rollup is a pre-summed single-read file (kernel 4.14+);
+    // it's far cheaper than parsing the full /proc/self/smaps.
+    std::ifstream f("/proc/self/smaps_rollup");
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.compare(0, 4, "Pss:") == 0)
+            return std::stoul(line.substr(4)) * 1024; // kB → bytes
+    }
+    return 0;
+
+#else
+    return 0;
+#endif
+}
 
 // Base64 encoding table
 static const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
