@@ -325,6 +325,15 @@ template <> inline auto Vec2<U32>::normalize() -> value_t {
     return norm;
 }
 
+inline void to_json(nlohmann::json& j, const Vec2d& vec) {
+    j = nlohmann::json::array({vec.x(), vec.y()});
+}
+
+inline void from_json(const nlohmann::json& j, Vec2d& vec) {
+    j.at(0).get_to(vec.x());
+    j.at(1).get_to(vec.y());
+}
+
 } // end of namespace nv
 
 namespace std {
