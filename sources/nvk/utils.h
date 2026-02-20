@@ -141,9 +141,16 @@ auto make_extensions_regex(const Vector<String>& extensions) -> std::regex;
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
 
-auto ecefToLLA(const Vec3d& xyz, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+// Forward/Right/Up to LLA
+auto fruToLLA(const Vec3d& xyz, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+auto llaToFRU(const Vec3d& lla, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
 
-auto llaToECEF(const Vec3d& lla, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+// Forward/Left/Up to LLA
+auto fluToLLA(const Vec3d& xyz, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+auto llaToFLU(const Vec3d& lla, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+
+// Align a given byte size to alignment boundaries:
+auto align_element_size(U32 elemSize, U32 alignment) -> U32;
 
 // Support to concatenate path elements:
 template <typename T, typename V>

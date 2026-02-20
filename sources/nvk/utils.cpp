@@ -1105,7 +1105,7 @@ auto get_relative_path(const String& filepath, const String& parent) -> String {
     return res;
 }
 
-auto ecefToLLA(const Vec3d& xyz, F64 radius) -> Vec3d {
+auto fluToLLA(const Vec3d& xyz, F64 radius) -> Vec3d {
 
     Vec3d vec{xyz};
     F64 R = vec.normalize();
@@ -1115,7 +1115,7 @@ auto ecefToLLA(const Vec3d& xyz, F64 radius) -> Vec3d {
     return {phi, theta, R - radius};
 }
 
-auto llaToECEF(const Vec3d& lla, F64 radius) -> Vec3d {
+auto llaToFLU(const Vec3d& lla, F64 radius) -> Vec3d {
 
     F64 sinlat = sin(lla.x());
     F64 coslat = cos(lla.x());
@@ -1126,11 +1126,32 @@ auto llaToECEF(const Vec3d& lla, F64 radius) -> Vec3d {
     return {-coslat * coslon * R, -coslat * sinlon * R, sinlat * R};
 }
 
+auto fruToLLA(const Vec3d& xyz, F64 radius) -> Vec3d {
+
+    Vec3d vec{xyz};
+    F64 R = vec.normalize();
+
+    F64 phi = asin(vec.z());
+    F64 theta = atan2(vec.y(), -vec.x());
+    return {phi, theta, R - radius};
+}
+
+auto llaToFRU(const Vec3d& lla, F64 radius) -> Vec3d {
+
+    F64 sinlat = sin(lla.x());
+    F64 coslat = cos(lla.x());
+    F64 sinlon = sin(lla.y());
+    F64 coslon = cos(lla.y());
+
+    F64 R = radius + lla.z();
+    return {-coslat * coslon * R, coslat * sinlon * R, sinlat * R};
+}
+
 auto get_neu_frame(const Vec3d& pos, const Vec3d& worldUp) -> Mat4d {
     // Compute local up:
     auto up = pos.normalized();
 
-    // Compute west dir:
+    // Compute east dir:
     auto east = worldUp.cross(up).normalized();
 
     // Compute north dir:
@@ -1140,5 +1161,9 @@ auto get_neu_frame(const Vec3d& pos, const Vec3d& worldUp) -> Mat4d {
             up.y(),    pos.y(),  north.z(), east.z(), up.z(),    pos.z(),
             0.0,       0.0,      0.0,       1.0};
 };
+
+auto align_element_size(U32 elemSize, U32 alignment) -> U32 {
+    return (elemSize + alignment - 1) & ~(alignment - 1);
+}
 
 } // namespace nv
