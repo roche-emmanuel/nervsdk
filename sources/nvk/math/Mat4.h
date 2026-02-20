@@ -1619,6 +1619,9 @@ inline auto to_mat4d(const Mat4f& mat) -> Mat4d {
     return res;
 }
 
+// Get North/East/Up frame:
+auto get_neu_frame(const Vec3d& pos, const Vec3d& worldUp) -> Mat4d;
+
 } // namespace nv
 
 // Custom formatter for the Matrix4x4 class

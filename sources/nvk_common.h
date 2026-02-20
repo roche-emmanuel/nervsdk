@@ -17,6 +17,10 @@
 
 #include <nvk_enums.h>
 
+#include <nvk/math/Vec2.h>
+#include <nvk/math/Vec3.h>
+#include <nvk/math/Vec4.h>
+
 #include <nvk/utils.h>
 
 #include <nvk/log/LogManager.h>
@@ -31,9 +35,6 @@
 #include <nvk/math/Range.h>
 #include <nvk/math/Spline2.h>
 #include <nvk/math/Spline3.h>
-#include <nvk/math/Vec2.h>
-#include <nvk/math/Vec3.h>
-#include <nvk/math/Vec4.h>
 
 #include <nvk/base/RandGen.h>
 

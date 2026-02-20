@@ -141,6 +141,10 @@ auto make_extensions_regex(const Vector<String>& extensions) -> std::regex;
 // Replace all instances of a given string inside another string:
 void replace_all(String& str, const String& old_value, const String& new_value);
 
+auto ecefToLLA(const Vec3d& xyz, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+
+auto llaToECEF(const Vec3d& lla, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
+
 // Support to concatenate path elements:
 template <typename T, typename V>
 auto get_path(const T& arg0, const V& arg1) -> String {

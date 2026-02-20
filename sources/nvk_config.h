@@ -21,7 +21,8 @@
 namespace nv {
 
 constexpr double SPHERICAL_EARTH_RADIUS = 6360000.0;
+constexpr double MEAN_EARTH_RADIUS = 6371000.0;
 
-}
+} // namespace nv
 
 #endif
