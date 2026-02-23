@@ -218,24 +218,28 @@ template <typename T> struct Vec3 {
      */
     inline auto normalize() -> value_t {
         value_t norm = Vec3::length();
-        if (norm > 0.0) {
-            value_t inv = 1.0F / norm;
+        if (norm > std::numeric_limits<value_t>::epsilon() *
+                       static_cast<value_t>(100)) {
+            value_t inv = 1.0 / norm;
             _v[0] *= inv;
             _v[1] *= inv;
             _v[2] *= inv;
+            return norm;
         }
-        return (norm);
+        return static_cast<value_t>(0);
     }
 
     inline auto normalize(value_t newLen) -> value_t {
         value_t norm = Vec3::length();
-        if (norm > 0.0) {
+        if (norm > std::numeric_limits<value_t>::epsilon() *
+                       static_cast<value_t>(100)) {
             value_t inv = newLen / norm;
             _v[0] *= inv;
             _v[1] *= inv;
             _v[2] *= inv;
+            return norm;
         }
-        return (norm);
+        return static_cast<value_t>(0);
     }
 
     inline auto normalized() const -> Vec3 {

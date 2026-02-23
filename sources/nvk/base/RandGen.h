@@ -26,6 +26,16 @@ class RandGen {
         }
     }
 
+    // Lognormal: mu and sigma are the mean and stddev of the *underlying
+    // normal*
+    // E.g. mu=1.5, sigma=0.6 gives a median of ~4.5 floors with a long right
+    // tail
+    template <typename T>
+    [[nodiscard]] auto lognormal(T mu, T sigma) const -> T {
+        std::lognormal_distribution<T> dis(mu, sigma);
+        return dis(_gen);
+    }
+
     // Vec2 array filler
     template <typename T>
     void uniform_real_array(Vec2<T>* ptr, U32 num, Vec2<T> min = Vec2<T>(0.0F),
