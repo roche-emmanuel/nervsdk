@@ -9,6 +9,11 @@
 
 #include <cstddef>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/heap.h>
+#include <malloc.h>
+#endif
+
 #if defined(_WIN32)
 #include <psapi.h>
 #include <windows.h>
@@ -65,6 +70,13 @@ auto get_current_rss() -> U64 {
                   reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS)
         return 0;
     return info.resident_size;
+
+#elif defined(__EMSCRIPTEN__)
+    // return static_cast<U64>(emscripten_get_heap_size() -
+    //                         emscripten_get_free_buffer_size());
+
+    struct mallinfo mi = mallinfo();
+    return static_cast<U64>(mi.uordblks);
 
 #elif defined(__linux__)
     // /proc/self/smaps_rollup gives PSS — proportional set size.
