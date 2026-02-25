@@ -963,17 +963,21 @@ auto get_files(const String& directory, bool recursive) -> Vector<String> {
         for (const auto& entry :
              std::filesystem::recursive_directory_iterator(directory)) {
             if (std::filesystem::is_regular_file(entry)) {
-                files.push_back(entry.path().string().c_str());
+                files.emplace_back(entry.path().string().c_str());
             }
         }
     } else {
         for (const auto& entry :
              std::filesystem::directory_iterator(directory)) {
             if (std::filesystem::is_regular_file(entry)) {
-                files.push_back(entry.path().string().c_str());
+                files.emplace_back(entry.path().string().c_str());
             }
         }
     }
+
+    // Avoid duplicates:
+    std::sort(files.begin(), files.end());
+    files.erase(std::unique(files.begin(), files.end()), files.end());
 
     return files;
 }
@@ -1008,6 +1012,10 @@ auto get_files(const String& directory, const std::regex& pattern,
             }
         }
     }
+
+    // Avoid duplicates:
+    std::sort(files.begin(), files.end());
+    files.erase(std::unique(files.begin(), files.end()), files.end());
 
     return files;
 }
