@@ -399,6 +399,19 @@ using Vec4d = Vec4<F64>;
 using Vec4i = Vec4<I32>;
 using Vec4u = Vec4<U32>;
 
+template <typename T>
+inline void to_json(nlohmann::json& j, const Vec4<T>& vec) {
+    j = nlohmann::json::array({vec.x(), vec.y(), vec.z(), vec.w()});
+}
+
+template <typename T>
+inline void from_json(const nlohmann::json& j, Vec4<T>& vec) {
+    j.at(0).get_to(vec.x());
+    j.at(1).get_to(vec.y());
+    j.at(2).get_to(vec.z());
+    j.at(3).get_to(vec.w());
+}
+
 } // namespace nv
 
 namespace std {
