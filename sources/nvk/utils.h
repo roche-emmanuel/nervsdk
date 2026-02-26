@@ -152,6 +152,8 @@ auto llaToFLU(const Vec3d& lla, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
 // Align a given byte size to alignment boundaries:
 auto align_element_size(U32 elemSize, U32 alignment) -> U32;
 
+auto color_to_f32(const Vec4f& col) -> F32;
+
 // Support to concatenate path elements:
 template <typename T, typename V>
 auto get_path(const T& arg0, const V& arg1) -> String {

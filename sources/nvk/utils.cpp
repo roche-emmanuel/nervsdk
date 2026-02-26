@@ -1186,4 +1186,18 @@ auto align_element_size(U32 elemSize, U32 alignment) -> U32 {
     return (elemSize + alignment - 1) & ~(alignment - 1);
 }
 
+auto color_to_f32(const Vec4f& col) -> F32 {
+    // Pack color components into bytes
+    U8 bytes[4];
+    bytes[0] = static_cast<U8>(std::clamp(col.x() * 255.0F, 0.0F, 255.0F));
+    bytes[1] = static_cast<U8>(std::clamp(col.y() * 255.0F, 0.0F, 255.0F));
+    bytes[2] = static_cast<U8>(std::clamp(col.z() * 255.0F, 0.0F, 255.0F));
+    bytes[3] = static_cast<U8>(std::clamp(col.w() * 255.0F, 0.0F, 255.0F));
+
+    // Safe type punning
+    F32 res = NAN;
+    std::memcpy(&res, bytes, sizeof(F32));
+    return res;
+}
+
 } // namespace nv
