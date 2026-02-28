@@ -18,7 +18,8 @@ using IStringStream = std::istringstream;
 
 template <typename T> using List = std::list<T>;
 
-template <typename T> using Set = std::set<T>;
+template <typename T, typename Comp = std::less<T>>
+using Set = std::set<T, Comp>;
 template <typename T> using UnorderedSet = std::unordered_set<T>;
 
 template <typename Key, typename T> using Map = std::map<Key, T>;
@@ -46,8 +47,9 @@ using IStringStream =
 template <typename T, typename MemAlloc = DefaultPoolAllocator>
 using List = std::list<T, STLAllocator<T, MemAlloc>>;
 
-template <typename T, typename MemAlloc = DefaultPoolAllocator>
-using Set = std::set<T, std::less<T>, STLAllocator<T, MemAlloc>>;
+template <typename T, typename Comp = std::less<T>,
+          typename MemAlloc = DefaultPoolAllocator>
+using Set = std::set<T, Comp, STLAllocator<T, MemAlloc>>;
 
 template <typename T, typename MemAlloc = DefaultPoolAllocator>
 using UnorderedSet =
