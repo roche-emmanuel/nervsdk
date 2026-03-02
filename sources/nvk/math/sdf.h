@@ -12,8 +12,11 @@ namespace nv {
 // p: 2d position of the point.
 // b: half width/height of the box.
 // r: border radius: x=top-right, y=bottom-right, z=top-left, w=bottom-left
+// r: border radius: tl, tr, br, bl
 template <typename T>
-auto sd_rounded_box(const Vec2<T>& p, const Vec2<T>& b, const Vec4<T>& r) -> T {
+auto sd_rounded_box(const Vec2<T>& p, const Vec2<T>& b, const Vec4<T>& rIn)
+    -> T {
+    auto r = Vec4<T>{rIn.y(), rIn.z(), rIn.x(), rIn.w()};
     auto rxy = (p.x() > 0.0) ? r.xy() : r.zw();
     auto radius = (p.y() > 0.0) ? rxy.x() : rxy.y();
     auto q = p.abs() - b + Vec2<T>(radius);
