@@ -345,6 +345,8 @@ template <typename T> struct Vec4 {
     /** Quick accessors */
     [[nodiscard]] auto xyz() const -> Vec3<T> { return {_v[0], _v[1], _v[2]}; }
     [[nodiscard]] auto xy() const -> Vec2<T> { return {_v[0], _v[1]}; }
+    [[nodiscard]] auto xw() const -> Vec2<T> { return {_v[0], _v[3]}; }
+    [[nodiscard]] auto zy() const -> Vec2<T> { return {_v[2], _v[1]}; }
     [[nodiscard]] auto xz() const -> Vec2<T> { return {_v[0], _v[2]}; }
     [[nodiscard]] auto zw() const -> Vec2<T> { return {_v[2], _v[3]}; }
     [[nodiscard]] auto yw() const -> Vec2<T> { return {_v[1], _v[3]}; }
