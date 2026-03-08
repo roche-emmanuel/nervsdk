@@ -119,6 +119,13 @@ class RandGen {
         return res;
     }
 
+    template <typename T>
+    [[nodiscard]] auto uniform_disc(T radius) const -> Vec2<T> {
+        auto theta = uniform_real(T(0), T(nv::PI * 2.0));
+        auto r = std::sqrt(uniform_real(T(0), T(1))) * radius;
+        return {r * std::cos(theta), r * std::sin(theta)};
+    }
+
   private:
     mutable std::mt19937 _gen;
     mutable std::uniform_real_distribution<F64> _udis{0.0, 1.0};
