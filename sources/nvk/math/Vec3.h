@@ -423,11 +423,13 @@ constexpr Vec3d VEC3D_XAXIS{1.0, 0.0, 0.0};
 constexpr Vec3d VEC3D_YAXIS{0.0, 1.0, 0.0};
 constexpr Vec3d VEC3D_ZAXIS{0.0, 0.0, 1.0};
 
-inline void to_json(nlohmann::json& j, const Vec3d& vec) {
+template <typename T>
+inline void to_json(nlohmann::json& j, const Vec3<T>& vec) {
     j = nlohmann::json::array({vec.x(), vec.y(), vec.z()});
 }
 
-inline void from_json(const nlohmann::json& j, Vec3d& vec) {
+template <typename T>
+inline void from_json(const nlohmann::json& j, Vec3<T>& vec) {
     j.at(0).get_to(vec.x());
     j.at(1).get_to(vec.y());
     j.at(2).get_to(vec.z());

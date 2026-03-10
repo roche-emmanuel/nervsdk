@@ -325,11 +325,13 @@ template <> inline auto Vec2<U32>::normalize() -> value_t {
     return norm;
 }
 
-inline void to_json(nlohmann::json& j, const Vec2d& vec) {
+template <typename T>
+inline void to_json(nlohmann::json& j, const Vec2<T>& vec) {
     j = nlohmann::json::array({vec.x(), vec.y()});
 }
 
-inline void from_json(const nlohmann::json& j, Vec2d& vec) {
+template <typename T>
+inline void from_json(const nlohmann::json& j, Vec2<T>& vec) {
     j.at(0).get_to(vec.x());
     j.at(1).get_to(vec.y());
 }
