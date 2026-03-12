@@ -227,7 +227,6 @@ void ResourceUnpacker::decompress_data(const U8Vector& input, U8* destData,
     zs.next_in = (Bytef*)input.data();
     zs.avail_in = static_cast<uInt>(input.size());
 
-    U8Vector decompressed(originalSize);
     zs.next_out = (Bytef*)destData;
     zs.avail_out = originalSize;
 
@@ -276,83 +275,95 @@ auto ResourceUnpacker::decrypt_data(const U8Vector& input) -> U8Vector {
 
 ResourceUnpacker::ResourceUnpacker(const String& packFilePath,
                                    const U8Vector& key, const U8Vector& iv)
-    : _filename(packFilePath), AES_KEY(key), AES_IV(iv) {
-    packFile.open(packFilePath, std::ios::binary);
-    NVCHK(packFile.is_open(), "Failed to open pack file {}", packFilePath);
+    : _filename(packFilePath), AES_KEY(key), AES_IV(iv) {}
 
-    // Read and verify header
-    char magic[5];
-    packFile.read(magic, 5);
-    String magicStr(magic, 5);
+auto ResourceUnpacker::get_file_table()
+    -> const UnorderedMap<String, FileEntry>& {
+    if (!_initialized) {
+        _packFile.open(_filename, std::ios::binary);
+        NVCHK(_packFile.is_open(), "Failed to open pack file {}", _filename);
 
-    NVCHK(magicStr == "NVPCK" || magicStr == "NVPKX",
-          "Invalid pack file format: {}", magicStr);
+        // Read and verify header
+        char magic[5];
+        _packFile.read(magic, 5);
+        String magicStr(magic, 5);
 
-    bool isV2Format = (magicStr == "NVPKX");
+        NVCHK(magicStr == "NVPCK" || magicStr == "NVPKX",
+              "Invalid pack file format: {}", magicStr);
 
-    if (isV2Format) {
-        // Read package version
-        packFile.read(reinterpret_cast<char*>(&packageVersion),
-                      sizeof(packageVersion));
+        bool isV2Format = (magicStr == "NVPKX");
 
-        // Read encrypted metadata
-        U32 encryptedMetadataLength;
-        packFile.read(reinterpret_cast<char*>(&encryptedMetadataLength),
-                      sizeof(encryptedMetadataLength));
+        if (isV2Format) {
+            // Read package version
+            _packFile.read(reinterpret_cast<char*>(&packageVersion),
+                           sizeof(packageVersion));
 
-        U8Vector encryptedMetadata(encryptedMetadataLength);
-        packFile.read(reinterpret_cast<char*>(encryptedMetadata.data()),
-                      encryptedMetadataLength);
+            // Read encrypted metadata
+            U32 encryptedMetadataLength;
+            _packFile.read(reinterpret_cast<char*>(&encryptedMetadataLength),
+                           sizeof(encryptedMetadataLength));
 
-        // Decrypt metadata
-        U8Vector decryptedMetadata = decrypt_data(encryptedMetadata);
-        metadata = String(decryptedMetadata.begin(), decryptedMetadata.end());
+            U8Vector encryptedMetadata(encryptedMetadataLength);
+            _packFile.read(reinterpret_cast<char*>(encryptedMetadata.data()),
+                           encryptedMetadataLength);
 
-        logDEBUG("Pack version: {}, metadata length: {}", packageVersion,
-                 metadata.length());
-    } else {
-        // Version 1 format - no version/metadata
-        packageVersion = 0;
-        metadata = "";
-        logDEBUG("Loading legacy v1 format pack");
+            // Decrypt metadata
+            U8Vector decryptedMetadata = decrypt_data(encryptedMetadata);
+            metadata =
+                String(decryptedMetadata.begin(), decryptedMetadata.end());
+
+            logDEBUG("Pack version: {}, metadata length: {}", packageVersion,
+                     metadata.length());
+        } else {
+            // Version 1 format - no version/metadata
+            packageVersion = 0;
+            metadata = "";
+            logDEBUG("Loading legacy v1 format pack");
+        }
+
+        // Read file count
+        U32 fileCount;
+        _packFile.read(reinterpret_cast<char*>(&fileCount), sizeof(fileCount));
+
+        logDEBUG("Reading file table with {} entries.", fileCount);
+
+        // Read file table (same for both versions)
+        for (U32 i = 0; i < fileCount; i++) {
+            U32 nameLength;
+            _packFile.read(reinterpret_cast<char*>(&nameLength),
+                           sizeof(nameLength));
+
+            Vector<char> nameBuffer(nameLength);
+            _packFile.read(nameBuffer.data(), nameLength);
+            String name(nameBuffer.data(), nameLength);
+
+            FileEntry entry;
+            entry.name = name;
+
+            _packFile.read(reinterpret_cast<char*>(&entry.offset),
+                           sizeof(entry.offset));
+            _packFile.read(reinterpret_cast<char*>(&entry.originalSize),
+                           sizeof(entry.originalSize));
+            _packFile.read(reinterpret_cast<char*>(&entry.compressedSize),
+                           sizeof(entry.compressedSize));
+            _packFile.read(reinterpret_cast<char*>(&entry.encryptedSize),
+                           sizeof(entry.encryptedSize));
+            _packFile.read(reinterpret_cast<char*>(&entry.checksum),
+                           sizeof(entry.checksum));
+
+            _fileTable[name] = entry;
+        }
+
+        _initialized = true;
     }
 
-    // Read file count
-    U32 fileCount;
-    packFile.read(reinterpret_cast<char*>(&fileCount), sizeof(fileCount));
-
-    logDEBUG("Reading file table with {} entries.", fileCount);
-
-    // Read file table (same for both versions)
-    for (U32 i = 0; i < fileCount; i++) {
-        U32 nameLength;
-        packFile.read(reinterpret_cast<char*>(&nameLength), sizeof(nameLength));
-
-        Vector<char> nameBuffer(nameLength);
-        packFile.read(nameBuffer.data(), nameLength);
-        String name(nameBuffer.data(), nameLength);
-
-        FileEntry entry;
-        entry.name = name;
-
-        packFile.read(reinterpret_cast<char*>(&entry.offset),
-                      sizeof(entry.offset));
-        packFile.read(reinterpret_cast<char*>(&entry.originalSize),
-                      sizeof(entry.originalSize));
-        packFile.read(reinterpret_cast<char*>(&entry.compressedSize),
-                      sizeof(entry.compressedSize));
-        packFile.read(reinterpret_cast<char*>(&entry.encryptedSize),
-                      sizeof(entry.encryptedSize));
-        packFile.read(reinterpret_cast<char*>(&entry.checksum),
-                      sizeof(entry.checksum));
-
-        fileTable[name] = entry;
-    }
+    return _fileTable;
 }
 
 auto ResourceUnpacker::get_file_info(const String& fileName) -> FileEntry {
-    auto it = fileTable.find(fileName);
-    NVCHK(it != fileTable.end(), "File not found in pack {}", fileName);
+    const auto& ft = get_file_table();
+    auto it = ft.find(fileName);
+    NVCHK(it != ft.end(), "File not found in pack {}", fileName);
     return it->second;
 }
 
@@ -361,7 +372,8 @@ auto ResourceUnpacker::get_file_size(const String& fileName) -> size_t {
 }
 
 auto ResourceUnpacker::contains_file(const String& fileName) -> bool {
-    return fileTable.find(fileName) != fileTable.end();
+    const auto& ft = get_file_table();
+    return ft.find(fileName) != ft.end();
 }
 
 void ResourceUnpacker::extract_file_to_disk(const String& fileName,
@@ -375,70 +387,10 @@ void ResourceUnpacker::extract_file_to_disk(const String& fileName,
     outFile.close();
 }
 
-auto ResourceUnpacker::extract_file(const String& fileName) -> U8Vector {
-    auto it = fileTable.find(fileName);
-    NVCHK(it != fileTable.end(), "File not found in pack: {}", fileName);
-
-    const FileEntry& entry = it->second;
-
-    // Seek to file data
-    packFile.seekg(entry.offset);
-
-    // Read encrypted data
-    U8Vector encryptedData(entry.encryptedSize);
-    packFile.read(reinterpret_cast<char*>(encryptedData.data()),
-                  entry.encryptedSize);
-
-    // Decrypt data
-    U8Vector compressedData = decrypt_data(encryptedData);
-
-    // Decompress data
-    U8Vector originalData(entry.originalSize);
-    decompress_data(compressedData, originalData.data(), entry.originalSize);
-
-    // Verify checksum
-    U32 checksum = calculate_checksum(originalData);
-    NVCHK(checksum == entry.checksum,
-          "Checksum verification failed for file: {}", fileName);
-
-    return originalData;
-}
-
-auto ResourceUnpacker::extract_file_as_string(const String& fileName)
-    -> String {
-    auto it = fileTable.find(fileName);
-    NVCHK(it != fileTable.end(), "File not found in pack: {}", fileName);
-
-    const FileEntry& entry = it->second;
-
-    // Seek to file data
-    packFile.seekg(entry.offset);
-
-    // Read encrypted data
-    U8Vector encryptedData(entry.encryptedSize);
-    packFile.read(reinterpret_cast<char*>(encryptedData.data()),
-                  entry.encryptedSize);
-
-    // Decrypt data
-    U8Vector compressedData = decrypt_data(encryptedData);
-
-    // Decompress data
-    String originalData(entry.originalSize, '\0');
-    decompress_data(compressedData, (U8*)originalData.data(),
-                    entry.originalSize);
-
-    // Verify checksum
-    U32 checksum = calculate_checksum(originalData);
-
-    NVCHK(checksum == entry.checksum,
-          "Checksum verification failed for file: {}", fileName);
-
-    return originalData;
-}
-
 auto ResourceUnpacker::list_files() -> Vector<String> {
     Vector<String> files;
-    for (const auto& entry : fileTable) {
+    const auto& ft = get_file_table();
+    for (const auto& entry : ft) {
         files.push_back(entry.first);
     }
     return files;
@@ -457,4 +409,28 @@ auto ResourceUnpacker::get_package_version() const -> I64 {
 auto ResourceUnpacker::get_metadata() const -> const String& {
     return metadata;
 }
+auto ResourceUnpacker::extract_compressed_data(const String& fileName,
+                                               U32& fileSize, U32& checksum)
+    -> U8Vector {
+    const auto& ft = get_file_table();
+    auto it = ft.find(fileName);
+    NVCHK(it != ft.end(), "File not found in pack: {}", fileName);
+
+    const FileEntry& entry = it->second;
+
+    // Seek to file data
+    _packFile.seekg(entry.offset);
+
+    // Read encrypted data
+    U8Vector encryptedData(entry.encryptedSize);
+    _packFile.read(reinterpret_cast<char*>(encryptedData.data()),
+                   entry.encryptedSize);
+
+    fileSize = entry.originalSize;
+    checksum = entry.checksum;
+
+    // Decrypt data
+    return decrypt_data(encryptedData);
+};
+
 } // namespace nv

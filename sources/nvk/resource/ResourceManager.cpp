@@ -149,7 +149,7 @@ auto ResourceManager::read_virtual_file(const String& fname,
     // Check for files in the resource packs:
     for (const auto& up : _unpackers) {
         if (up->contains_file(fname)) {
-            return up->extract_file_as_string(fname);
+            return up->extract_file<String>(fname);
         }
     }
 
