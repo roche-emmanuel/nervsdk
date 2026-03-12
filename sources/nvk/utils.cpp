@@ -805,20 +805,55 @@ auto get_path_extension(const String& fname) -> String {
     return "";
 }
 
-auto get_parent_folder(const char* fname) -> String {
+void normalize_path(String& path, bool isFolder, PathSep sep) {
+    if (path.empty()) {
+        return;
+    }
+
+    // Replace all separators and add trailing if needed
+    if (sep == PATHSEP_LINUX) {
+        for (char& c : path) {
+            if (c == '\\')
+                c = '/';
+        }
+        NVCHK(isFolder || path.back() != '/',
+              "Invalid path ending for file: {}", path);
+
+        if (isFolder && path.back() != '/') {
+            path += '/';
+        }
+    } else if (sep == PATHSEP_WIN) {
+        for (char& c : path) {
+            if (c == '/')
+                c = '\\';
+        }
+        NVCHK(isFolder || path.back() != '\\',
+              "Invalid path ending for file: {}", path);
+
+        if (isFolder && path.back() != '\\') {
+            path += '\\';
+        }
+    }
+}
+
+auto get_parent_folder(const char* fname, PathSep sep) -> String {
     std::filesystem::path filePath(fname);
     std::filesystem::path parentPath = filePath.parent_path();
 
 #if NV_USE_STD_MEMORY
-    return parentPath.string();
+    String pathStr = parentPath.string();
 #else
-    return parentPath.string<char, std::char_traits<char>,
-                             STLAllocator<char, DefaultPoolAllocator>>();
+    String pathStr =
+        parentPath.string<char, std::char_traits<char>,
+                          STLAllocator<char, DefaultPoolAllocator>>();
 #endif
+
+    normalize_path(pathStr, true, sep);
+    return pathStr;
 }
 
-auto get_parent_folder(const String& fname) -> String {
-    return get_parent_folder(fname.c_str());
+auto get_parent_folder(const String& fname, PathSep sep) -> String {
+    return get_parent_folder(fname.c_str(), sep);
 }
 
 auto get_cwd() -> String {
@@ -1200,4 +1235,38 @@ auto color_to_f32(const Vec4f& col) -> F32 {
     return res;
 }
 
+auto normalized_path(const String& path, bool isFolder, PathSep sep) -> String {
+    String result{path};
+    normalize_path(result, isFolder, sep);
+    return result;
+};
+
+auto get_current_module_path(PathSep sep) -> String {
+    // Use TCHAR to handle both ANSI and Unicode builds
+    TCHAR pBuf[MAX_PATH];
+
+    DWORD bytes = GetModuleFileName(NULL, pBuf, MAX_PATH);
+
+    // Check for failure
+    if (bytes == 0) {
+        THROW_MSG("Cannot retrieve executable path.");
+        return {};
+    }
+
+    // Check for truncation (buffer too small)
+    if (bytes == MAX_PATH) {
+        DWORD error = GetLastError();
+        if (error == ERROR_INSUFFICIENT_BUFFER) {
+            THROW_MSG("Executable path exceeds MAX_PATH.");
+            return {};
+        }
+    }
+
+    return normalized_path(pBuf, false, sep);
+}
+auto get_current_module_folder(PathSep sep) -> String {
+    auto mpath = get_current_module_path(sep);
+    NVCHK(!mpath.empty(), "Invalid module path.");
+    return get_parent_folder(mpath, sep);
+}
 } // namespace nv

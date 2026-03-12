@@ -106,9 +106,22 @@ auto create_folders(const String& fullpath) -> bool;
 
 auto get_path_extension(const String& fname) -> String;
 
-auto get_parent_folder(const char* fname) -> String;
+enum PathSep {
+    PATHSEP_NONE,
+    PATHSEP_LINUX,
+    PATHSEP_WIN,
+};
 
-auto get_parent_folder(const String& fname) -> String;
+void normalize_path(String& path, bool isFolder, PathSep sep = PATHSEP_LINUX);
+
+auto normalized_path(const String& path, bool isFolder,
+                     PathSep sep = PATHSEP_LINUX) -> String;
+
+auto get_parent_folder(const char* fname, PathSep sep = PATHSEP_LINUX)
+    -> String;
+
+auto get_parent_folder(const String& fname, PathSep sep = PATHSEP_LINUX)
+    -> String;
 
 auto get_filename(const String& full_path, bool withExt = true) -> String;
 
@@ -153,6 +166,10 @@ auto llaToFLU(const Vec3d& lla, F64 radius = MEAN_EARTH_RADIUS) -> Vec3d;
 auto align_element_size(U32 elemSize, U32 alignment) -> U32;
 
 auto color_to_f32(const Vec4f& col) -> F32;
+
+auto get_current_module_path(PathSep sep = PATHSEP_LINUX) -> String;
+
+auto get_current_module_folder(PathSep sep = PATHSEP_LINUX) -> String;
 
 // Support to concatenate path elements:
 template <typename T, typename V>
