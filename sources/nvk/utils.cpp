@@ -782,10 +782,12 @@ auto read_config_file(const String& fname, bool forceAllowSystem) -> Json {
 }
 
 auto create_folders(const String& fullpath) -> bool {
-    if (fullpath.empty() || system_dir_exists(fullpath.c_str())) {
+    auto cleanPath = normalized_path(fullpath, true, PATHSEP_NONE);
+
+    if (cleanPath.empty() || system_dir_exists(cleanPath.c_str())) {
         return true;
     }
-    return std::filesystem::create_directories(fullpath.c_str());
+    return std::filesystem::create_directories(cleanPath.c_str());
 }
 
 auto get_path_extension(const String& fname) -> String {
@@ -830,6 +832,11 @@ void normalize_path(String& path, bool isFolder, PathSep sep) {
 
         if (isFolder && path.back() != '\\') {
             path += '\\';
+        }
+    } else if (sep == PATHSEP_NONE) {
+        // Remove trailing separators
+        while (!path.empty() && (path.back() == '/' || path.back() == '\\')) {
+            path.pop_back();
         }
     }
 }
