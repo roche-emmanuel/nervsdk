@@ -239,7 +239,7 @@ void ResourceManager::register_resource_packs(const StringVector& packFiles) {
 
     // When done registering the resource packs we trigger the ready signal:
     _dirtyResourcePacks = false;
-    resourcesReady.emit();
+    notify_resources_ready();
 }
 
 auto ResourceManager::get_files(const String& directory,
@@ -299,5 +299,20 @@ void ResourceManager::sort_resource_packs() {
         return a->get_package_version() > b->get_package_version();
     });
 };
+
+void ResourceManager::add_memory_pack(Vector<U8>&& data,
+                                      const String& packName) {
+    NVCHK(!has_resource_pack(packName), "Resource pack {} already loaded.",
+          packName);
+
+    auto up = nv::create<ResourceUnpackerMemory>(std::move(data), packName,
+                                                 _aesKey, _aesIV);
+    _unpackers.emplace_back(up);
+
+    // Sort the resource packs by version number:
+    sort_resource_packs();
+};
+
+void ResourceManager::notify_resources_ready() { resourcesReady.emit(); }
 
 } // namespace nv

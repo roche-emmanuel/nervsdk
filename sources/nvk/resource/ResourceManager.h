@@ -65,9 +65,12 @@ class ResourceManager {
     }
 
     void register_resource_packs(const StringVector& packFiles);
+    void add_memory_pack(Vector<U8>&& data, const String& packName);
 
     auto get_files(const String& directory, const std::regex& pattern,
                    bool recursive) -> StringVector;
+
+    void notify_resources_ready();
 
     Signal<> resourcesReady;
 
