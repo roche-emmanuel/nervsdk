@@ -473,10 +473,8 @@ static auto expand_single_wildcard(const String& sourceDir,
     std::ranges::replace(normalized_pattern, '\\', '/');
 
     // Check if pattern contains wildcards
-    if (normalized_pattern.find('*') == String::npos &&
-        normalized_pattern.find('?') == String::npos) {
-        // No wildcards, return as-is
-        matched_files.insert(pattern);
+    if (normalized_pattern.find_first_of("*?") == String::npos) {
+        matched_files.insert(normalized_pattern);
         return matched_files;
     }
 
