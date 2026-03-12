@@ -30,9 +30,6 @@ class ResourcePacker : public RefObject {
     I64 packageVersion{0};
     String metadata;
 
-    // Calculate a simple checksum
-    auto calculate_checksum(const U8Vector& data) -> U32;
-
     // Compress data using zlib
     auto compress_data(const U8Vector& input) -> U8Vector;
 
@@ -77,18 +74,6 @@ class ResourceUnpacker : public RefObject {
 
     // Decrypt data using AES-256
     auto decrypt_data(const U8Vector& input) -> U8Vector;
-
-    // Calculate a checksum
-    template <typename Container>
-    auto calculate_checksum(const Container& data) -> U32 {
-        U32 checksum = 0;
-        for (auto byte : data) {
-            // For string, we need to cast char to unsigned to avoid sign
-            // extension issues
-            checksum = (checksum << 1) ^ static_cast<U8>(byte);
-        }
-        return checksum;
-    }
 
   public:
     explicit ResourceUnpacker(const String& packFilePath, const U8Vector& key,
@@ -136,7 +121,7 @@ class ResourceUnpacker : public RefObject {
         decompress_data(compressedData, (U8*)originalData.data(), originalSize);
 
         // Verify checksum
-        U32 checksum = calculate_checksum(originalData);
+        U32 checksum = compute_data_checksum(originalData);
 
         NVCHK(checksum == entryChecksum,
               "Checksum verification failed for file: {}", fileName);

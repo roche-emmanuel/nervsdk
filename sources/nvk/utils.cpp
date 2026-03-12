@@ -1267,4 +1267,9 @@ auto get_current_module_folder(PathSep sep) -> String {
     NVCHK(!mpath.empty(), "Invalid module path.");
     return get_parent_folder(mpath, sep);
 }
+auto compute_file_checksum(const String& filename, bool forceAllowSystem)
+    -> U32 {
+    auto content = read_virtual_file(filename, forceAllowSystem);
+    return compute_data_checksum(content);
+}
 } // namespace nv

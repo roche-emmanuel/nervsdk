@@ -248,6 +248,20 @@ auto remove_vector_element(std::vector<RefPtr<T>>& vec, T* val) -> bool {
 }
 #endif
 
+template <typename Container>
+auto compute_data_checksum(const Container& data) -> U32 {
+    U32 checksum = 0;
+    for (auto byte : data) {
+        // For string, we need to cast char to unsigned to avoid sign
+        // extension issues
+        checksum = (checksum << 1) ^ static_cast<U8>(byte);
+    }
+    return checksum;
+}
+
+auto compute_file_checksum(const String& filename,
+                           bool forceAllowSystem = false) -> U32;
+
 } // namespace nv
 
 #endif

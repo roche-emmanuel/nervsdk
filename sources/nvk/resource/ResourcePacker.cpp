@@ -42,14 +42,6 @@ auto ResourcePacker::compress_data(const U8Vector& input) -> U8Vector {
     return compressed;
 }
 
-auto ResourcePacker::calculate_checksum(const U8Vector& data) -> U32 {
-    U32 checksum = 0;
-    for (auto byte : data) {
-        checksum = (checksum << 1) ^ byte;
-    }
-    return checksum;
-}
-
 auto ResourcePacker::encrypt_data(const U8Vector& input) -> U8Vector {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
@@ -116,7 +108,7 @@ void ResourcePacker::add_file(const String& filePath, const String& entryName) {
     //          entry.compressedSize, entry.encryptedSize);
 
     // Calculate checksum (on the original data)
-    entry.checksum = calculate_checksum(content);
+    entry.checksum = compute_data_checksum(content);
 
     // Store file info
     entry.offset = 0; // Will be set during pack()
