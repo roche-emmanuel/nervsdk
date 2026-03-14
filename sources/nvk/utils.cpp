@@ -1247,6 +1247,7 @@ auto normalized_path(const String& path, bool isFolder, PathSep sep) -> String {
 };
 
 auto get_current_module_path(PathSep sep) -> String {
+#ifdef _WIN32
     // Use TCHAR to handle both ANSI and Unicode builds
     TCHAR pBuf[MAX_PATH];
 
@@ -1268,7 +1269,11 @@ auto get_current_module_path(PathSep sep) -> String {
     }
 
     return normalized_path(pBuf, false, sep);
+#else
+    THROW_MSG("get_current_module_path() not supported.");
+#endif
 }
+
 auto get_current_module_folder(PathSep sep) -> String {
     auto mpath = get_current_module_path(sep);
     NVCHK(!mpath.empty(), "Invalid module path.");
