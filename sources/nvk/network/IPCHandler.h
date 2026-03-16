@@ -17,6 +17,7 @@ class IPCBase : public RefObject {
 
     // Connection state
     [[nodiscard]] auto is_connected() const -> bool { return _connected; }
+    [[nodiscard]] auto is_running() const -> bool { return _running; }
 
     // Timeout (milliseconds)
     void set_timeout(DWORD timeout) { _timeout = timeout; }
@@ -49,6 +50,10 @@ class IPCBase : public RefObject {
     std::thread _readerThread;
 
     static constexpr size_t BUFFER_SIZE = 65536;
+
+  private:
+    std::condition_variable _stopCondition;
+    std::mutex _stopMutex;
 };
 
 // Server implementation

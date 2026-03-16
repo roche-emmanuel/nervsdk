@@ -47,6 +47,9 @@ void IPCBase::stop() {
     if (_running) {
         _running = false;
 
+        // Interrupt any sleeping threads
+        _stopCondition.notify_all();
+
         logDEBUG("Waiting for IPC Thread...");
         NVCHK(_readerThread.joinable(), "Reader thread is not joinable.");
         _readerThread.join();
@@ -55,7 +58,7 @@ void IPCBase::stop() {
 }
 
 void IPCBase::disconnect() {
-    if (_connected && _pipeHandle != INVALID_HANDLE_VALUE) {
+    if (_connected) {
         _connected = false;
         disconnected.emit();
         logNOTE("IPC disconnected.");
@@ -140,7 +143,11 @@ void IPCBase::run() {
 
     while (_running) {
         if (!establish_connection()) {
-            sleep_s(1);
+            if (_running) {
+                std::unique_lock<std::mutex> lock(_stopMutex);
+                _stopCondition.wait_for(lock, std::chrono::seconds(1),
+                                        [this] { return !_running; });
+            }
             continue;
         }
 
@@ -233,13 +240,7 @@ void IPCBase::run() {
     }
 
     logDEBUG("IPC thread cleaning up...");
-    if (_pipeHandle != INVALID_HANDLE_VALUE) {
-        CancelIoEx(_pipeHandle, nullptr);
-        disconnect();
-
-        CloseHandle(_pipeHandle);
-        _pipeHandle = INVALID_HANDLE_VALUE;
-    }
+    cleanup_connection();
 
     logDEBUG("Exiting IPC thread.");
 }
@@ -326,9 +327,11 @@ auto IPCServer::establish_connection() -> bool {
 
 void IPCServer::cleanup_connection() {
     if (_pipeHandle != INVALID_HANDLE_VALUE) {
+        CancelIoEx(_pipeHandle, nullptr);
         DisconnectNamedPipe(_pipeHandle);
         CloseHandle(_pipeHandle);
         _pipeHandle = INVALID_HANDLE_VALUE;
+        disconnect();
     }
 }
 
@@ -398,8 +401,10 @@ auto IPCClient::establish_connection() -> bool { return connect_to_server(); }
 
 void IPCClient::cleanup_connection() {
     if (_pipeHandle != INVALID_HANDLE_VALUE) {
+        CancelIoEx(_pipeHandle, nullptr);
         CloseHandle(_pipeHandle);
         _pipeHandle = INVALID_HANDLE_VALUE;
+        disconnect();
     }
 }
 
