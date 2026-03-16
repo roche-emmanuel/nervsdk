@@ -46,10 +46,9 @@ void IPCBase::start() {
 void IPCBase::stop() {
     if (_running) {
         _running = false;
-        CancelIoEx(_pipeHandle, nullptr);
-        disconnect();
 
         logDEBUG("Waiting for IPC Thread...");
+        NVCHK(_readerThread.joinable(), "Reader thread is not joinable.");
         _readerThread.join();
         logDEBUG("IPC Thread finished.");
     }
@@ -235,6 +234,9 @@ void IPCBase::run() {
 
     logDEBUG("IPC thread cleaning up...");
     if (_pipeHandle != INVALID_HANDLE_VALUE) {
+        CancelIoEx(_pipeHandle, nullptr);
+        disconnect();
+
         CloseHandle(_pipeHandle);
         _pipeHandle = INVALID_HANDLE_VALUE;
     }
