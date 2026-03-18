@@ -144,19 +144,7 @@ void RefObject::unref() {
         // std::cout << "Deleting RefObject " << toString() << std::endl;
         // if we have an allocator, then we should use it
         // to free the memory we are currently using:
-#if NV_USE_STD_MEMORY
-        delete this;
-#else
-        if (_allocator != nullptr) {
-            // We manually call the destructor:
-            this->~RefObject();
-            // then we free the memory:
-            _allocator->free(this);
-        } else {
-            // otherwise we can still delete normaly:
-            delete this;
-        }
-#endif
+        delete_object();
     }
 }
 
@@ -192,5 +180,25 @@ auto RefObject::cast(StringID tid) -> RefObject* {
 }
 
 auto RefObject::get_class_id() const -> StringID { return SID("RefObject"); }
+
+auto RefObject::ref_count() const -> U64 {
+    return _refCount.load(std::memory_order_acquire);
+}
+auto RefObject::supports_weak_refs() const -> bool { return false; }
+void RefObject::delete_object() {
+#if NV_USE_STD_MEMORY
+    delete this;
+#else
+    if (_allocator != nullptr) {
+        // We manually call the destructor:
+        this->~RefObject();
+        // then we free the memory:
+        _allocator->free(this);
+    } else {
+        // otherwise we can still delete normaly:
+        delete this;
+    }
+#endif
+}
 
 } // namespace nv

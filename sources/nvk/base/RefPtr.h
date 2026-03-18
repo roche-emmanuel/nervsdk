@@ -3,11 +3,13 @@
 
 namespace nv {
 
+template <typename T> class WeakPtr;
+
 template <typename T> class RefPtr {
   public:
     using element_type = T;
 
-    RefPtr() : _ptr(0) {}
+    RefPtr() : _ptr(nullptr) {}
 
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
     RefPtr(T* ptr) : _ptr(ptr) {
@@ -29,12 +31,15 @@ template <typename T> class RefPtr {
         }
     }
 
-    // RefPtr(observer_ptr<T>& optr) : _ptr(0) { optr.lock(*this); }
+    // Construct from WeakPtr
+    // NOLINTNEXTLINE(hicpp-explicit-conversions)
+    explicit RefPtr(const WeakPtr<T>& weak);
+
     ~RefPtr() {
         if (_ptr) {
             _ptr->unref();
         }
-        _ptr = 0;
+        _ptr = nullptr;
     }
 
     auto operator=(const RefPtr& ref) -> RefPtr& {
@@ -49,26 +54,19 @@ template <typename T> class RefPtr {
         return *this;
     }
 
-    // Move constructor:
-    // RefPtr(RefPtr&& ref) noexcept = delete;
+    // Move constructor
     RefPtr(RefPtr&& ref) noexcept {
         // NOLINTNEXTLINE
         _ptr = ref._ptr;
-        // we do not change the ptr count for the ref (since we add 1 and sub 1)
-        // Just reset that ref ptr:
         ref._ptr = nullptr;
     }
 
-    // Move assignment:
-    // auto operator=(RefPtr&& ref) noexcept -> RefPtr& = delete;
+    // Move assignment
     auto operator=(RefPtr&& ref) noexcept -> RefPtr& {
         T* tmp_ptr = _ptr;
         // NOLINTNEXTLINE
         _ptr = ref._ptr;
-        // we do not change the ptr count for the ref (since we add 1 and sub 1)
-        // Just reset that ref ptr:
         ref._ptr = nullptr;
-        // And unref our prev ptr:
         if (tmp_ptr) {
             tmp_ptr->unref();
         }
@@ -84,9 +82,6 @@ template <typename T> class RefPtr {
         if (_ptr) {
             _ptr->ref();
         }
-        // unref second to prevent any deletion of any object which might
-        // be referenced by the other object. i.e rp is child of the
-        // original _ptr.
         if (tmp_ptr) {
             tmp_ptr->unref();
         }
@@ -114,42 +109,21 @@ template <typename T> class RefPtr {
         return (_ptr < ref._ptr);
     }
 
-    // follows is an implmentation of the "safe bool idiom", details can be
-    // found at:
-    //   http://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Safe_bool
-    //   http://lists.boost.org/Archives/boost/2003/09/52856.php
-
-    //   private:
-    //     using unspecified_bool_type = T* RefPtr::*;
-
-    //   public:
-    //     // safe bool conversion
-    //     explicit operator unspecified_bool_type() const {
-    //         return valid() ? &RefPtr::_ptr : 0;
-    //     }
-    // Update C++11 explicit bool conversion:
-    // cf. https://www.kdab.com/explicit-operator-bool/
     explicit operator bool() const { return valid(); }
 
-    auto operator*() const -> T& {
-        // #ifndef NDEBUG
-        //         NVCHK(_ptr != nullptr, "RefPtr: invalid pointer
-        //         dereference.");
-        // #endif
-        return *_ptr;
-    }
+    auto operator*() const -> T& { return *_ptr; }
     auto operator->() const -> T* { return _ptr; }
     auto get() const -> T* { return _ptr; }
 
-    auto operator!() const -> bool { return _ptr == 0; } // not required
-    [[nodiscard]] auto valid() const -> bool { return _ptr != 0; }
+    auto operator!() const -> bool { return _ptr == nullptr; }
+    [[nodiscard]] auto valid() const -> bool { return _ptr != nullptr; }
 
     auto release() -> T* {
         T* tmp = _ptr;
         if (_ptr) {
             _ptr->unref_nodelete();
         }
-        _ptr = 0;
+        _ptr = nullptr;
         return tmp;
     }
 
@@ -159,7 +133,7 @@ template <typename T> class RefPtr {
         ref._ptr = tmp;
     }
 
-    void reset(T* ptr = 0) { *this = ptr; }
+    void reset(T* ptr = nullptr) { *this = ptr; }
 
   private:
     template <class Other> void assign(const RefPtr<Other>& ref) {
@@ -171,19 +145,17 @@ template <typename T> class RefPtr {
         if (_ptr) {
             _ptr->ref();
         }
-        // unref second to prevent any deletion of any object which might
-        // be referenced by the other object. i.e rp is child of the
-        // original _ptr.
         if (tmp_ptr) {
             tmp_ptr->unref();
         }
     }
 
     template <class Other> friend class RefPtr;
+    template <class Other> friend class WeakPtr;
 
     T* _ptr{nullptr};
 };
 
-}; // namespace nv
+} // namespace nv
 
 #endif

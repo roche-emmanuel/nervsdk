@@ -24,12 +24,12 @@ class RefObject {
     /**
       Increment the reference count.
     */
-    void ref();
+    virtual void ref();
 
     /**
     Decrement the reference count.
     */
-    void unref();
+    virtual void unref();
 
     /** Decrement the reference count by one, indicating that
             a pointer to this object is no longer referencing it.  However, do
@@ -37,14 +37,14 @@ class RefObject {
        unref_nodelete() should only be called if the user knows exactly who will
             be responsible for, one should prefer unref() over unref_nodelete()
             as the latter can lead to memory leaks.*/
-    void unref_nodelete();
+    virtual void unref_nodelete();
+
+    [[nodiscard]] virtual auto supports_weak_refs() const -> bool;
 
     /**
     Retrieve the current reference count.
     */
-    [[nodiscard]] inline auto ref_count() const -> U64 {
-        return _refCount.load(std::memory_order_acquire);
-    }
+    [[nodiscard]] virtual auto ref_count() const -> U64;
 
     template <class U> inline auto cast() -> U* {
         return dynamic_cast<U*>(this);
@@ -77,6 +77,9 @@ class RefObject {
     itself. */
     virtual void set_allocator(Allocator* alloc);
 #endif
+
+  protected:
+    void delete_object();
 };
 
 } // namespace nv
