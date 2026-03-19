@@ -1,9 +1,9 @@
 #include <nvk/base/WeakRefObject.h>
 
 namespace nv {
-RefControlBlock::RefControlBlock() : _strongCount(1), _weakCount(1) {}
+RefControlBlock::RefControlBlock() : _strongCount(0), _weakCount(1) {}
 void RefControlBlock::reset() {
-    _strongCount.store(1, std::memory_order_relaxed);
+    _strongCount.store(0, std::memory_order_relaxed);
     _weakCount.store(1, std::memory_order_relaxed);
 }
 void RefControlBlock::add_strong_ref() {

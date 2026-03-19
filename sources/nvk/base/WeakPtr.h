@@ -113,7 +113,7 @@ template <typename T> class WeakPtr {
 
     [[nodiscard]] auto lock() const -> RefPtr<T> {
         if (_controlBlock != nullptr && _controlBlock->try_add_strong_ref()) {
-            return RefPtr<T>(_ptr);
+            return RefPtr<T>(_ptr, RefPtr<T>::Adopt); // Use adopt constructor
         }
         return RefPtr<T>();
     }

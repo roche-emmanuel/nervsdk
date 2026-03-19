@@ -154,6 +154,13 @@ template <typename T> class RefPtr {
     template <class Other> friend class WeakPtr;
 
     T* _ptr{nullptr};
+
+    struct AdoptTag {};
+    static constexpr AdoptTag Adopt{};
+
+    RefPtr(T* ptr, AdoptTag) : _ptr(ptr) {
+        // Don't call ref() - we're adopting an existing reference
+    }
 };
 
 } // namespace nv
