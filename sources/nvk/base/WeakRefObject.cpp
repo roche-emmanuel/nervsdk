@@ -40,6 +40,7 @@ auto RefControlBlockPool::instance() -> RefControlBlockPool& {
     return pool;
 }
 auto RefControlBlockPool::acquire() -> RefControlBlock* {
+    std::lock_guard lock(_mutex);
     U32 index = _provider.acquire_slot();
     RefControlBlock* block = &_provider[index];
     // Reset atomics to initial state (much faster than placement new)
@@ -49,6 +50,7 @@ auto RefControlBlockPool::acquire() -> RefControlBlock* {
     return block;
 }
 void RefControlBlockPool::release(RefControlBlock* block) {
+    std::lock_guard lock(_mutex);
     auto it = _indexMap.find(block);
     if (it != _indexMap.end()) {
         U32 index = it->second;

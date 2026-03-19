@@ -49,7 +49,7 @@ class RefControlBlockPool {
 
   private:
     RefControlBlockPool() = default;
-
+    std::mutex _mutex;
     SlotProvider<RefControlBlock, U32, Deque<RefControlBlock>> _provider;
     UnorderedMap<RefControlBlock*, U32> _indexMap;
 };
