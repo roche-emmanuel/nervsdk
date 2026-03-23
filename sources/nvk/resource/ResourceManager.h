@@ -86,6 +86,9 @@ class ResourceManager {
     U8Vector _aesKey;
     U8Vector _aesIV;
 
+    auto is_matching_file(const String& file, const String& dir,
+                          const std::regex& pattern, bool recursive) -> bool;
+
   private:
     /** List of resource unpackers */
     Vector<RefPtr<ResourceUnpacker>> _unpackers;
@@ -97,9 +100,6 @@ class ResourceManager {
     bool _dirtyResourcePacks{true};
 
     void sort_resource_packs();
-
-    auto is_matching_file(const String& file, const String& dir,
-                          const std::regex& pattern, bool recursive) -> bool;
 };
 
 } // namespace nv
