@@ -5,7 +5,6 @@
 #include <nvk/base/std_containers.h>
 #include <nvk/resource/ResourceLoader.h>
 #include <nvk/resource/ResourcePacker.h>
-#include <nvk/resource/ResourceProvider.h>
 
 namespace nv {
 
@@ -94,9 +93,6 @@ class ResourceManager {
     bool _dirtyResourcePacks{true};
 
     void sort_resource_packs();
-
-    /** List of resource providers */
-    Vector<RefPtr<ResourceProvider>> _providers;
 };
 
 } // namespace nv
