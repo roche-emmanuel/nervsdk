@@ -242,11 +242,9 @@ void ResourceManager::register_resource_packs(const StringVector& packFiles) {
     notify_resources_ready();
 }
 
-auto ResourceManager::get_files(const String& directory,
-                                const std::regex& pattern, bool recursive)
-    -> StringVector {
-    Set<String> uniqueFiles;
-
+void ResourceManager::collect_files(const String& directory,
+                                    const std::regex& pattern, bool recursive,
+                                    Set<String>& uniqueFiles) {
     // Search in system files if enabled
     if (_useSystemFiles) {
         // Check relative to root path
@@ -268,26 +266,18 @@ auto ResourceManager::get_files(const String& directory,
 
         for (const auto& file : all_files) {
 
-            if (!dir.empty() && !file.starts_with(dir)) {
-                // Not in the correct folder.
-                continue;
-            }
-
-            // For non-recursive, ensure no subdirectories
-            if (!recursive) {
-                String relative_path =
-                    dir.empty() ? file : file.substr(dir.length());
-                if (relative_path.find('/') != String::npos) {
-                    // File is in a subdirectory
-                    continue;
-                }
-            }
-
-            if (std::regex_match(file, pattern)) {
+            if (is_matching_file(file, dir, pattern, recursive)) {
                 uniqueFiles.insert(file);
             }
         }
     }
+};
+
+auto ResourceManager::get_files(const String& directory,
+                                const std::regex& pattern, bool recursive)
+    -> StringVector {
+    Set<String> uniqueFiles;
+    collect_files(directory, pattern, recursive, uniqueFiles);
 
     StringVector result(uniqueFiles.begin(), uniqueFiles.end());
     return result;
@@ -314,5 +304,29 @@ void ResourceManager::add_memory_pack(Vector<U8>&& data,
 };
 
 void ResourceManager::notify_resources_ready() { resourcesReady.emit(); }
+
+auto ResourceManager::is_matching_file(const String& file, const String& dir,
+                                       const std::regex& pattern,
+                                       bool recursive) -> bool {
+    if (!dir.empty() && !file.starts_with(dir)) {
+        // Not in the correct folder.
+        return false;
+    }
+
+    // For non-recursive, ensure no subdirectories
+    if (!recursive) {
+        String relative_path = dir.empty() ? file : file.substr(dir.length());
+        if (relative_path.find('/') != String::npos) {
+            // File is in a subdirectory
+            return false;
+        }
+    }
+
+    if (std::regex_match(file, pattern)) {
+        return true;
+    }
+
+    return false;
+};
 
 } // namespace nv

@@ -67,6 +67,10 @@ class ResourceManager {
     void register_resource_packs(const StringVector& packFiles);
     void add_memory_pack(Vector<U8>&& data, const String& packName);
 
+    virtual void collect_files(const String& directory,
+                               const std::regex& pattern, bool recursive,
+                               Set<String>& uniqueFiles);
+
     auto get_files(const String& directory, const std::regex& pattern,
                    bool recursive) -> StringVector;
 
@@ -93,6 +97,9 @@ class ResourceManager {
     bool _dirtyResourcePacks{true};
 
     void sort_resource_packs();
+
+    auto is_matching_file(const String& file, const String& dir,
+                          const std::regex& pattern, bool recursive) -> bool;
 };
 
 } // namespace nv
