@@ -2,8 +2,8 @@
 #ifndef NV_RESOURCEPACKER_
 #define NV_RESOURCEPACKER_
 
+#include <nvk/resource/ResourceProvider.h>
 #include <nvk_common.h>
-
 namespace nv {
 
 // Structure for file entry in the pack
@@ -52,7 +52,7 @@ class ResourcePacker : public RefObject {
 };
 
 // Resource unpacker for the game engine
-class ResourceUnpacker : public RefObject {
+class ResourceUnpacker : public ResourceProvider {
   private:
     String _filename;
     std::ifstream _packFile;
@@ -88,7 +88,7 @@ class ResourceUnpacker : public RefObject {
     auto get_filename() const -> const String&;
 
     // List all files in the pack
-    auto list_files() -> Vector<String>;
+    auto list_files() -> Vector<String> override;
 
     virtual auto extract_compressed_data(const String& fileName, U32& fileSize,
                                          U32& checksum) -> U8Vector;
@@ -97,7 +97,7 @@ class ResourceUnpacker : public RefObject {
     void extract_file_to_disk(const String& fileName, const String& outputPath);
 
     // Check if a file exists in the pack
-    auto contains_file(const String& fileName) -> bool;
+    auto contains_file(const String& fileName) -> bool override;
 
     // Get original size of a file
     auto get_file_size(const String& fileName) -> size_t;
@@ -124,6 +124,23 @@ class ResourceUnpacker : public RefObject {
 
         return originalData;
     }
+
+    auto get_file_metadata(const String& fileName) -> Json override;
+
+    auto get_version() const -> I64 override;
+    auto get_name() const -> String override;
+
+    auto supports_sync_read() const -> bool override;
+
+    auto read_file(const String& fileName) -> String override {
+        return extract_file<String>(fileName);
+    }
+    auto read_binary_file(const String& fileName) -> U8Vector override {
+        return extract_file<U8Vector>(fileName);
+    }
+
+    void read_file_async(const String& fileName,
+                         ReadCallback callback) override;
 };
 
 class ResourceUnpackerMemory : public ResourceUnpacker {

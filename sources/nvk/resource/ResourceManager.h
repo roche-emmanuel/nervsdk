@@ -24,7 +24,8 @@ class ResourceManager {
     [[nodiscard]] virtual auto get_root_path() const -> String { return {}; };
 
     /** Check if we have a given resource pack */
-    [[nodiscard]] auto has_resource_pack(const String& packFile) const -> bool;
+    [[nodiscard]] auto has_resource_provider(const String& packFile) const
+        -> bool;
 
     /** Add a given resource pack */
     void add_resource_pack(const String& packFile);
@@ -89,9 +90,11 @@ class ResourceManager {
     auto is_matching_file(const String& file, const String& dir,
                           const std::regex& pattern, bool recursive) -> bool;
 
+    void add_provider(RefPtr<ResourceProvider> provider);
+
   private:
     /** List of resource unpackers */
-    Vector<RefPtr<ResourceUnpacker>> _unpackers;
+    Vector<RefPtr<ResourceProvider>> _providers;
 
     /** List of configurable paths per category*/
     UnorderedMap<StringID, StringVector> _allResourcePaths;
@@ -99,7 +102,10 @@ class ResourceManager {
     /** flag for resource dirty state */
     bool _dirtyResourcePacks{true};
 
-    void sort_resource_packs();
+    /** List of resource providers */
+    std::mutex _providersMutex;
+
+    void sort_resource_providers();
 };
 
 } // namespace nv

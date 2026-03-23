@@ -12,28 +12,27 @@ ResourceManager::ResourceManager() = default;
 
 void ResourceManager::uninit_instance() {
     _allResourcePaths.clear();
-    _unpackers.clear();
+    _providers.clear();
 }
 
 void ResourceManager::init_instance() {}
 
 void ResourceManager::add_resource_pack(const String& packFile) {
-    NVCHK(!has_resource_pack(packFile), "Resource pack {} already loaded.",
+    NVCHK(!has_resource_provider(packFile), "Resource pack {} already loaded.",
           packFile);
 
     NVCHK(system_file_exists(packFile), "Resource file {} doesn't exist.",
           packFile);
 
     auto up = nv::create<ResourceUnpacker>(packFile, _aesKey, _aesIV);
-    _unpackers.push_back(up);
 
-    // Sort the resource packs by version number:
-    sort_resource_packs();
+    add_provider(up);
 }
 
-auto ResourceManager::has_resource_pack(const String& packFile) const -> bool {
-    for (const auto& up : _unpackers) {
-        if (up->get_filename() == packFile) {
+auto ResourceManager::has_resource_provider(const String& packFile) const
+    -> bool {
+    for (const auto& up : _providers) {
+        if (up->get_name() == packFile) {
             return true;
         }
     }
@@ -121,7 +120,7 @@ auto ResourceManager::virtual_file_exists(const String& fname,
     // logDEBUG("Searching for file {}", fname);
 
     // Check for files in the resource packs:
-    for (const auto& up : _unpackers) {
+    for (const auto& up : _providers) {
         if (up->contains_file(fname)) {
             // logDEBUG("Found file {} in pack {}", fname,
             // up->get_filename());
@@ -147,9 +146,14 @@ auto ResourceManager::read_virtual_file(const String& fname,
     }
 
     // Check for files in the resource packs:
-    for (const auto& up : _unpackers) {
+    for (const auto& up : _providers) {
         if (up->contains_file(fname)) {
-            return up->extract_file<String>(fname);
+            if (up->supports_sync_read()) {
+                return up->read_file(fname);
+            }
+
+            logWARN("Provider {} doesn't support sync read, cannot read {}",
+                    up->get_name(), fname);
         }
     }
 
@@ -166,9 +170,14 @@ auto ResourceManager::read_virtual_binary_file(const String& fname,
     }
 
     // Check for files in the resource packs:
-    for (const auto& up : _unpackers) {
+    for (const auto& up : _providers) {
         if (up->contains_file(fname)) {
-            return up->extract_file(fname);
+            if (up->supports_sync_read()) {
+                return up->read_binary_file(fname);
+            }
+
+            logWARN("Provider {} doesn't support sync read, cannot read {}",
+                    up->get_name(), fname);
         }
     }
 
@@ -215,13 +224,16 @@ auto ResourceManager::get_file_last_write_time(const String& fname)
     }
 
     // Iterate on the data packs:
-    for (const auto& up : _unpackers) {
+    for (const auto& up : _providers) {
         if (up->contains_file(fname)) {
-            auto packFile = up->get_filename();
+            auto packFile = up->get_name();
             // Note: we must have a real file for this pack for now.
             // Eventually we might support "packs into packs", but
             // we would need to add support for a "string buffer" instead
             // of the file stream object in the unpacker first.
+            if (!system_file_exists(packFile)) {
+                return 0;
+            }
             return get_system_file_last_write_time(packFile);
         }
     }
@@ -261,7 +273,7 @@ void ResourceManager::collect_files(const String& directory,
     }
 
     // Search in resource packs
-    for (const auto& up : _unpackers) {
+    for (const auto& up : _providers) {
         auto all_files = up->list_files();
 
         for (const auto& file : all_files) {
@@ -283,24 +295,21 @@ auto ResourceManager::get_files(const String& directory,
     return result;
 }
 
-void ResourceManager::sort_resource_packs() {
-    std::ranges::sort(_unpackers, [](const RefPtr<ResourceUnpacker>& a,
-                                     const RefPtr<ResourceUnpacker>& b) {
-        return a->get_package_version() > b->get_package_version();
+void ResourceManager::sort_resource_providers() {
+    std::ranges::sort(_providers, [](const RefPtr<ResourceProvider>& a,
+                                     const RefPtr<ResourceProvider>& b) {
+        return a->get_version() > b->get_version();
     });
 };
 
 void ResourceManager::add_memory_pack(Vector<U8>&& data,
                                       const String& packName) {
-    NVCHK(!has_resource_pack(packName), "Resource pack {} already loaded.",
+    NVCHK(!has_resource_provider(packName), "Resource pack {} already loaded.",
           packName);
 
     auto up = nv::create<ResourceUnpackerMemory>(std::move(data), packName,
                                                  _aesKey, _aesIV);
-    _unpackers.emplace_back(up);
-
-    // Sort the resource packs by version number:
-    sort_resource_packs();
+    add_provider(up);
 };
 
 void ResourceManager::notify_resources_ready() { resourcesReady.emit(); }
@@ -329,4 +338,9 @@ auto ResourceManager::is_matching_file(const String& file, const String& dir,
     return false;
 };
 
+void ResourceManager::add_provider(RefPtr<ResourceProvider> provider) {
+    std::lock_guard lock(_providersMutex);
+    _providers.emplace_back(std::move(provider));
+    sort_resource_providers();
+}
 } // namespace nv

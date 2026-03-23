@@ -540,4 +540,17 @@ ResourceUnpackerMemory::ResourceUnpackerMemory(U8Vector&& data,
                                                const U8Vector& key,
                                                const U8Vector& iv)
     : ResourceUnpacker(virtualFilename, key, iv), _packData(std::move(data)) {}
+void ResourceUnpacker::read_file_async(const String& fileName,
+                                       ReadCallback callback) {
+    String err;
+    callback(read_file(fileName), err);
+};
+auto ResourceUnpacker::get_file_metadata(const String& fileName) -> Json {
+    return {};
+};
+auto ResourceUnpacker::get_version() const -> I64 {
+    return get_package_version();
+}
+auto ResourceUnpacker::get_name() const -> String { return get_filename(); }
+auto ResourceUnpacker::supports_sync_read() const -> bool { return true; }
 } // namespace nv
