@@ -195,4 +195,14 @@ class LogManager;
         }                                                                      \
     }
 
+#define NV_DECLARE_CLASS(cname)                                                \
+  public:                                                                      \
+    [[nodiscard]] auto get_class_name() const -> const char* override {        \
+        return #cname;                                                         \
+    }                                                                          \
+    static constexpr nv::StringID class_id = SID(#cname);                      \
+    [[nodiscard]] auto get_class_id() const -> nv::StringID override {         \
+        return SID(#cname);                                                    \
+    }
+
 #endif
