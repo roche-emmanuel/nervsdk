@@ -52,8 +52,9 @@ class ResourceManager {
     auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
         -> String;
 
-    void read_virtual_file_async(const String& fname, FileReadCallback cb,
-                                 bool forceAllowSystem = false);
+    auto read_virtual_file_async(const String& fname,
+                                 bool forceAllowSystem = false)
+        -> Promise<String>;
 
     auto get_file_last_write_time(const String& fname) -> std::time_t;
 

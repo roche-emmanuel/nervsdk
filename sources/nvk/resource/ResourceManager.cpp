@@ -320,30 +320,34 @@ void ResourceManager::add_provider(RefPtr<ResourceProvider> provider) {
     sort_resource_providers();
 }
 
-void ResourceManager::read_virtual_file_async(const String& fname,
-                                              FileReadCallback cb,
-                                              bool forceAllowSystem) {
+auto ResourceManager::read_virtual_file_async(const String& fname,
+                                              bool forceAllowSystem)
+    -> Promise<String> {
     if ((_useSystemFiles || forceAllowSystem)) {
-        String err;
         if (system_file_exists(fname)) {
-            cb(read_system_file(fname.c_str()), err);
+            return make_promise<String>([fname](Defer d) {
+                d.resolve(read_system_file(fname.c_str()));
+            });
         }
 
         String f_path = get_path(get_root_path(), fname);
         if (system_file_exists(f_path)) {
-            cb(read_system_file(f_path.c_str()), err);
+            return make_promise<String>([fname](Defer d) {
+                d.resolve(read_system_file(fname.c_str()));
+            });
         }
     }
 
     // Check for files in the resource packs:
     for (const auto& up : _providers) {
         if (up->contains_file(fname)) {
-            up->read_file_async(fname, std::move(cb));
-            return;
+            return up->read_file_async(fname);
         }
     }
 
     THROW_MSG("Cannot read virtual file async {}", fname);
+    // TODO: Should return a properly rejected promise here.
+    return {};
 };
 
 } // namespace nv

@@ -22,8 +22,7 @@ class ResourceProvider : public RefObject {
         return {};
     }
 
-    virtual void read_file_async(const String& fileName,
-                                 FileReadCallback callback) = 0;
+    virtual auto read_file_async(const String& fileName) -> Promise<String> = 0;
 };
 
 } // namespace nv

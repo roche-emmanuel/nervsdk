@@ -540,11 +540,13 @@ ResourceUnpackerMemory::ResourceUnpackerMemory(U8Vector&& data,
                                                const U8Vector& key,
                                                const U8Vector& iv)
     : ResourceUnpacker(virtualFilename, key, iv), _packData(std::move(data)) {}
-void ResourceUnpacker::read_file_async(const String& fileName,
-                                       FileReadCallback callback) {
-    String err;
-    callback(read_file(fileName), err);
+
+auto ResourceUnpacker::read_file_async(const String& fileName)
+    -> Promise<String> {
+    return make_promise<String>(
+        [this, fileName](Defer d) { d.resolve(read_file(fileName)); });
 };
+
 auto ResourceUnpacker::get_file_metadata(const String& fileName) -> Json {
     return {};
 };

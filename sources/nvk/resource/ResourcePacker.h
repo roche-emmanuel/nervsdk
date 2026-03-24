@@ -136,8 +136,7 @@ class ResourceUnpacker : public ResourceProvider {
         return extract_file<String>(fileName);
     }
 
-    void read_file_async(const String& fileName,
-                         FileReadCallback callback) override;
+    auto read_file_async(const String& fileName) -> Promise<String> override;
 };
 
 class ResourceUnpackerMemory : public ResourceUnpacker {
