@@ -321,6 +321,29 @@ void ResourceManager::add_provider(RefPtr<ResourceProvider> provider) {
 }
 
 void ResourceManager::read_virtual_file_async(const String& fname,
-                                              FileReadCallback cb) {};
+                                              FileReadCallback cb,
+                                              bool forceAllowSystem) {
+    if ((_useSystemFiles || forceAllowSystem)) {
+        String err;
+        if (system_file_exists(fname)) {
+            cb(read_system_file(fname.c_str()), err);
+        }
+
+        String f_path = get_path(get_root_path(), fname);
+        if (system_file_exists(f_path)) {
+            cb(read_system_file(f_path.c_str()), err);
+        }
+    }
+
+    // Check for files in the resource packs:
+    for (const auto& up : _providers) {
+        if (up->contains_file(fname)) {
+            up->read_file_async(fname, std::move(cb));
+            return;
+        }
+    }
+
+    THROW_MSG("Cannot read virtual file async {}", fname);
+};
 
 } // namespace nv
