@@ -6,10 +6,10 @@
 
 namespace nv {
 
+using FileReadCallback = std::function<void(String data, const String& error)>;
+
 class ResourceProvider : public RefObject {
   public:
-    using ReadCallback = std::function<void(String data, const String& error)>;
-
     virtual auto list_files() -> Vector<String> = 0;
     virtual auto contains_file(const String& fileName) -> bool = 0;
     virtual auto get_file_metadata(const String& fileName) -> Json = 0;
@@ -23,7 +23,7 @@ class ResourceProvider : public RefObject {
     }
 
     virtual void read_file_async(const String& fileName,
-                                 ReadCallback callback) = 0;
+                                 FileReadCallback callback) = 0;
 };
 
 } // namespace nv

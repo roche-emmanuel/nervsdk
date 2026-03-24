@@ -137,7 +137,7 @@ class ResourceUnpacker : public ResourceProvider {
     }
 
     void read_file_async(const String& fileName,
-                         ReadCallback callback) override;
+                         FileReadCallback callback) override;
 };
 
 class ResourceUnpackerMemory : public ResourceUnpacker {

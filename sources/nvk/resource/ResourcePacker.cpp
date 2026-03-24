@@ -541,7 +541,7 @@ ResourceUnpackerMemory::ResourceUnpackerMemory(U8Vector&& data,
                                                const U8Vector& iv)
     : ResourceUnpacker(virtualFilename, key, iv), _packData(std::move(data)) {}
 void ResourceUnpacker::read_file_async(const String& fileName,
-                                       ReadCallback callback) {
+                                       FileReadCallback callback) {
     String err;
     callback(read_file(fileName), err);
 };

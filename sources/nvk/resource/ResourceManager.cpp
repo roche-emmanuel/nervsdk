@@ -319,4 +319,8 @@ void ResourceManager::add_provider(RefPtr<ResourceProvider> provider) {
     _providers.emplace_back(std::move(provider));
     sort_resource_providers();
 }
+
+void ResourceManager::read_virtual_file_async(const String& fname,
+                                              FileReadCallback cb) {};
+
 } // namespace nv
