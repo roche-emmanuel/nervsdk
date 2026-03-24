@@ -13,6 +13,8 @@ class JobDispatcher {
 
     // Default: execute synchronously — correct for tests and NervSDK standalone
     virtual void post(Job job, bool onMain = false) { job(); }
+
+    [[nodiscard]] virtual auto is_main_thread() const -> bool { return false; }
 };
 
 } // namespace nv
