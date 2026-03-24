@@ -51,8 +51,6 @@ class ResourceManager {
 
     auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
         -> String;
-    auto read_virtual_binary_file(const String& fname,
-                                  bool forceAllowSystem = false) -> U8Vector;
 
     auto get_file_last_write_time(const String& fname) -> std::time_t;
 

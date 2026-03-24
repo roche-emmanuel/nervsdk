@@ -363,12 +363,12 @@ void GLTFAsset::load_gltf(const char* path, bool load_buffers,
     load_from_json(data);
 }
 
-void GLTFAsset::load_glb_from_memory(const U8Vector& content) {
+void GLTFAsset::load_glb_from_memory(const String& content) {
     clear();
     NVCHK(content.size() >= sizeof(GLBHeader),
           "File too small to be valid GLB");
 
-    const uint8_t* ptr = content.data();
+    const auto* ptr = (const uint8_t*)content.data();
     const uint8_t* end = ptr + content.size();
 
     // --- Read header ---
@@ -427,7 +427,7 @@ void GLTFAsset::load_glb_from_memory(const U8Vector& content) {
 }
 
 void GLTFAsset::load_glb(const char* path, bool forceAllowSystem) {
-    U8Vector content = nv::read_virtual_binary_file(path, forceAllowSystem);
+    String content = nv::read_virtual_file(path, forceAllowSystem);
     load_glb_from_memory(content);
 }
 

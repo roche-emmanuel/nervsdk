@@ -51,7 +51,7 @@ class GLTFAsset : public RefObject {
                    bool forceAllowSystem = false);
     void load_glb(const char* path, bool forceAllowSystem = false);
     void load_from_json(const Json& data, U8Vector* glb_bin_chunk = nullptr);
-    void load_glb_from_memory(const U8Vector& content);
+    void load_glb_from_memory(const String& content);
 
     auto write_json() const -> Json;
     void save(const char* path) const;

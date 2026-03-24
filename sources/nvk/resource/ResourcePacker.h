@@ -135,9 +135,6 @@ class ResourceUnpacker : public ResourceProvider {
     auto read_file(const String& fileName) -> String override {
         return extract_file<String>(fileName);
     }
-    auto read_binary_file(const String& fileName) -> U8Vector override {
-        return extract_file<U8Vector>(fileName);
-    }
 
     void read_file_async(const String& fileName,
                          ReadCallback callback) override;

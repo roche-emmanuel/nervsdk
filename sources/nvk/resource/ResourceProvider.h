@@ -21,10 +21,6 @@ class ResourceProvider : public RefObject {
         THROW_MSG("Sync read not supported by provider {}", get_name());
         return {};
     }
-    virtual auto read_binary_file(const String& fileName) -> U8Vector {
-        THROW_MSG("Sync read not supported by provider {}", get_name());
-        return {};
-    }
 
     virtual void read_file_async(const String& fileName,
                                  ReadCallback callback) = 0;

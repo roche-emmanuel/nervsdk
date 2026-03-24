@@ -161,30 +161,6 @@ auto ResourceManager::read_virtual_file(const String& fname,
     return {};
 }
 
-auto ResourceManager::read_virtual_binary_file(const String& fname,
-                                               bool forceAllowSystem)
-    -> U8Vector {
-
-    if ((_useSystemFiles || forceAllowSystem) && system_file_exists(fname)) {
-        return read_system_binary_file(fname.c_str());
-    }
-
-    // Check for files in the resource packs:
-    for (const auto& up : _providers) {
-        if (up->contains_file(fname)) {
-            if (up->supports_sync_read()) {
-                return up->read_binary_file(fname);
-            }
-
-            logWARN("Provider {} doesn't support sync read, cannot read {}",
-                    up->get_name(), fname);
-        }
-    }
-
-    THROW_MSG("Cannot read virtual file {}", fname);
-    return {};
-}
-
 auto ResourceManager::validate_resource_path(StringID category,
                                              const char* filename) -> String {
     String full_path = filename;
