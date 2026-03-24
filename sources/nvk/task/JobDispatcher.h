@@ -12,10 +12,7 @@ class JobDispatcher {
     using Job = std::function<void()>;
 
     // Default: execute synchronously — correct for tests and NervSDK standalone
-    virtual void post(Job job) { job(); }
-
-    // For continuations that must run on the main thread
-    virtual void post_main(Job job) { job(); }
+    virtual void post(Job job, bool onMain = false) { job(); }
 };
 
 } // namespace nv
