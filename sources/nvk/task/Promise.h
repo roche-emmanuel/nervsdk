@@ -628,17 +628,17 @@ inline auto make_resolved_promise() -> Promise<void> {
     return Promise<void>(impl);
 }
 
-template <typename E>
-inline auto make_rejected_promise(E&& error) -> Promise<void> {
+template <typename E, typename T = void>
+inline auto make_rejected_promise(E&& error) -> Promise<T> {
     auto impl = create_ref_object<PromiseBase>();
     impl->reject_internal(Any(std::forward<E>(error)));
-    return Promise<void>(impl);
+    return Promise<T>(impl);
 }
 
-inline auto make_rejected_promise() -> Promise<void> {
+template <typename T = void> inline auto make_rejected_promise() -> Promise<T> {
     auto impl = create_ref_object<PromiseBase>();
     impl->reject_internal();
-    return Promise<void>(impl);
+    return Promise<T>(impl);
 }
 
 // ---------------------------------------------------------------------------
