@@ -9,6 +9,8 @@
 
 namespace nv {
 
+template <typename T> class Promise;
+
 // Returns current physical RAM usage in bytes, or 0 on failure.
 auto get_current_rss() -> U64;
 
@@ -61,6 +63,9 @@ auto read_system_binary_file(const char* fname) -> U8Vector;
 
 auto read_virtual_file(const String& fname, bool forceAllowSystem = false)
     -> String;
+
+auto read_virtual_file_async(const String& fname, bool forceAllowSystem = false)
+    -> Promise<String>;
 
 auto get_virtual_files(const String& directory, const std::regex& pattern,
                        bool recursive) -> Vector<String>;
