@@ -30,22 +30,142 @@ Mathematical primitives and utilities:
 
 ### PCG (Procedural Content Generation)
 
-Complete PCG system for planar graph generation:
+Complete PCG system for 2D planar graph analysis and path manipulation.
 
-- **PCGContext**: Main context holding the planar graph
-- **PCGGraph**: Planar graph with nodes and edges
-- **PCGNode**: Graph nodes with position, data, and connectivity
-- **PCGPoint**: Point coordinates and attributes
-- **PCGPointRef**: Reference to points in the array
-- **PointArray**: Storage container with fast indexing
-- **PointAttribute**: Custom typed data per point
+#### Core Types
 
-**Operations**:
-- `pcg_set_data_id()` - Assign unique IDs to paths
-- `pcg_find_path_2d_intersections()` - Detect crossing points
-- `pcg_build_intersection_contours()` - Generate closed loops
-- `pcg_resample_paths()` - Equal-interval resampling
-- `pcg_compute_path_offsets()` - Perpendicular offset generation
+- **PointArray**: Container for points with typed attributes
+- **PointAttribute**: Typed data storage (Vec3d, F32, I32, etc.)
+- **PCGPoint**: Value-type point (independent copy)
+- **PCGPointRef**: Reference-type point (modifies underlying array)
+- **WeightedPoint**: Point with weight for averaging operations
+- **PCGContext**: ExecutionContext with input/output slots
+
+#### Built-in Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `$Index` | I32 | Point index |
+| `$Position` | Vec3d | 3D position |
+| `$Rotation` | Vec3d | Rotation Euler |
+| `$Scale` | Vec3d | Scale factor |
+| `$Color` | Vec4d | RGBA color |
+| `$Density` | F64 | Density value |
+| `$Steepness` | F64 | Slope steepness |
+| `$BoundsMin` | Vec3d | Bounding min |
+| `$BoundsMax` | Vec3d | Bounding max |
+
+#### Operations
+
+| Function | Description |
+|----------|-------------|
+| `pcg_set_data_id(ctx)` | Assign unique ID attribute to each path |
+| `pcg_find_path_2d_intersections(ctx)` | Find path crossing points |
+| `pcg_build_intersection_contours(ctx)` | Generate closed loops at intersections |
+| `pcg_resample_paths(ctx)` | Resample at equal intervals |
+| `pcg_compute_path_offsets(ctx)` | Generate parallel offset paths |
+
+#### PCG Usage Examples
+
+**Creating a PointArray with custom attributes:**
+```cpp
+#include <nvk_pcg.h>
+
+using namespace nv;
+
+// Create a square path with positions
+auto pos = PointAttribute::create<Vec3d>(pt_position_attr, {
+    {0.0, 0.0, 0.0},
+    {1.0, 0.0, 0.0},
+    {1.0, 1.0, 0.0},
+    {0.0, 1.0, 0.0},
+});
+
+auto color = PointAttribute::create<Vec4d>("$Color", {
+    {1.0, 0.0, 0.0, 1.0},
+    {0.0, 1.0, 0.0, 1.0},
+    {0.0, 0.0, 1.0, 1.0},
+    {1.0, 1.0, 0.0, 1.0},
+});
+
+auto points = PointArray::create({pos, color});
+points->set_closed_loop(true);
+```
+
+**Accessing and modifying points:**
+```cpp
+// Get a point reference (modifies underlying array)
+auto pointRef = points->get_point(0);
+Vec3d pos = pointRef.position();  // Get position
+pointRef.set_position(Vec3d(2.0, 0.0, 0.0));
+
+// Get a point copy (independent)
+PCGPoint pointCopy = points->copy_point(0);
+pointCopy.set_position(Vec3d(3.0, 0.0, 0.0));  // Doesn't affect array
+
+// Access attributes by type
+const auto& positions = points->get<Vec3d>(pt_position_attr);
+const auto& colors = points->get<Vec4d>("$Color");
+```
+
+**PCG Context workflow:**
+```cpp
+auto ctx = PCGContext::create();
+auto& in = ctx->inputs();
+
+// Add multiple paths as input
+PointArrayVector paths;
+paths.push_back(points);
+in.set("In", paths);
+
+// Set operation parameters
+in.set("Distance", 0.5);  // Offset distance
+
+// Execute operation
+pcg_compute_path_offsets(*ctx);
+
+// Get results
+PointArrayVector outputs = ctx->outputs().get("Out");
+for (const auto& contour : outputs) {
+    const auto& positions = contour->get<Vec3d>(pt_position_attr);
+    // Process offset contour...
+}
+```
+
+**Weighted averaging of point attributes:**
+```cpp
+Vector<WeightedPoint> weighted;
+weighted.emplace_back(points->get_point(0), 0.7);
+weighted.emplace_back(points->get_point(1), 0.3);
+
+PCGPoint averaged;
+averaged.set_weighted_average(weighted, {"$Position"});
+```
+
+**Resampling paths:**
+```cpp
+in.set("Resolution", 0.1);  // Target segment length
+pcg_resample_paths(*ctx);
+```
+
+**Intersection contour generation:**
+```cpp
+// Create intersecting paths (forming a cross)
+auto pos1 = PointAttribute::create<Vec3d>(pt_position_attr, {
+    {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {2.0, 1.0, 0.0},
+    {1.0, 1.0, 0.0}, {1.0, -1.0, 0.0},
+});
+auto paths = PointArrayVector{PointArray::create({pos1})};
+
+auto ctx = PCGContext::create();
+ctx->inputs().set("In", paths);
+
+pcg_find_path_2d_intersections(*ctx);
+pcg_build_intersection_contours(*ctx);
+
+auto contours = ctx->outputs().get("Out");
+// Contours contain closed loops at intersection points
+```
 
 ### GLTF
 
