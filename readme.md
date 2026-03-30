@@ -278,40 +278,41 @@ External libraries:
 - **RTree** - Spatial indexing
 - **entt** - ECS framework (optional)
 
-## Usage Example
+## PCG Quick Example
 
 ```cpp
-#include <nvk_base.h>
-#include <nvk_math.h>
-#include <nvk/pcg/PCGContext.h>
-#include <nvk/gltf/Asset.h>
+#include <nvk_pcg.h>
 
 using namespace nv;
 
-// Math
-Vec3f pos(1.0f, 2.0f, 3.0f);
-Vec3f normalized = pos.normalized();
-
-// PCG
-PCGContext ctx;
-ctx.add_node(0, Vec2f(0, 0));
-ctx.add_node(1, Vec2f(1, 1));
-ctx.add_edge(0, 1);
-pcg_set_data_id(ctx);
-
-// GLTF
-GLTFAsset asset = GLTFAsset::load("model.gltf");
-GLTFScene* scene = asset.getScene(0);
-
-// Task
-auto promise = make_promise([](Defer d) {
-    // async work
-    d.resolve(42);
+// Create a closed-loop square path
+auto pos = PointAttribute::create<Vec3d>(pt_position_attr, {
+    {0.0, 0.0, 0.0},
+    {2.0, 0.0, 0.0},
+    {2.0, 2.0, 0.0},
+    {0.0, 2.0, 0.0},
 });
+auto points = PointArray::create({pos});
+points->set_closed_loop(true);
 
-promise.then([](const Any& value) {
-    return value.get<int>();
-});
+// Add custom attribute
+auto density = points->add_attribute<F64>("$Density", 1.0);
+density[0] = 0.5; density[1] = 0.7; density[2] = 0.9; density[3] = 0.3;
+
+// Set up PCG context
+auto ctx = PCGContext::create();
+ctx->inputs().set("In", PointArrayVector{points});
+ctx->inputs().set("Distance", 0.25);
+
+// Compute offsets
+pcg_compute_path_offsets(*ctx);
+auto contours = ctx->outputs().get("Out");
+
+// Process result
+for (const auto& contour : contours) {
+    F64 area = contour->compute_area();
+    // contour is a closed loop of offset positions
+}
 ```
 
 ## Build
