@@ -43,31 +43,32 @@ Complete PCG system for 2D planar graph analysis and path manipulation.
 
 #### Built-in Attributes
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `$Index` | I32 | Point index |
-| `$Position` | Vec3d | 3D position |
-| `$Rotation` | Vec3d | Rotation Euler |
-| `$Scale` | Vec3d | Scale factor |
-| `$Color` | Vec4d | RGBA color |
-| `$Density` | F64 | Density value |
-| `$Steepness` | F64 | Slope steepness |
-| `$BoundsMin` | Vec3d | Bounding min |
-| `$BoundsMax` | Vec3d | Bounding max |
+| Attribute    | Type  | Description     |
+| ------------ | ----- | --------------- |
+| `$Index`     | I32   | Point index     |
+| `$Position`  | Vec3d | 3D position     |
+| `$Rotation`  | Vec3d | Rotation Euler  |
+| `$Scale`     | Vec3d | Scale factor    |
+| `$Color`     | Vec4d | RGBA color      |
+| `$Density`   | F64   | Density value   |
+| `$Steepness` | F64   | Slope steepness |
+| `$BoundsMin` | Vec3d | Bounding min    |
+| `$BoundsMax` | Vec3d | Bounding max    |
 
 #### Operations
 
-| Function | Description |
-|----------|-------------|
-| `pcg_set_data_id(ctx)` | Assign unique ID attribute to each path |
-| `pcg_find_path_2d_intersections(ctx)` | Find path crossing points |
-| `pcg_build_intersection_contours(ctx)` | Generate closed loops at intersections |
-| `pcg_resample_paths(ctx)` | Resample at equal intervals |
-| `pcg_compute_path_offsets(ctx)` | Generate parallel offset paths |
+| Function                               | Description                             |
+| -------------------------------------- | --------------------------------------- |
+| `pcg_set_data_id(ctx)`                 | Assign unique ID attribute to each path |
+| `pcg_find_path_2d_intersections(ctx)`  | Find path crossing points               |
+| `pcg_build_intersection_contours(ctx)` | Generate closed loops at intersections  |
+| `pcg_resample_paths(ctx)`              | Resample at equal intervals             |
+| `pcg_compute_path_offsets(ctx)`        | Generate parallel offset paths          |
 
 #### PCG Usage Examples
 
 **Creating a PointArray with custom attributes:**
+
 ```cpp
 #include <nvk_pcg.h>
 
@@ -93,6 +94,7 @@ points->set_closed_loop(true);
 ```
 
 **Accessing and modifying points:**
+
 ```cpp
 // Get a point reference (modifies underlying array)
 auto pointRef = points->get_point(0);
@@ -109,6 +111,7 @@ const auto& colors = points->get<Vec4d>("$Color");
 ```
 
 **PCG Context workflow:**
+
 ```cpp
 auto ctx = PCGContext::create();
 auto& in = ctx->inputs();
@@ -133,6 +136,7 @@ for (const auto& contour : outputs) {
 ```
 
 **Weighted averaging of point attributes:**
+
 ```cpp
 Vector<WeightedPoint> weighted;
 weighted.emplace_back(points->get_point(0), 0.7);
@@ -143,12 +147,14 @@ averaged.set_weighted_average(weighted, {"$Position"});
 ```
 
 **Resampling paths:**
+
 ```cpp
 in.set("Resolution", 0.1);  // Target segment length
 pcg_resample_paths(*ctx);
 ```
 
 **Intersection contour generation:**
+
 ```cpp
 // Create intersecting paths (forming a cross)
 auto pos1 = PointAttribute::create<Vec3d>(pt_position_attr, {
@@ -165,6 +171,43 @@ pcg_build_intersection_contours(*ctx);
 
 auto contours = ctx->outputs().get("Out");
 // Contours contain closed loops at intersection points
+```
+
+**Path offsetting:**
+
+```cpp
+#include <nvk_pcg.h>
+
+using namespace nv;
+
+// Create a closed-loop square path
+auto pos = PointAttribute::create<Vec3d>(pt_position_attr, {
+    {0.0, 0.0, 0.0},
+    {2.0, 0.0, 0.0},
+    {2.0, 2.0, 0.0},
+    {0.0, 2.0, 0.0},
+});
+auto points = PointArray::create({pos});
+points->set_closed_loop(true);
+
+// Add custom attribute
+auto density = points->add_attribute<F64>("$Density", 1.0);
+density[0] = 0.5; density[1] = 0.7; density[2] = 0.9; density[3] = 0.3;
+
+// Set up PCG context
+auto ctx = PCGContext::create();
+ctx->inputs().set("In", PointArrayVector{points});
+ctx->inputs().set("Distance", 0.25);
+
+// Compute offsets
+pcg_compute_path_offsets(*ctx);
+auto contours = ctx->outputs().get("Out");
+
+// Process result
+for (const auto& contour : contours) {
+    F64 area = contour->compute_area();
+    // contour is a closed loop of offset positions
+}
 ```
 
 ### GLTF
@@ -185,6 +228,7 @@ Full glTF 2.0 loader with scene graph construction:
 - **GLTFCamera**: Perspective/orthographic camera
 
 **Features**:
+
 - Position, normal, tangent, UV, color, joint, weight attributes
 - PBR workflow with all standard textures
 - Morph targets support
@@ -201,6 +245,7 @@ Promise-based asynchronous programming:
 - **JobDispatcher**: Thread pool task scheduling
 
 **Combinators**:
+
 - `promise_all()` - Wait for all promises to resolve
 - `promise_all_settled()` - Get all results (success or failure)
 - `promise_race()` - First promise to settle
@@ -239,20 +284,21 @@ Graphics engine implementations:
 
 Core type definitions:
 
-| Type | Description |
-|------|-------------|
-| Bool | bool |
-| Byte | unsigned char |
-| I8/U8 | int8_t / uint8_t |
-| I16/U16 | int16_t / uint16_t |
-| I32/U32 | int32_t / uint32_t |
-| I64/U64 | int64_t / uint64_t |
-| F16 | half_float::half |
-| F32 | float |
-| F64 | double |
+| Type     | Description                                   |
+| -------- | --------------------------------------------- |
+| Bool     | bool                                          |
+| Byte     | unsigned char                                 |
+| I8/U8    | int8_t / uint8_t                              |
+| I16/U16  | int16_t / uint16_t                            |
+| I32/U32  | int32_t / uint32_t                            |
+| I64/U64  | int64_t / uint64_t                            |
+| F16      | half_float::half                              |
+| F32      | float                                         |
+| F64      | double                                        |
 | StringID | FNV-1a hash of string (compile-time constant) |
 
 String ID macros:
+
 ```cpp
 #define SID(str) nv::str_id_const(str)  // Compile-time hash
 auto id = my_string"_sid;             // User literal
@@ -278,43 +324,6 @@ External libraries:
 - **RTree** - Spatial indexing
 - **entt** - ECS framework (optional)
 
-## PCG Quick Example
-
-```cpp
-#include <nvk_pcg.h>
-
-using namespace nv;
-
-// Create a closed-loop square path
-auto pos = PointAttribute::create<Vec3d>(pt_position_attr, {
-    {0.0, 0.0, 0.0},
-    {2.0, 0.0, 0.0},
-    {2.0, 2.0, 0.0},
-    {0.0, 2.0, 0.0},
-});
-auto points = PointArray::create({pos});
-points->set_closed_loop(true);
-
-// Add custom attribute
-auto density = points->add_attribute<F64>("$Density", 1.0);
-density[0] = 0.5; density[1] = 0.7; density[2] = 0.9; density[3] = 0.3;
-
-// Set up PCG context
-auto ctx = PCGContext::create();
-ctx->inputs().set("In", PointArrayVector{points});
-ctx->inputs().set("Distance", 0.25);
-
-// Compute offsets
-pcg_compute_path_offsets(*ctx);
-auto contours = ctx->outputs().get("Out");
-
-// Process result
-for (const auto& contour : contours) {
-    F64 area = contour->compute_area();
-    // contour is a closed loop of offset positions
-}
-```
-
 ## Build
 
 ```bash
@@ -323,6 +332,7 @@ cmake --build build
 ```
 
 Requirements:
+
 - C++17 compatible compiler
 - CMake 3.15+
 
