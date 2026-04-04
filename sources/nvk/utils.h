@@ -264,6 +264,130 @@ auto compute_data_checksum(const Container& data) -> U32 {
 auto compute_file_checksum(const String& filename,
                            bool forceAllowSystem = false) -> U32;
 
+template <typename T> inline auto mean(T* ptr, U64 num) -> T {
+
+    if (num == 0) {
+        return 0.0;
+    }
+
+    T meanVal = 0.0;
+
+    for (U64 i = 0; i < num; ++i) {
+        meanVal += (*ptr++);
+    }
+
+    return meanVal / (T)num;
+}
+
+template <typename T> inline auto mean(Vector<T> vec) -> T {
+    return mean(vec.data(), vec.size());
+}
+
+template <typename T> inline auto mean(T* ptr, U64 num, T& mini, T& maxi) -> T {
+
+    if (num == 0) {
+        return 0.0;
+    }
+
+    T meanVal = 0.0;
+    mini = ptr[0];
+    maxi = ptr[0];
+
+    for (U64 i = 0; i < num; ++i) {
+        auto val = (*ptr++);
+        if (val < mini) {
+            mini = val;
+        }
+        if (val > maxi) {
+            maxi = val;
+        }
+
+        meanVal += val;
+    }
+
+    return meanVal / (T)num;
+}
+
+template <typename T> inline auto mean(Vector<T> vec, T& mini, T& maxi) -> T {
+    return mean(vec.data(), vec.size(), mini, maxi);
+}
+
+template <typename T> inline auto stddev(T* ptr, U64 num) -> T {
+
+    if (num == 0) {
+        return 0.0;
+    }
+
+    T meanVal = mean(ptr, num);
+    T stddevVal = 0.0;
+
+    for (U64 i = 0; i < num; ++i) {
+        T diff = (*ptr++) - meanVal;
+        stddevVal += diff * diff;
+    }
+
+    return std::sqrt(stddevVal / (T)num);
+}
+
+template <typename T> inline auto stddev(Vector<T> vec) -> T {
+    return stddev(vec.data(), vec.size());
+}
+
+template <typename T>
+inline auto stddev(T* ptr, U64 num, T& meanVal, T& mini, T& maxi) -> T {
+
+    if (num == 0) {
+        return 0.0;
+    }
+
+    meanVal = mean(ptr, num, mini, maxi);
+    T stddevVal = 0.0;
+
+    for (U64 i = 0; i < num; ++i) {
+        T diff = (*ptr++) - meanVal;
+        stddevVal += diff * diff;
+    }
+
+    return std::sqrt(stddevVal / (T)num);
+}
+
+template <typename T>
+inline auto stddev(Vector<T> vec, T& meanVal, T& mini, T& maxi) -> T {
+    return stddev(vec.data(), vec.size(), meanVal, mini, maxi);
+}
+
+template <typename T>
+inline auto percentile(const T* ptr, U64 num, F64 percentile) -> T {
+
+    if (num == 0) {
+        return 0.0;
+    }
+
+    // Ensure percentile is within [0, 100]
+    percentile = std::max(0.0, std::min(100.0, percentile));
+
+    // Create a copy of the array:
+    Vector<T> sortedArray(ptr, ptr + num);
+
+    // Sort the copied array
+    std::sort(sortedArray.begin(), sortedArray.end());
+
+    // Calculate the index corresponding to the given percentile
+    F64 index = (percentile / 100.0) * (F64)(num - 1);
+
+    // Compute the lower and upper indices for interpolation
+    U64 lowerIndex = static_cast<U64>(std::floor(index));
+    U64 upperIndex = static_cast<U64>(std::ceil(index));
+
+    // Interpolate between the values at lower and upper indices
+    T lowerValue = sortedArray[lowerIndex];
+    T upperValue = sortedArray[upperIndex];
+    F64 fraction = index - (F64)lowerIndex;
+
+    return static_cast<T>((1.0 - fraction) * lowerValue +
+                          fraction * upperValue);
+}
+
 } // namespace nv
 
 #endif
