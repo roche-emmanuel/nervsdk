@@ -41,6 +41,7 @@
 #include <nvk_type_ids.h>
 
 #include <nvk/base/Any.h>
+#include <nvk/base/uuid.h>
 #include <nvk/task/Promise.h>
 
 #endif

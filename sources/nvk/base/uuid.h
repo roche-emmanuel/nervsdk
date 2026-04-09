@@ -4,7 +4,7 @@
 #define NV_UUID_H_
 
 #include <nvk/base/std_containers.h>
-#include <nvk_common.h>
+#include <nvk_base.h>
 
 namespace nv {
 
@@ -93,6 +93,34 @@ template <> struct hash<nv::Uuid> {
         return h;
     }
 };
+
+// Add support to write to string:
+inline auto operator<<(std::ostream& os, const nv::Uuid& uid) -> std::ostream& {
+    os << uid.to_string();
+    return os;
+}
+
 } // namespace std
+
+template <> struct fmt::formatter<nv::Uuid> {
+    constexpr auto parse(format_parse_context& ctx) const
+        -> decltype(ctx.begin()) {
+        const auto* it = ctx.begin();
+        const auto* end = ctx.end();
+
+        // Check if reached the end of the range:
+        if (it != end && *it != '}')
+            throw format_error("invalid format");
+
+        // Return an iterator past the end of the parsed range:
+        return it;
+    }
+
+    // Overloaded format method
+    auto format(const nv::Uuid uid, fmt::format_context& ctx) const
+        -> decltype(ctx.out()) {
+        return fmt::format_to(ctx.out(), "{}", uid.to_string());
+    }
+};
 
 #endif
