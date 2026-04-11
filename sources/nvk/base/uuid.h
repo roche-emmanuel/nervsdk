@@ -81,16 +81,29 @@ class Uuid {
 } // namespace nv
 
 namespace std {
+
 template <> struct hash<nv::Uuid> {
     auto operator()(const nv::Uuid& uuid) const noexcept -> std::size_t {
-        // FNV-1a over the 16 bytes; good enough for hash_map use.
         const nv::U8* p = uuid.bytes();
-        std::size_t h = 14695981039346656037ULL;
-        for (nv::U32 i = 0; i < nv::Uuid::BYTE_COUNT; ++i) {
-            h ^= static_cast<std::size_t>(p[i]);
-            h *= 1099511628211ULL;
+
+        // FNV-1a constants sized to the platform's size_t.
+        // 64-bit: offset=14695981039346656037, prime=1099511628211
+        // 32-bit: offset=2166136261,           prime=16777619
+        if constexpr (sizeof(std::size_t) == 8) {
+            std::size_t h = 14695981039346656037ULL;
+            for (nv::U32 i = 0; i < nv::Uuid::BYTE_COUNT; ++i) {
+                h ^= static_cast<std::size_t>(p[i]);
+                h *= 1099511628211ULL;
+            }
+            return h;
+        } else {
+            std::size_t h = 2166136261UL;
+            for (nv::U32 i = 0; i < nv::Uuid::BYTE_COUNT; ++i) {
+                h ^= static_cast<std::size_t>(p[i]);
+                h *= 16777619UL;
+            }
+            return h;
         }
-        return h;
     }
 };
 
