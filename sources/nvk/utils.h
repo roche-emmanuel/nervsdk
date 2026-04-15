@@ -33,6 +33,11 @@ auto glob_to_regex(const String& pattern) -> String;
 auto matches_pattern(const String& name, const String& pattern) -> bool;
 
 // Return true if 'name' is covered by at least one pattern in 'patterns'.
+// Patterns are evaluated in order. A pattern prefixed with '!' is a deny rule:
+// if the name matches it, the function immediately returns false, short-
+// circuiting any remaining allow patterns. This allows expressions like:
+//   { "!mxs.advanced.*", "mxs.*" }  — all mxs.* except mxs.advanced.*
+//   { "!test_*", "*" }              — everything except test_* entries
 auto matches_any_pattern(const String& name, const Vector<String>& patterns)
     -> bool;
 

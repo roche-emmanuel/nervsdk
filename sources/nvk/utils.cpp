@@ -1298,8 +1298,16 @@ auto matches_pattern(const String& name, const String& pattern) -> bool {
 auto matches_any_pattern(const String& name, const Vector<String>& patterns)
     -> bool {
     for (const auto& pattern : patterns) {
-        if (matches_pattern(name, pattern))
-            return true;
+        // A pattern starting with '!' is a deny rule: if the name matches
+        // the rest of the pattern, immediately return false regardless of
+        // any subsequent allow patterns. Order in the list matters.
+        if (!pattern.empty() && pattern[0] == '!') {
+            if (matches_pattern(name, pattern.substr(1)))
+                return false;
+        } else {
+            if (matches_pattern(name, pattern))
+                return true;
+        }
     }
     return false;
 }
