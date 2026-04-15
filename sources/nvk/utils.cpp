@@ -1284,4 +1284,24 @@ auto compute_file_checksum(const String& filename, bool forceAllowSystem)
     auto content = read_virtual_file(filename, forceAllowSystem);
     return compute_data_checksum(content);
 }
+
+auto nv::matches_pattern(const String& name, const String& pattern) -> bool {
+    // Full wildcard short-circuit — avoids building a regex for the common case
+    if (pattern == "*")
+        return true;
+
+    // Build an anchored regex from the glob pattern and match the full name
+    String regexStr = "^" + glob_to_regex(pattern) + "$";
+    return std::regex_match(name, std::regex(regexStr));
+}
+
+auto nv::matches_any_pattern(const String& name, const Vector<String>& patterns)
+    -> bool {
+    for (const auto& pattern : patterns) {
+        if (matches_pattern(name, pattern))
+            return true;
+    }
+    return false;
+}
+
 } // namespace nv

@@ -24,6 +24,18 @@ auto fromHex(const String& hex) -> U8Vector;
 // Helper function to convert glob pattern to regex
 auto glob_to_regex(const String& pattern) -> String;
 
+// Return true if 'name' matches 'pattern' using full glob rules.
+// The pattern is anchored (must match the entire string), so:
+//   "*"        matches any name
+//   "mxs.*"    matches "mxs.backend_panel", "mxs.rcs_panel", etc.
+//   "200113_*" matches "200113_09_MX20HD", "200113_anything", etc.
+//   "exact"    matches only that exact string
+auto matches_pattern(const String& name, const String& pattern) -> bool;
+
+// Return true if 'name' is covered by at least one pattern in 'patterns'.
+auto matches_any_pattern(const String& name, const Vector<String>& patterns)
+    -> bool;
+
 // Helper function to expand file wildcards
 auto expand_files_wildcard(const String& sourceDir, const String& pattern)
     -> Set<String>;
