@@ -1285,7 +1285,7 @@ auto compute_file_checksum(const String& filename, bool forceAllowSystem)
     return compute_data_checksum(content);
 }
 
-auto nv::matches_pattern(const String& name, const String& pattern) -> bool {
+auto matches_pattern(const String& name, const String& pattern) -> bool {
     // Full wildcard short-circuit — avoids building a regex for the common case
     if (pattern == "*")
         return true;
@@ -1295,7 +1295,7 @@ auto nv::matches_pattern(const String& name, const String& pattern) -> bool {
     return std::regex_match(name, std::regex(regexStr));
 }
 
-auto nv::matches_any_pattern(const String& name, const Vector<String>& patterns)
+auto matches_any_pattern(const String& name, const Vector<String>& patterns)
     -> bool {
     for (const auto& pattern : patterns) {
         if (matches_pattern(name, pattern))
