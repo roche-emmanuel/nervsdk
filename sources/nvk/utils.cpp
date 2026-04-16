@@ -664,8 +664,8 @@ static auto yaml_to_json(const YAML::Node& node) -> Json {
 
     case YAML::NodeType::Scalar: {
         bool bool_val;
-        long long int_val;
-        double double_val;
+        I64 int_val;
+        F64 double_val;
 
         // Try conversions in order
         if (YAML::convert<bool>::decode(node, bool_val)) {
