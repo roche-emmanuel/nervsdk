@@ -357,7 +357,8 @@ template <> struct AnyGetter<F64Vector> {
         // Convert and store in the Any object
         F64Vector converted;
         converted.reserve(ref->size());
-        converted.insert(converted.end(), ref->begin(), ref->end());
+        std::transform(ref->begin(), ref->end(), std::back_inserter(converted),
+                       [](I64 v) { return static_cast<double>(v); });
 
         Any& mval = const_cast<Any&>(val);
 
