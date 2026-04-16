@@ -1313,4 +1313,20 @@ auto matches_any_pattern(const String& name, const Vector<String>& patterns)
     return false;
 }
 
+auto fromHexString(const String& hex) -> String {
+    nv::U8Vector bytes = nv::fromHex(hex);
+    return String(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
+
+auto toHexString(const String& s) -> String {
+    return nv::toHex(
+        nv::U8Vector(reinterpret_cast<const uint8_t*>(s.data()),
+                     reinterpret_cast<const uint8_t*>(s.data()) + s.size()));
+}
+
+auto toUpperHexString(const String& s) -> String {
+    String hex = toHexString(s);
+    std::transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+    return hex;
+}
 } // namespace nv

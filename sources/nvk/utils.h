@@ -21,6 +21,11 @@ auto base64_decode(const String& encoded_string) -> Vector<U8>;
 auto toHex(const U8Vector& data) -> String;
 auto fromHex(const String& hex) -> U8Vector;
 
+auto toHexString(const String& s) -> String;
+auto toUpperHexString(const String& s) -> String;
+
+auto fromHexString(const String& hex) -> String;
+
 // Helper function to convert glob pattern to regex
 auto glob_to_regex(const String& pattern) -> String;
 
