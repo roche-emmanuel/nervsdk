@@ -1271,6 +1271,7 @@ auto get_current_module_path(PathSep sep) -> String {
     return normalized_path(pBuf, false, sep);
 #else
     THROW_MSG("get_current_module_path() not supported.");
+    return {};
 #endif
 }
 
