@@ -1329,4 +1329,5 @@ auto toUpperHexString(const String& s) -> String {
     std::transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
     return hex;
 }
+
 } // namespace nv
