@@ -298,22 +298,7 @@ auto is_absolute_path(const String& path) -> bool {
 }
 
 auto get_absolute_path(const String& path) -> String {
-#ifdef _WIN32
-    DWORD retval = 0;
-    std::array<char, BUFSIZE> buffer{0};
-    char** lppPart = {nullptr};
-
-    retval = GetFullPathName(path.c_str(), BUFSIZE, buffer.data(), lppPart);
-
-    NVCHK(retval != 0, "Cannot build fullpath variable.");
-
-    String result = buffer.data();
-    return result;
-#else
-    char resolved_path[PATH_MAX];
-    realpath(path.c_str(), resolved_path);
-    return String(resolved_path);
-#endif
+    return std::filesystem::absolute(path).string();
 }
 
 // Read file content as string:
