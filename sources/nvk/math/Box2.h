@@ -202,8 +202,8 @@ template <typename T> struct Box2 {
      * @param p an arbitrary point.
      */
     [[nodiscard]] auto enlarge(const Vec2<value_t>& p) const -> Box2<value_t> {
-        return Box2<value_t>(minimum(xmin, p.x), maximum(xmax, p.x),
-                             minimum(ymin, p.y), maximum(ymax, p.y));
+        return Box2<value_t>(std::min(xmin, p.x()), std::max(xmax, p.x()),
+                             std::min(ymin, p.y()), std::max(ymax, p.y()));
     }
 
     /**
@@ -212,8 +212,8 @@ template <typename T> struct Box2 {
      * @param r an arbitrary bounding box.
      */
     [[nodiscard]] auto enlarge(const Box2<value_t>& r) const -> Box2<value_t> {
-        return Box2<value_t>(minimum(xmin, r.xmin), maximum(xmax, r.xmax),
-                             minimum(ymin, r.ymin), maximum(ymax, r.ymax));
+        return Box2<value_t>(std::min(xmin, r.xmin), std::max(xmax, r.xmax),
+                             std::min(ymin, r.ymin), std::max(ymax, r.ymax));
     }
 
     /**

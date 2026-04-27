@@ -537,7 +537,7 @@ template <typename T> class Mat3 {
     }
 
     inline auto operator*(const Vec4<T>& v) const -> Vec4<T> {
-        return post_mult(v);
+        return Vec4<T>{post_mult(v.xyz()), v.w()};
     }
 
     [[nodiscard]] inline auto get_scale() const -> Vec3<T> {
@@ -788,7 +788,7 @@ template <typename T> class Mat3 {
         const auto* ptr = (const value_t*)_mat;
         for (int i = 0; i < num_elements; ++i) {
             if (std::isnan(*ptr)) {
-                return {NAN};
+                return {NAN, NAN};
             }
             r.extendTo(*ptr++);
         }

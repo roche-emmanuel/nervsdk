@@ -74,10 +74,10 @@ template <typename T> struct Box4 {
      * Creates a new bounding box enclosing the two given points.
      */
     Box4(const Vec4<value_t>& p, const Vec4<value_t>& q)
-        : xmin(minimum(p.x, q.x)), xmax(maximum(p.x, q.x)),
-          ymin(minimum(p.y, q.y)), ymax(maximum(p.y, q.y)),
-          zmin(minimum(p.z, q.z)), zmax(maximum(p.z, q.z)),
-          wmin(minimum(p.w, q.w)), wmax(maximum(p.w, q.w)) {}
+        : xmin(std::min(p.x(), q.x())), xmax(std::max(p.x(), q.x())),
+          ymin(std::min(p.y(), q.y())), ymax(std::max(p.y(), q.y())),
+          zmin(std::min(p.z(), q.z())), zmax(std::max(p.z(), q.z())),
+          wmin(std::min(p.w(), q.w())), wmax(std::max(p.w(), q.w())) {}
 
     /**
      * Returns the center of this bounding box.
@@ -105,10 +105,10 @@ template <typename T> struct Box4 {
      * @param p an arbitrary point.
      */
     [[nodiscard]] auto enlarge(const Vec4<value_t>& p) const -> Box4<value_t> {
-        return Box4<value_t>(minimum(xmin, p.x), maximum(xmax, p.x),
-                             minimum(ymin, p.y), maximum(ymax, p.y),
-                             minimum(zmin, p.z), maximum(zmax, p.z),
-                             minimum(wmin, p.w), maximum(wmax, p.w));
+        return Box4<value_t>(std::min(xmin, p.x()), std::max(xmax, p.x()),
+                             std::min(ymin, p.y()), std::max(ymax, p.y()),
+                             std::min(zmin, p.z()), std::max(zmax, p.z()),
+                             std::min(wmin, p.w()), std::max(wmax, p.w()));
     }
 
     /**
@@ -117,10 +117,10 @@ template <typename T> struct Box4 {
      * @param r an arbitrary bounding box.
      */
     [[nodiscard]] auto enlarge(const Box4<value_t>& r) const -> Box4<value_t> {
-        return Box4<value_t>(minimum(xmin, r.xmin), maximum(xmax, r.xmax),
-                             minimum(ymin, r.ymin), maximum(ymax, r.ymax),
-                             minimum(zmin, r.zmin), maximum(zmax, r.zmax),
-                             minimum(wmin, r.wmin), maximum(wmax, r.wmax));
+        return Box4<value_t>(std::min(xmin, r.xmin), std::max(xmax, r.xmax),
+                             std::min(ymin, r.ymin), std::max(ymax, r.ymax),
+                             std::min(zmin, r.zmin), std::max(zmax, r.zmax),
+                             std::min(wmin, r.wmin), std::max(wmax, r.wmax));
     }
 
     /**
@@ -129,8 +129,9 @@ template <typename T> struct Box4 {
      * @param p an arbitrary point.
      */
     [[nodiscard]] auto contains(const Vec4<value_t>& p) const -> bool {
-        return p.x >= xmin && p.x <= xmax && p.y >= ymin && p.y <= ymax &&
-               p.z >= zmin && p.z <= zmax && p.w >= wmin && p.w <= wmax;
+        return p.x() >= xmin && p.x() <= xmax && p.y() >= ymin &&
+               p.y() <= ymax && p.z() >= zmin && p.z() <= zmax &&
+               p.w() >= wmin && p.w() <= wmax;
     }
 
     /** Min vector */

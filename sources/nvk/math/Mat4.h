@@ -149,9 +149,12 @@ template <typename T> class Mat4 {
     }
 
     auto almost_equals(const Mat4& rhs,
-                       value_t epsilon = default_epsilon<value_t>()) -> bool {
+                       value_t epsilon = -1.0) -> bool {
         const value_t* p0 = ptr();
         const value_t* p1 = rhs.ptr();
+        if(epsilon<0.0) {
+            epsilon = default_epsilon<value_t>();
+        }
         for (int i = 0; i < num_elements; ++i) {
             if (std::abs(p1[i] - p0[i]) > epsilon) {
                 return false;
@@ -1532,7 +1535,7 @@ template <typename T> class Mat4 {
         const auto* ptr = (const value_t*)_mat;
         for (int i = 0; i < num_elements; ++i) {
             if (std::isnan(*ptr)) {
-                return {NAN};
+                return {NAN, NAN};
             }
             r.extendTo(*ptr++);
         }

@@ -52,7 +52,7 @@ template <typename T> class Mat2 {
 
     // inline explicit Mat2( float const * const ptr ) { set(ptr); }
     // inline explicit Mat2( double const * const ptr ) { set(ptr); }
-    explicit Mat2(const Quaternion<T>& quat) { make_rotate(quat); }
+    // explicit Mat2(const Quaternion<T>& quat) { make_rotate(quat); }
 
     Mat2(value_t a00, value_t a01, value_t a10, value_t a11) {
         SET_ROW(0, a00, a01);
@@ -384,7 +384,7 @@ template <typename T> class Mat2 {
                 MAT_RC(0, 1) * v.x() + MAT_RC(1, 1) * v.y()};
     }
 
-    [[nodiscard]] inline auto post_mult(const Vec3<T>& v) const -> Vec3<T> {
+    [[nodiscard]] inline auto post_mult(const Vec2<T>& v) const -> Vec2<T> {
         return {MAT_RC(0, 0) * v.x() + MAT_RC(0, 1) * v.y(),
                 MAT_RC(1, 0) * v.x() + MAT_RC(1, 1) * v.y()};
     }
@@ -393,7 +393,7 @@ template <typename T> class Mat2 {
         return post_mult(v);
     }
 
-    [[nodiscard]] inline auto get_scale() const -> Vec3<T> {
+    [[nodiscard]] inline auto get_scale() const -> Vec2<T> {
         Vec2<T> x_vec(MAT_RC(0, 0), MAT_RC(1, 0));
         Vec2<T> y_vec(MAT_RC(0, 1), MAT_RC(1, 1));
         return {x_vec.length(), y_vec.length()};
@@ -560,7 +560,7 @@ template <typename T> class Mat2 {
         const auto* ptr = (const value_t*)_mat;
         for (int i = 0; i < num_elements; ++i) {
             if (std::isnan(*ptr)) {
-                return {NAN};
+                return {NAN, NAN};
             }
             r.extendTo(*ptr++);
         }

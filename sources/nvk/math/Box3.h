@@ -64,9 +64,9 @@ template <typename T> struct Box3 {
      * Creates a new bounding box enclosing the two given points.
      */
     Box3(const Vec3<value_t>& p, const Vec3<value_t>& q)
-        : xmin(minimum(p.x, q.x)), xmax(maximum(p.x, q.x)),
-          ymin(minimum(p.y, q.y)), ymax(maximum(p.y, q.y)),
-          zmin(minimum(p.z, q.z)), zmax(maximum(p.z, q.z)) {}
+        : xmin(std::min(p.x(), q.x())), xmax(std::max(p.x(), q.x())),
+          ymin(std::min(p.y(), q.y())), ymax(std::max(p.y(), q.y())),
+          zmin(std::min(p.z(), q.z())), zmax(std::max(p.z(), q.z())) {}
 
     /**
      * Returns the center of this bounding box.
@@ -92,9 +92,9 @@ template <typename T> struct Box3 {
      * @param p an arbitrary point.
      */
     [[nodiscard]] auto enlarge(const Vec3<value_t>& p) const -> Box3<value_t> {
-        return Box3<value_t>(minimum(xmin, p.x), maximum(xmax, p.x),
-                             minimum(ymin, p.y), maximum(ymax, p.y),
-                             minimum(zmin, p.z), maximum(zmax, p.z));
+        return Box3<value_t>(std::min(xmin, p.x()), std::max(xmax, p.x()),
+                             std::min(ymin, p.y()), std::max(ymax, p.y()),
+                             std::min(zmin, p.z()), std::max(zmax, p.z()));
     }
 
     /**
@@ -103,9 +103,9 @@ template <typename T> struct Box3 {
      * @param r an arbitrary bounding box.
      */
     [[nodiscard]] auto enlarge(const Box3<value_t>& r) const -> Box3<value_t> {
-        return Box3<value_t>(minimum(xmin, r.xmin), maximum(xmax, r.xmax),
-                             minimum(ymin, r.ymin), maximum(ymax, r.ymax),
-                             minimum(zmin, r.zmin), maximum(zmax, r.zmax));
+        return Box3<value_t>(std::min(xmin, r.xmin), std::max(xmax, r.xmax),
+                             std::min(ymin, r.ymin), std::max(ymax, r.ymax),
+                             std::min(zmin, r.zmin), std::max(zmax, r.zmax));
     }
 
     /**
@@ -114,8 +114,8 @@ template <typename T> struct Box3 {
      * @param p an arbitrary point.
      */
     [[nodiscard]] auto contains(const Vec3<value_t>& p) const -> bool {
-        return p.x >= xmin && p.x <= xmax && p.y >= ymin && p.y <= ymax &&
-               p.z >= zmin && p.z <= zmax;
+        return p.x() >= xmin && p.x() <= xmax && p.y() >= ymin &&
+               p.y() <= ymax && p.z() >= zmin && p.z() <= zmax;
     }
 
     /** Min vector */
