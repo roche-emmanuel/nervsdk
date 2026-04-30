@@ -336,15 +336,52 @@ template <typename T> class Spline2 {
         arcLength = nv::clamp(arcLength, static_cast<value_t>(0), total);
 
         value_t accumulated = 0;
+        size_t numSegs = numSegments();
+
         for (size_t i = 0; i < _segment_lengths.size(); ++i) {
-            if (accumulated + _segment_lengths[i] >= arcLength) {
-                value_t segT = (arcLength - accumulated) / _segment_lengths[i];
-                return (i + segT) / numSegments();
+            value_t segLen = _segment_lengths[i];
+
+            if (accumulated + segLen >= arcLength ||
+                i == _segment_lengths.size() - 1) {
+                // Target lies within segment i.
+                // Binary-search for the local t in [0,1] whose arc from the
+                // segment start equals (arcLength - accumulated).
+                value_t targetLocal = arcLength - accumulated;
+                targetLocal =
+                    nv::clamp(targetLocal, static_cast<value_t>(0), segLen);
+
+                value_t lo = 0, hi = 1;
+                const int iterations =
+                    16; // 16 bisections -> error < segLen/65536
+                for (int iter = 0; iter < iterations; ++iter) {
+                    value_t mid = (lo + hi) * static_cast<value_t>(0.5);
+
+                    // Measure arc from segment start to mid using fine
+                    // sampling.
+                    const int samples = 16;
+                    value_t arcMid = 0;
+                    point_t prev = getSegmentPoint(i, 0);
+                    for (int s = 1; s <= samples; ++s) {
+                        value_t st = mid * static_cast<value_t>(s) / samples;
+                        point_t curr = getSegmentPoint(i, st);
+                        arcMid += (curr - prev).length();
+                        prev = curr;
+                    }
+
+                    if (arcMid < targetLocal)
+                        lo = mid;
+                    else
+                        hi = mid;
+                }
+
+                value_t localT = (lo + hi) * static_cast<value_t>(0.5);
+                return (static_cast<value_t>(i) + localT) / numSegs;
             }
-            accumulated += _segment_lengths[i];
+
+            accumulated += segLen;
         }
 
-        return 1.0;
+        return static_cast<value_t>(1);
     }
 
     // Sample points uniformly by arc length
