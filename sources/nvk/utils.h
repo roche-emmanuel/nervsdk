@@ -63,6 +63,10 @@ auto to_upper(const String& str) -> String;
 // Convert a string to lower characters:
 auto to_lower(const String& str) -> String;
 
+void trim(String& s);
+
+auto trimmed(String s) -> String;
+
 auto system_file_exists(const char* fname) -> bool;
 
 inline auto system_file_exists(const String& fname) -> bool {
@@ -71,6 +75,10 @@ inline auto system_file_exists(const String& fname) -> bool {
 
 auto system_dir_exists(const char* path) -> bool;
 
+inline auto system_dir_exists(const String& fname) -> bool {
+    return system_dir_exists(fname.c_str());
+}
+
 /** Check if a virtual file exists. */
 auto virtual_file_exists(const String& fname, bool forceAllowSystem = false)
     -> bool;
@@ -78,6 +86,8 @@ auto virtual_file_exists(const String& fname, bool forceAllowSystem = false)
 auto get_file_last_write_time(const String& fname) -> std::time_t;
 
 auto is_absolute_path(const String& path) -> bool;
+auto is_relative_path(const String& path) -> bool;
+
 auto get_absolute_path(const String& path) -> String;
 
 auto read_system_file(const char* fname) -> String;
@@ -99,6 +109,10 @@ void write_binary_file(const char* fname, const U8Vector& content,
                        bool createFolders = true);
 
 void remove_file(const char* fname);
+void remove_file(const String& fname);
+auto remove_file_if_exists(const String& fname) -> bool;
+
+void move_path(const String& src, const String& dest);
 
 auto read_json_string(const String& content) -> Json;
 
@@ -127,6 +141,8 @@ auto is_json_file(const char* filename) -> bool;
 auto is_json_file(const String& filename) -> bool;
 
 auto create_folders(const String& fullpath) -> bool;
+
+auto get_executable_path() -> String;
 
 auto get_path_extension(const String& fname) -> String;
 

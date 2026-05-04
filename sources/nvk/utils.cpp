@@ -1315,4 +1315,129 @@ auto toUpperHexString(const String& s) -> String {
     return hex;
 }
 
+auto is_relative_path(const String& path) -> bool {
+    return !is_absolute_path(path);
+}
+
+void move_path(const String& src, const String& dest) {
+    namespace fs = std::filesystem;
+
+    const fs::path src_path(src);
+    const fs::path dest_path(dest);
+
+    // Validate source exists
+    std::error_code ec;
+    if (!fs::exists(src_path, ec) || ec) {
+        THROW_MSG("Source path does not exist: {}", src);
+    }
+
+    // Ensure destination parent directory exists
+    const auto dest_parent = dest_path.parent_path();
+    if (!dest_parent.empty() && !fs::exists(dest_parent, ec)) {
+        fs::create_directories(dest_parent, ec);
+        if (ec) {
+            THROW_MSG("Failed to create destination directories: {}",
+                      ec.message());
+        }
+    }
+
+    // Attempt rename first (fast, same-filesystem move)
+    fs::rename(src_path, dest_path, ec);
+    if (!ec)
+        return;
+
+    // Fallback: cross-device move (copy + remove)
+    if (ec.value() == EXDEV || ec == std::errc::cross_device_link) {
+        if (fs::is_directory(src_path)) {
+            fs::copy(src_path, dest_path,
+                     fs::copy_options::recursive |
+                         fs::copy_options::copy_symlinks,
+                     ec);
+        } else {
+            fs::copy_file(src_path, dest_path,
+                          fs::copy_options::overwrite_existing, ec);
+        }
+        if (ec) {
+            THROW_MSG("Failed to copy during cross-device move: {}",
+                      ec.message());
+        }
+
+        fs::remove_all(src_path, ec);
+        if (ec) {
+            // Non-fatal: dest was written successfully, warn or log
+            // Optionally throw, depending on your semantics
+        }
+        return;
+    }
+
+    // Any other rename failure
+    THROW_MSG("Failed to move '{}' to '{}': {}", src, dest, ec.message());
+}
+void remove_file(const String& fname) { remove_file(fname.c_str()); }
+auto remove_file_if_exists(const String& fname) -> bool {
+    if (system_file_exists(fname)) {
+        remove_file(fname);
+        return true;
+    }
+    return false;
+}
+void trim(String& s) {
+    // Trim left
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char c) {
+                return !std::isspace(c);
+            }));
+
+    // Trim right
+    s.erase(std::find_if(s.rbegin(), s.rend(),
+                         [](unsigned char c) { return !std::isspace(c); })
+                .base(),
+            s.end());
+}
+
+auto trimmed(String s) -> String {
+    trim(s);
+    return s;
+}
+
+auto get_executable_path() -> String {
+#ifdef __EMSCRIPTEN__
+    // Get the application path using EM_ASM
+    // String appPath =
+    //     (const char*)EM_ASM_INT({ return Module['locateFile'](''); });
+    String appPath = "/nvapp";
+    // Print the application path
+    logDEBUG("Application path: {}", appPath.c_str());
+    return appPath;
+
+#elif defined _WIN32
+    std::array<char, FILENAME_MAX> pBuf{0};
+
+    int bytes = GetModuleFileName(nullptr, pBuf.data(), FILENAME_MAX);
+    if (bytes == 0) {
+        logERROR("Cannot retrieve executable path.");
+        return {};
+    }
+
+    String path = pBuf.data();
+    auto index = path.rfind('\\');
+    path = path.substr(0, index);
+
+    // logINFO("Found VBSSim3 root path: " + path);
+    return path;
+#else
+    // cf.
+    // http://stackoverflow.com/questions/4025370/can-an-executable-discover-its-own-path-linux
+    char path[PATH_MAX];
+    char dest[PATH_MAX];
+    // struct stat info;
+    pid_t pid = getpid();
+    sprintf(path, "/proc/%d/exe", pid);
+    NVCHK(readlink(path, dest, PATH_MAX) != -1, "Readlink error occured.");
+
+    String pstr = String(dest);
+
+    int index = pstr.rfind("/");
+    return pstr.substr(0, index);
+#endif
+}
 } // namespace nv
