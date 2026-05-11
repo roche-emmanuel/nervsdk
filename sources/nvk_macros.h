@@ -205,4 +205,6 @@ class LogManager;
         return SID(#cname);                                                    \
     }
 
+#define NV_DEFINE_VECTOR(tname) using tname##Vector = Vector<tname>;
+
 #endif

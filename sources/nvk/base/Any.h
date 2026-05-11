@@ -107,6 +107,8 @@ template <typename T> struct AnyGetter {
 // Type ID definition:
 NV_DEFINE_TYPE_ID(nv::Any)
 
+NV_DEFINE_VECTOR(Any)
+
 template <> struct TypeId<Vector<bool>> {
     constexpr static nv::StringID id = str_id_const("nv::Vector<bool>");
 };

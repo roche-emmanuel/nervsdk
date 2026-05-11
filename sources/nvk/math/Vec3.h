@@ -405,6 +405,11 @@ using Vec3d = Vec3<F64>;
 using Vec3i = Vec3<I32>;
 using Vec3u = Vec3<U32>;
 
+NV_DEFINE_VECTOR(Vec3f)
+NV_DEFINE_VECTOR(Vec3d)
+NV_DEFINE_VECTOR(Vec3i)
+NV_DEFINE_VECTOR(Vec3u)
+
 constexpr Vec3f VEC3F_UP{0.0, -1.0, 0.0};
 constexpr Vec3f VEC3F_RIGHT{1.0, 0.0, 0.0};
 constexpr Vec3f VEC3F_FWD{0.0, 0.0, 1.0};

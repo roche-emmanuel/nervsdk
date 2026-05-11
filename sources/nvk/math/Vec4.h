@@ -401,6 +401,11 @@ using Vec4d = Vec4<F64>;
 using Vec4i = Vec4<I32>;
 using Vec4u = Vec4<U32>;
 
+NV_DEFINE_VECTOR(Vec4f)
+NV_DEFINE_VECTOR(Vec4d)
+NV_DEFINE_VECTOR(Vec4i)
+NV_DEFINE_VECTOR(Vec4u)
+
 template <typename T>
 inline void to_json(nlohmann::json& j, const Vec4<T>& vec) {
     j = nlohmann::json::array({vec.x(), vec.y(), vec.z(), vec.w()});

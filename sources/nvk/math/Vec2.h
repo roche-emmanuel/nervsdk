@@ -300,6 +300,11 @@ using Vec2d = Vec2<F64>;
 using Vec2i = Vec2<I32>;
 using Vec2u = Vec2<U32>;
 
+NV_DEFINE_VECTOR(Vec2f)
+NV_DEFINE_VECTOR(Vec2d)
+NV_DEFINE_VECTOR(Vec2i)
+NV_DEFINE_VECTOR(Vec2u)
+
 // Specialized version of normalize() for I32
 template <> inline auto Vec2<I32>::normalize() -> value_t {
     // Your specialized implementation for I32
