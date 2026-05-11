@@ -52,6 +52,8 @@ auto WStringToString(const std::wstring& wstr) -> std::string;
 
 }; // namespace nv
 
+#ifndef CHECK_RESULT
 #define CHECK_RESULT nv::check_result
+#endif
 
 #endif
