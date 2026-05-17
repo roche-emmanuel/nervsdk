@@ -226,6 +226,11 @@ void sleep_us(U32 usecs) {
     std::this_thread::sleep_for(std::chrono::microseconds(usecs));
 }
 
+auto system_path_exists(const char* path) -> bool {
+    // Check if path exists and is a directory
+    return std::filesystem::exists(path);
+}
+
 auto system_dir_exists(const char* path) -> bool {
     // Check if path exists and is a directory
     return std::filesystem::exists(path) && std::filesystem::is_directory(path);

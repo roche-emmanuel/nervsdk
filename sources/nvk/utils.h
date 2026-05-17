@@ -67,6 +67,11 @@ void trim(String& s);
 
 auto trimmed(String s) -> String;
 
+auto system_path_exists(const char* fname) -> bool;
+inline auto system_path_exists(const String& fname) -> bool {
+    return system_path_exists(fname.c_str());
+}
+
 auto system_file_exists(const char* fname) -> bool;
 
 inline auto system_file_exists(const String& fname) -> bool {
