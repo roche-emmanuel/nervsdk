@@ -15,8 +15,8 @@ auto ResourceLoader::find_resource(const char* name, String& fullpath) -> bool {
     // We iterate on each available path searching for the resourse file:
     String fpath;
     for (auto& p : _paths) {
-        fpath = p + name;
-        if (system_file_exists(fpath.c_str())) {
+        fpath = get_path(p, name);
+        if (virtual_file_exists(fpath)) {
             fullpath = fpath;
             return true;
         }
