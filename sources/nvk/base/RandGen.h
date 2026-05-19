@@ -38,8 +38,8 @@ class RandGen {
 
     // Vec2 array filler
     template <typename T>
-    void uniform_real_array(Vec2<T>* ptr, U32 num, Vec2<T> min = Vec2<T>(0.0F),
-                            Vec2<T> max = Vec2<T>(1.0F)) const {
+    void uniform_real_array(Vec2<T>* ptr, U32 num, Vec2<T> min = {0.0F},
+                            Vec2<T> max = {1.0F}) const {
         Vec2<T> range = max - min;
         for (U32 i = 0; i < num; ++i) {
             ptr[i].set(min.x() + static_cast<T>(_udis(_gen)) * range.x(),
@@ -49,8 +49,8 @@ class RandGen {
 
     // Vec3 array filler
     template <typename T>
-    void uniform_real_array(Vec3<T>* ptr, U32 num, Vec3<T> min = Vec3<T>(0.0F),
-                            Vec3<T> max = Vec3<T>(1.0F)) const {
+    void uniform_real_array(Vec3<T>* ptr, U32 num, Vec3<T> min = {0.0F},
+                            Vec3<T> max = {1.0F}) const {
         Vec3<T> range = max - min;
         for (U32 i = 0; i < num; ++i) {
             ptr[i].set(min.x() + static_cast<T>(_udis(_gen)) * range.x(),
@@ -61,8 +61,8 @@ class RandGen {
 
     // Vec4 array filler
     template <typename T>
-    void uniform_real_array(Vec4<T>* ptr, U32 num, Vec4<T> min = Vec4<T>(0.0F),
-                            Vec4<T> max = Vec4<T>(1.0F)) const {
+    void uniform_real_array(Vec4<T>* ptr, U32 num, Vec4<T> min = {0.0F},
+                            Vec4<T> max = {1.0F}) const {
         Vec4<T> range = max - min;
         for (U32 i = 0; i < num; ++i) {
             ptr[i].set(min.x() + static_cast<T>(_udis(_gen)) * range.x(),
