@@ -61,6 +61,10 @@ using F64 = std::double_t;
 using ResourceType = StringID;
 using ComponentType = StringID;
 
+struct StringIDHolder {
+    StringID value;
+};
+
 constexpr U64 U64_MAX = ULLONG_MAX;
 constexpr U32 U32_MAX = UINT_MAX;
 
