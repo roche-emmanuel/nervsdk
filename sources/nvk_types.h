@@ -62,7 +62,7 @@ using ResourceType = StringID;
 using ComponentType = StringID;
 
 struct StringIDHolder {
-    StringID value;
+    StringID value{0};
 };
 
 constexpr U64 U64_MAX = ULLONG_MAX;
