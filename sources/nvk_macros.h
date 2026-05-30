@@ -56,8 +56,8 @@ class LogManager;
 #undef assert
 #endif
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+#define NV_STRINGIFY(x) #x
+#define NV_TOSTRING(x) NV_STRINGIFY(x)
 
 #define VALIDATE_RET(exp)                                                      \
     auto __res = (exp);                                                        \
