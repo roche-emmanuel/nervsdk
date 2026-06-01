@@ -1445,4 +1445,10 @@ auto get_executable_path() -> String {
     return pstr.substr(0, index);
 #endif
 }
+auto get_str(const Json& obj, const String& key, const String& defVal)
+    -> std::string {
+    if (!obj.contains(key) || obj[key].is_null())
+        return defVal;
+    return obj[key].get<String>();
+};
 } // namespace nv

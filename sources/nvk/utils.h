@@ -216,6 +216,10 @@ auto get_current_module_path(PathSep sep = PATHSEP_LINUX) -> String;
 
 auto get_current_module_folder(PathSep sep = PATHSEP_LINUX) -> String;
 
+// JSON utils:
+auto get_str(const Json& obj, const String& key, const String& defVal = "")
+    -> std::string;
+
 // Support to concatenate path elements:
 template <typename T, typename V>
 auto get_path(const T& arg0, const V& arg1) -> String {
