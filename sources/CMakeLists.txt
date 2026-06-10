@@ -6,6 +6,10 @@ include_directories(${ZLIB_DIR}/include)
 include_directories(${YAMLCPP_DIR}/include)
 include_directories(${CLIPPER2_DIR}/include)
 
+if(NV_USE_HLA)
+  include_directories(${OPENRTI_DIR}/include/rti1516e)
+endif()
+
 # library should be linked to this: set(CLIPPER2_LIBS
 # ${CLIPPER2_DIR}/lib/libClipper2.a)
 

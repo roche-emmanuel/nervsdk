@@ -13,6 +13,8 @@ message(STATUS "Building ${CMAKE_BUILD_TYPE} version of NervSDK")
 
 setup_compiler_flags()
 
+add_definitions(-DNV_USE_HLA=${NV_USE_HLA})
+
 # prepare the source folder:
 set(SRC_DIR ${PROJECT_SOURCE_DIR}/sources)
 

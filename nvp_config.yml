@@ -17,9 +17,8 @@ cmake_projects:
     version: "22.7"
     prefix: nv
 
-    # defs:
-    #   NV_DAWN_VERSION: 250901
-    #   NV_USE_FFMPEG: 1
+    defs:
+      NV_USE_HLA: 1
 
     dependencies:
       FMT_DIR: fmt
@@ -27,3 +26,4 @@ cmake_projects:
       ZLIB_DIR: zlib
       YAMLCPP_DIR: yamlcpp
       CLIPPER2_DIR: clipper2
+      OPENRTI_DIR: OpenRTI
