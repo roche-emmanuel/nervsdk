@@ -48,8 +48,6 @@ inline void check_result(HRESULT hr, const char* fmt_str) {
     }
 }
 
-auto WStringToString(const std::wstring& wstr) -> std::string;
-
 }; // namespace nv
 
 #ifndef CHECK_RESULT

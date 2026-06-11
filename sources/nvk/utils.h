@@ -57,6 +57,8 @@ void sleep_s(U32 secs);
 void sleep_ms(U32 msecs);
 void sleep_us(U32 usecs);
 
+auto WStringToString(const std::wstring& wstr) -> std::string;
+
 // Convert a string to upper characters:
 auto to_upper(const String& str) -> String;
 
