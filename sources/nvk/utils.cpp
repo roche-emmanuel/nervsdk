@@ -1463,4 +1463,29 @@ auto get_str(const Json& obj, const String& key, const String& defVal)
         return defVal;
     return obj[key].get<String>();
 };
+auto get_bool(const Json& obj, const String& key, bool defVal) -> bool {
+    if (!obj.contains(key) || obj[key].is_null())
+        return defVal;
+    return obj[key].get<bool>();
+};
+auto get_i32(const Json& obj, const String& key, I32 defVal) -> I32 {
+    if (!obj.contains(key) || obj[key].is_null())
+        return defVal;
+    return obj[key].get<I32>();
+};
+auto get_u32(const Json& obj, const String& key, U32 defVal) -> U32 {
+    if (!obj.contains(key) || obj[key].is_null())
+        return defVal;
+    return obj[key].get<U32>();
+};
+auto get_f32(const Json& obj, const String& key, F32 defVal) -> F32 {
+    if (!obj.contains(key) || obj[key].is_null())
+        return defVal;
+    return obj[key].get<F32>();
+};
+auto get_f64(const Json& obj, const String& key, F64 defVal) -> F64 {
+    if (!obj.contains(key) || obj[key].is_null())
+        return defVal;
+    return obj[key].get<F64>();
+};
 } // namespace nv

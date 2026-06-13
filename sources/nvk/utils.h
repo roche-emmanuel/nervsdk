@@ -222,6 +222,12 @@ auto get_current_module_folder(PathSep sep = PATHSEP_LINUX) -> String;
 auto get_str(const Json& obj, const String& key, const String& defVal = "")
     -> std::string;
 
+auto get_bool(const Json& obj, const String& key, bool defVal) -> bool;
+auto get_i32(const Json& obj, const String& key, I32 defVal) -> I32;
+auto get_u32(const Json& obj, const String& key, U32 defVal) -> U32;
+auto get_f32(const Json& obj, const String& key, F32 defVal) -> F32;
+auto get_f64(const Json& obj, const String& key, F64 defVal) -> F64;
+
 // Support to concatenate path elements:
 template <typename T, typename V>
 auto get_path(const T& arg0, const V& arg1) -> String {
