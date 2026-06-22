@@ -93,6 +93,13 @@ class MsgpackWriter {
         _writeU32BE(bits);
     }
 
+    void writeFloat64(F64 v) {
+        _buf.push_back(0xcb);
+        U64 bits = 0;
+        std::memcpy(&bits, &v, 8);
+        _writeU64BE(bits);
+    }
+
   private:
     U8Vector _buf;
 
@@ -101,6 +108,16 @@ class MsgpackWriter {
         _buf.push_back(U8(v));
     }
     void _writeU32BE(U32 v) {
+        _buf.push_back(U8(v >> 24));
+        _buf.push_back(U8(v >> 16));
+        _buf.push_back(U8(v >> 8));
+        _buf.push_back(U8(v));
+    }
+    void _writeU64BE(U64 v) {
+        _buf.push_back(U8(v >> 56));
+        _buf.push_back(U8(v >> 48));
+        _buf.push_back(U8(v >> 40));
+        _buf.push_back(U8(v >> 32));
         _buf.push_back(U8(v >> 24));
         _buf.push_back(U8(v >> 16));
         _buf.push_back(U8(v >> 8));
