@@ -228,6 +228,13 @@ auto get_u32(const Json& obj, const String& key, U32 defVal) -> U32;
 auto get_f32(const Json& obj, const String& key, F32 defVal) -> F32;
 auto get_f64(const Json& obj, const String& key, F64 defVal) -> F64;
 
+template <typename T>
+inline void get_opt(const Json& j, const char* key, T& out) {
+    auto it = j.find(key);
+    if (it != j.end() && !it->is_null())
+        it->get_to(out);
+}
+
 // Support to concatenate path elements:
 template <typename T, typename V>
 auto get_path(const T& arg0, const V& arg1) -> String {
