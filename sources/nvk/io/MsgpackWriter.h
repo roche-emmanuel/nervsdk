@@ -100,6 +100,9 @@ class MsgpackWriter {
         _writeU64BE(bits);
     }
 
+    // Writes a boolean as msgpack bool (0xc2 = false, 0xc3 = true).
+    void writeBool(bool v) { _buf.push_back(v ? 0xc3U : 0xc2U); }
+
   private:
     U8Vector _buf;
 
