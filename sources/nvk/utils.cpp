@@ -1488,4 +1488,7 @@ auto get_f64(const Json& obj, const String& key, F64 defVal) -> F64 {
         return defVal;
     return obj[key].get<F64>();
 };
+void write_json_file(const String& fname, const Json& content, I32 indent) {
+    write_json_file(fname.c_str(), content, indent);
+}
 } // namespace nv

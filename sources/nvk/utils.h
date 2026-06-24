@@ -131,6 +131,7 @@ auto read_ordered_json_file(const String& fname, bool forceAllowSystem = false)
     -> OrderedJson;
 
 void write_json_file(const char* fname, const Json& content, I32 indent = 2);
+void write_json_file(const String& fname, const Json& content, I32 indent = 2);
 
 auto read_yaml_string(const String& content) -> Json;
 
