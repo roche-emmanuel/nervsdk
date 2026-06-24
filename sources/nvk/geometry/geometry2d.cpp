@@ -1,6 +1,8 @@
 #include <external/RTree.h>
 #include <nvk/geometry/geometry2d.h>
 
+#include <clipper2/clipper.h>
+
 namespace nv {
 
 // Internal helper elements:
@@ -275,5 +277,34 @@ auto compute_polyline2_intersections(const Polyline2Vector<F64>& paths,
 
     return out;
 }
+
+auto inflate_polyline2(const Polyline2f& centerLine, F32 offset, I32 joinType,
+                       I32 endType) -> Vector<Polygon2f> {
+
+    Clipper2Lib::PathD cPath;
+    cPath.reserve(centerLine.points.size());
+    for (const auto& pt : centerLine.points) {
+        cPath.emplace_back(pt.x(), pt.y());
+    }
+
+    Clipper2Lib::PathsD solution = Clipper2Lib::InflatePaths(
+        {cPath}, offset, (Clipper2Lib::JoinType)joinType,
+        (Clipper2Lib::EndType)endType);
+
+    Vector<Polygon2f> result;
+    result.reserve(solution.size());
+    for (const auto& ring : solution) {
+        if (ring.size() < 3) {
+            continue;
+        }
+        Polygon2f poly;
+        poly.coords.reserve(ring.size());
+        for (const auto& pt : ring) {
+            poly.coords.push_back({F32(pt.x), F32(pt.y)});
+        }
+        result.push_back(std::move(poly));
+    }
+    return result;
+};
 
 }; // namespace nv

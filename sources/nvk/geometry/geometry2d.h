@@ -328,12 +328,26 @@ auto polygon_signed_area_2d(const Vec3<T>* polygon, U32 size,
 }
 
 template <typename T> struct Polyline2 {
-    I32 id;
+    I32 id{-1};
     Vector<Vec2<T>> points;
-    bool closedLoop;
+    bool closedLoop{false};
 };
 
 template <typename T> using Polyline2Vector = Vector<Polyline2<T>>;
+
+using Polyline2f = Polyline2<F32>;
+using Polyline2d = Polyline2<F64>;
+
+// ---------------------------------------------------------------------------
+// Polygon2 / Polygon2f / Polygon2d
+// ---------------------------------------------------------------------------
+
+template <typename T> struct Polygon2 {
+    Vector<Vec2<T>> coords;
+};
+
+using Polygon2f = Polygon2<F32>;
+using Polygon2d = Polygon2<F64>;
 
 template <typename T> struct Segment2 {
     Vec2<T> a;
@@ -395,6 +409,25 @@ auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
 auto compute_polyline2_intersections(const Polyline2Vector<F64>& paths,
                                      F64 endpointDistance)
     -> Polyline2IntersectionResults<F64>;
+
+enum PathJoinType {
+    PATH_JOIN_SQUARE,
+    PATH_JOIN_BEVEL,
+    PATH_JOIN_ROUND,
+    PATH_JOIN_MITER,
+};
+
+enum PathEndType {
+    PATH_END_POLYGON,
+    PATH_END_JOINED,
+    PATH_END_BUTT,
+    PATH_END_SQUARE,
+    PATH_END_ROUND,
+};
+
+auto inflate_polyline2(const Polyline2f& centerLine, F32 offset,
+                       I32 joinType = PATH_JOIN_ROUND,
+                       I32 endType = PATH_END_ROUND) -> Vector<Polygon2f>;
 
 }; // namespace nv
 
