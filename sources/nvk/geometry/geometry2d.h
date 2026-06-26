@@ -3,6 +3,8 @@
 
 #include <nvk_common.h>
 
+#include <external/earcut.hpp>
+
 namespace nv {
 
 template <typename T>
@@ -428,6 +430,70 @@ enum PathEndType {
 auto inflate_polyline2(const Polyline2f& centerLine, F32 offset,
                        I32 joinType = PATH_JOIN_ROUND,
                        I32 endType = PATH_END_ROUND) -> Vector<Polygon2f>;
+
+// ---------------------------------------------------------------------------
+// Region2 — a planar region: one outer boundary ring + zero or more holes.
+//
+// Convention (matches Clipper2 / GeoJSON / earcut expectations):
+//   outer : CCW winding  (positive area)
+//   holes : CW  winding  (each hole cuts out of the outer)
+//
+// inflate_polyline2() returns Vector<Polygon2f>; use Region2f::from_rings()
+// to interpret the first ring as outer and the rest as holes.
+// ---------------------------------------------------------------------------
+template <typename T> struct Region2 {
+    Polygon2<T> outer;
+    Vector<Polygon2<T>> holes;
+
+    [[nodiscard]] auto empty() const -> bool { return outer.coords.size() < 3; }
+
+    // Interpret the Vector<Polygon2> returned by inflate_polyline2 as a
+    // Region2: first ring = outer, subsequent rings = holes.
+    static auto from_rings(const Vector<Polygon2<T>>& rings) -> Region2<T> {
+        Region2<T> result;
+        if (rings.empty())
+            return result;
+        result.outer = rings[0];
+        for (U32 i = 1; i < U32(rings.size()); ++i)
+            result.holes.push_back(rings[i]);
+        return result;
+    }
+
+    // Triangulate using mapbox/earcut.
+    //
+    // Returns a flat index buffer into the region's concatenated vertex array:
+    //   [ outer.coords ... hole[0].coords ... hole[1].coords ... ]
+    // i.e. the same layout you'd build when constructing 3-D mesh vertices,
+    // so indices are usable directly with no offset arithmetic.
+    //
+    // Returns empty if the outer ring has fewer than 3 vertices.
+    [[nodiscard]] auto triangulate() const -> Vector<U32> {
+        if (outer.coords.size() < 3)
+            return {};
+
+        using EarcutPoint = std::array<T, 2>;
+        std::vector<std::vector<EarcutPoint>> polygon;
+
+        auto& outerRing = polygon.emplace_back();
+        outerRing.reserve(outer.coords.size());
+        for (const auto& pt : outer.coords)
+            outerRing.push_back({pt.x(), pt.y()});
+
+        for (const auto& hole : holes) {
+            if (hole.coords.size() < 3)
+                continue;
+            auto& holeRing = polygon.emplace_back();
+            holeRing.reserve(hole.coords.size());
+            for (const auto& pt : hole.coords)
+                holeRing.push_back({pt.x(), pt.y()});
+        }
+
+        return mapbox::earcut<U32>(polygon);
+    }
+};
+
+using Region2f = Region2<F32>;
+using Region2d = Region2<F64>;
 
 }; // namespace nv
 
