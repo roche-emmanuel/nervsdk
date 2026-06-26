@@ -388,16 +388,26 @@ template <typename T> struct PolylineRayHit {
 
 template <typename T>
 auto polyline_ray_intersections(const Vec2<T>& origin, const Vec2<T>& dir,
-                                const Polyline2<T>& polyline)
+                                const Vector<Vec2<T>>& points,
+                                bool closedLoop = false)
     -> Vector<PolylineRayHit<T>> {
     Vector<PolylineRayHit<T>> hits;
 
-    const U32 n = U32(polyline.points.size());
-    for (U32 i = 0; i + 1 < n; ++i) {
-        F64 tRay = 0.0;
-        if (ray_intersect_segment2d(origin, dir, polyline.points[i],
-                                    polyline.points[i + 1], tRay)) {
-            if (tRay >= 0.0) {
+    const U32 n = U32(points.size());
+    if (n < 2)
+        return hits;
+
+    // Number of segments: n-1 for open polylines, n for closed loops
+    // (the extra segment wraps points[n-1] → points[0]).
+    const U32 numSegs = closedLoop ? n : n - 1;
+
+    for (U32 i = 0; i < numSegs; ++i) {
+        const Vec2<T>& a = points[i];
+        const Vec2<T>& b = points[(i + 1) % n]; // wrap on the closing segment
+
+        T tRay = T(0);
+        if (ray_intersect_segment2d(origin, dir, a, b, tRay)) {
+            if (tRay >= T(0)) {
                 hits.push_back({
                     .tRay = tRay,
                     .segIdx = i,
@@ -414,6 +424,13 @@ auto polyline_ray_intersections(const Vec2<T>& origin, const Vec2<T>& dir,
               });
 
     return hits;
+}
+
+template <typename T>
+auto polyline_ray_intersections(const Vec2<T>& origin, const Vec2<T>& dir,
+                                const Polyline2<T>& polyline) {
+    return polyline_ray_intersections(origin, dir, polyline.points,
+                                      polyline.closedLoop);
 }
 
 // ---------------------------------------------------------------------------
