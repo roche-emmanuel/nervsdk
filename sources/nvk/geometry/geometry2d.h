@@ -47,6 +47,46 @@ auto seg2_intersect(const Vec2<T>& seg0_a, const Vec2<T>& seg0_b,
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// ray_intersect_segment2d
+//
+// Tests a ray (origin, dir) against a finite line segment (a, b).
+// Unlike seg2_intersect, the ray is unbounded in the forward direction:
+//   only requires  tSeg ∈ [0, 1]  (point lies on segment)
+//   and            tRay > -kEps   (point is in front of origin).
+//
+// Returns true and writes tRay (>= 0) if an intersection exists.
+// tRay is the scalar such that  origin + dir * tRay == intersection point.
+// ---------------------------------------------------------------------------
+template <typename T>
+auto ray_intersect_segment2d(const Vec2<T>& origin, const Vec2<T>& dir,
+                             const Vec2<T>& a, const Vec2<T>& b, T& tRay)
+    -> bool {
+    // Solve:  origin + tRay * dir  ==  a + tSeg * (b - a)
+    // Rearranged as a 2x2 linear system:
+    //   [ dir | -(b-a) ] * [ tRay; tSeg ] = a - origin
+    const Vec2<T> seg = b - a;
+    const T det = dir.x() * (-seg.y()) - dir.y() * (-seg.x());
+    // det == cross(dir, seg)  (2-D cross product)
+
+    constexpr T kEps = T(100) * std::numeric_limits<T>::epsilon();
+    if (std::abs(det) < kEps)
+        return false; // ray and segment are parallel
+
+    const Vec2<T> rhs = a - origin;
+    const T invDet = 1.0 / det;
+
+    tRay = (rhs.x() * (-seg.y()) - rhs.y() * (-seg.x())) * invDet;
+    const T tSeg = (dir.x() * rhs.y() - dir.y() * rhs.x()) * invDet;
+
+    // Ray must go forward; segment must be hit within [0, 1].
+    if (tRay < -kEps || tSeg < -kEps || tSeg > 1.0 + kEps)
+        return false;
+
+    tRay = std::max(tRay, 0.0); // clamp tiny negatives to zero
+    return true;
+}
+
 /** General segment/circle intersection function: */
 template <typename T>
 auto seg2_circle_intersect(const Vec2<T>& seg_a, const Vec2<T>& seg_b,
@@ -340,6 +380,42 @@ template <typename T> using Polyline2Vector = Vector<Polyline2<T>>;
 using Polyline2f = Polyline2<F32>;
 using Polyline2d = Polyline2<F64>;
 
+template <typename T> struct PolylineRayHit {
+    T tRay{0.0};   // distance parameter along the ray
+    U32 segIdx{0}; // index of the polyline segment that was hit
+    Vec2<T> point; // world position of the intersection
+};
+
+template <typename T>
+auto polyline_ray_intersections(const Vec2<T>& origin, const Vec2<T>& dir,
+                                const Polyline2<T>& polyline)
+    -> Vector<PolylineRayHit<T>> {
+    Vector<PolylineRayHit<T>> hits;
+
+    const U32 n = U32(polyline.points.size());
+    for (U32 i = 0; i + 1 < n; ++i) {
+        F64 tRay = 0.0;
+        if (ray_intersect_segment2d(origin, dir, polyline.points[i],
+                                    polyline.points[i + 1], tRay)) {
+            if (tRay >= 0.0) {
+                hits.push_back({
+                    .tRay = tRay,
+                    .segIdx = i,
+                    .point = origin + dir * tRay,
+                });
+            }
+        }
+    }
+
+    // Sort closest first so callers can just take hits[0].
+    std::sort(hits.begin(), hits.end(),
+              [](const PolylineRayHit<T>& x, const PolylineRayHit<T>& y) {
+                  return x.tRay < y.tRay;
+              });
+
+    return hits;
+}
+
 // ---------------------------------------------------------------------------
 // Polygon2 / Polygon2f / Polygon2d
 // ---------------------------------------------------------------------------
@@ -577,9 +653,14 @@ template <typename T> struct Region2 {
 
         // Anti-parallel edges (spike / 180° reversal): fall back to next edge
         if (sumLen < T(1e-9))
-            return nextEdge;
+            return nextEdge.normalized();
 
-        return sum / sumLen;
+        return sum.normalized();
+    }
+
+    [[nodiscard]] auto get_point_normal(U32 globalIdx) const -> Vec2<T> {
+        auto tang = get_point_tangent(globalIdx);
+        return tang.ccw90();
     }
 };
 
