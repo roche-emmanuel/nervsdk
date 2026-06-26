@@ -598,6 +598,34 @@ template <typename T> struct Region2 {
         return mapbox::earcut<U32>(polygon);
     }
 
+    [[nodiscard]] auto get_point_position(U32 globalIdx) const -> Vec2<T> {
+        // Resolve global index → (ring coords, local index)
+        const Vector<Vec2<T>>* ring = nullptr;
+        U32 localIdx = globalIdx;
+
+        const U32 outerN = U32(outer.coords.size());
+        if (localIdx < outerN) {
+            ring = &outer.coords;
+        } else {
+            localIdx -= outerN;
+            for (const auto& hole : holes) {
+                const U32 holeN = U32(hole.coords.size());
+                if (localIdx < holeN) {
+                    ring = &hole.coords;
+                    break;
+                }
+                localIdx -= holeN;
+            }
+        }
+
+        NVCHK(ring != nullptr,
+              "Region2::get_point: global index {} out of range "
+              "(get_num_points={})",
+              globalIdx, get_num_points());
+
+        return (*ring)[localIdx];
+    }
+
     // Returns the polygon boundary tangent at global vertex index i.
     //
     // Global index layout (same as triangulate()):
