@@ -346,6 +346,8 @@ using Polyline2d = Polyline2<F64>;
 
 template <typename T> struct Polygon2 {
     Vector<Vec2<T>> coords;
+
+    [[nodiscard]] auto size() const -> size_t { return coords.size(); }
 };
 
 using Polygon2f = Polygon2<F32>;
@@ -431,6 +433,10 @@ auto inflate_polyline2(const Polyline2f& centerLine, F32 offset,
                        I32 joinType = PATH_JOIN_ROUND,
                        I32 endType = PATH_END_ROUND) -> Vector<Polygon2f>;
 
+auto inflate_polyline2(const Polyline2d& centerLine, F64 offset,
+                       I32 joinType = PATH_JOIN_ROUND,
+                       I32 endType = PATH_END_ROUND) -> Vector<Polygon2d>;
+
 // ---------------------------------------------------------------------------
 // Region2 — a planar region: one outer boundary ring + zero or more holes.
 //
@@ -446,6 +452,14 @@ template <typename T> struct Region2 {
     Vector<Polygon2<T>> holes;
 
     [[nodiscard]] auto empty() const -> bool { return outer.coords.size() < 3; }
+
+    [[nodiscard]] auto get_num_points() const -> U32 {
+        U32 count = outer.size();
+        for (const auto& h : holes) {
+            count += h.size();
+        }
+        return count;
+    }
 
     // Interpret the Vector<Polygon2> returned by inflate_polyline2 as a
     // Region2: first ring = outer, subsequent rings = holes.
@@ -489,6 +503,83 @@ template <typename T> struct Region2 {
         }
 
         return mapbox::earcut<U32>(polygon);
+    }
+
+    // Returns the polygon boundary tangent at global vertex index i.
+    //
+    // Global index layout (same as triangulate()):
+    //   [0 .. outerN-1]                          outer ring
+    //   [outerN .. outerN+hole0N-1]               hole 0
+    //   [outerN+hole0N .. outerN+hole0N+hole1N-1] hole 1
+    //   ...
+    //
+    // The tangent is the mean of the two edge directions meeting at vertex i,
+    // then normalised:
+    //   prev_edge = normalise(pos[i]   - pos[i-1])
+    //   next_edge = normalise(pos[i+1] - pos[i])
+    //   tangent   = normalise(prev_edge + next_edge)
+    //
+    // Rings are treated as implicitly closed (open storage: coords[n-1] is
+    // followed by coords[0]). No duplicate closing vertex is assumed.
+    //
+    // If the two edges are anti-parallel (180° reversal — degenerate spike),
+    // the sum is near-zero; in that case the next-edge direction is returned
+    // as a fallback.
+    [[nodiscard]] auto get_point_tangent(U32 globalIdx) const -> Vec2<T> {
+        // Resolve global index → (ring coords, local index)
+        const Vector<Vec2<T>>* ring = nullptr;
+        U32 localIdx = globalIdx;
+
+        const U32 outerN = U32(outer.coords.size());
+        if (localIdx < outerN) {
+            ring = &outer.coords;
+        } else {
+            localIdx -= outerN;
+            for (const auto& hole : holes) {
+                const U32 holeN = U32(hole.coords.size());
+                if (localIdx < holeN) {
+                    ring = &hole.coords;
+                    break;
+                }
+                localIdx -= holeN;
+            }
+        }
+
+        NVCHK(ring != nullptr,
+              "Region2::get_point_tangent: global index {} out of range "
+              "(get_num_points={})",
+              globalIdx, get_num_points());
+
+        const U32 n = U32(ring->size());
+        NVCHK(n >= 2,
+              "Region2::get_point_tangent: ring has fewer than 2 vertices");
+
+        // Wrap-around neighbours (ring is implicitly closed, no dup vertex)
+        const U32 iPrev = (localIdx + n - 1) % n;
+        const U32 iNext = (localIdx + 1) % n;
+
+        const Vec2<T>& pPrev = (*ring)[iPrev];
+        const Vec2<T>& pCurr = (*ring)[localIdx];
+        const Vec2<T>& pNext = (*ring)[iNext];
+
+        // Normalise each edge direction individually before averaging so that
+        // very short edges don't dominate long ones.
+        auto safeNorm = [](Vec2<T> v) -> Vec2<T> {
+            const T len = v.length();
+            return (len > T(1e-12)) ? v / len : Vec2<T>(T(0), T(0));
+        };
+
+        const Vec2<T> prevEdge = safeNorm(pCurr - pPrev);
+        const Vec2<T> nextEdge = safeNorm(pNext - pCurr);
+
+        Vec2<T> sum = prevEdge + nextEdge;
+        const T sumLen = sum.length();
+
+        // Anti-parallel edges (spike / 180° reversal): fall back to next edge
+        if (sumLen < T(1e-9))
+            return nextEdge;
+
+        return sum / sumLen;
     }
 };
 
