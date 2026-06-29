@@ -664,6 +664,7 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
 
 void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
                                 F64 stepCm, F64 lookaheadCm,
+                                F64 connectFlatSize,
                                 const Vector<std::pair<U32, F64>>& pins,
                                 Vector<F64>& adj) {
     const U32 n = U32(ribs.size());
@@ -802,12 +803,18 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
         // Scan outward in both directions from pinRib while within lookaheadCm.
         // We iterate over all ribs rather than just left/right to handle
         // irregular rib spacing cleanly.
+
         for (U32 i = 0; i < n; ++i) {
-            const F64 dist = std::abs(ribs[i].u - pinU);
-            if (dist >= lookaheadCm)
+            F64 dist = std::abs(ribs[i].u - pinU);
+            if (dist >= (connectFlatSize + lookaheadCm))
                 continue;
-            const F64 w = 1.0 - dist / lookaheadCm; // 1.0 at pin, 0.0 at edge
-            adj[i] = adj[i] + w * (pinZ - adj[i]);  // lerp toward pin
+            if (dist <= connectFlatSize) {
+                adj[i] = pinZ;
+            } else {
+                const F64 w = 1.0 - (dist - connectFlatSize) /
+                                        lookaheadCm; // 1.0 at pin, 0.0 at edge
+                adj[i] = adj[i] + w * (pinZ - adj[i]); // lerp toward pin
+            }
         }
     }
 

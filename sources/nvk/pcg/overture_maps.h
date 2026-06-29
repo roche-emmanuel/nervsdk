@@ -431,6 +431,7 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
 // ---------------------------------------------------------------------------
 void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
                                 F64 stepCm, F64 lookaheadCm,
+                                F64 connectFlatSize,
                                 const Vector<std::pair<U32, F64>>& pins,
                                 Vector<F64>& adj);
 
