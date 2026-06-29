@@ -233,6 +233,20 @@ void clamp_profile_slope_raise_only(const Vector<F64>& u, Vector<F64>& z,
 // shared z back. No-op for < 2 ribs or maxSlope <= 0.
 void adjust_rib_elevations(Vector<RoadRib>& ribs, F64 maxSlope);
 
+// Index of the rib whose centre is closest (XY) to pos. ribs must be
+// non-empty.
+[[nodiscard]] auto nearest_rib_index(const Vector<RoadRib>& ribs,
+                                     const Vec2d& pos) -> U32;
+
+void pin_segment_profile(Vector<RoadRib>& ribs,
+                         Vector<std::pair<U32, F64>> pins, F64 maxSlope,
+                         const String& segId);
+
+[[nodiscard]] auto pin_and_fill_span(const Vector<F64>& u,
+                                     const Vector<F64>& ground, Vector<F64>& z,
+                                     U32 ia, U32 ib, F64 za, F64 zb,
+                                     F64 maxSlope) -> bool;
+
 } // namespace nv
 
 #endif

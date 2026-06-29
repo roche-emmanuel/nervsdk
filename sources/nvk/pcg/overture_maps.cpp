@@ -252,4 +252,95 @@ void adjust_rib_elevations(Vector<RoadRib>& ribs, F64 maxSlope) {
         ribs[i].z = z[i]; // both left/right of a rib still share this single z
 }
 
+auto nearest_rib_index(const Vector<RoadRib>& ribs, const Vec2d& pos) -> U32 {
+    U32 best = 0;
+    F64 bestD2 = std::numeric_limits<F64>::max();
+    for (U32 i = 0; i < U32(ribs.size()); ++i) {
+        const Vec2d centre = (ribs[i].left + ribs[i].right) * 0.5;
+        const Vec2d d = centre - pos;
+        const F64 d2 = d.dot(d);
+        if (d2 < bestD2) {
+            bestD2 = d2;
+            best = i;
+        }
+    }
+    return best;
+}
+
+void pin_segment_profile(Vector<RoadRib>& ribs,
+                         Vector<std::pair<U32, F64>> pins, F64 maxSlope,
+                         const String& segId) {
+    const U32 n = U32(ribs.size());
+    if (n < 2 || pins.size() < 2)
+        return;
+
+    std::sort(pins.begin(), pins.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    Vector<F64> u(n), ground(n), z(n);
+    for (U32 i = 0; i < n; ++i) {
+        u[i] = ribs[i].u;
+        ground[i] = ribs[i].z; // build_ribs left the raw ground cross-max here
+        z[i] = ribs[i].z;
+    }
+
+    for (U32 k = 0; k + 1 < U32(pins.size()); ++k) {
+        const U32 ia = pins[k].first, ib = pins[k + 1].first;
+        if (ib <= ia)
+            continue; // duplicate pin (two connectors on one rib): skip
+        if (pin_and_fill_span(u, ground, z, ia, ib, pins[k].second,
+                              pins[k + 1].second, maxSlope)) {
+            const F64 grade = std::abs(pins[k + 1].second - pins[k].second) /
+                              std::max(1e-9, u[ib] - u[ia]);
+            logWARN("Road {}: connector-to-connector grade {:.1f}% exceeds "
+                    "limit {:.1f}% — building anyway",
+                    segId, 100.0 * grade, 100.0 * maxSlope);
+        }
+    }
+
+    for (U32 i = 0; i < n; ++i)
+        ribs[i].z = z[i];
+}
+
+auto pin_and_fill_span(const Vector<F64>& u, const Vector<F64>& ground,
+                       Vector<F64>& z, U32 ia, U32 ib, F64 za, F64 zb,
+                       F64 maxSlope) -> bool {
+    z[ia] = za;
+    z[ib] = zb;
+    for (U32 i = ia + 1; i < ib; ++i)
+        z[i] = ground[i]; // interior floor
+
+    // Forward cone from the start pin (za seeds z[ia]); fills valleys.
+    for (U32 i = ia + 1; i < ib; ++i) {
+        const F64 du = std::max(0.0, u[i] - u[i - 1]);
+        const F64 cone = z[i - 1] - maxSlope * du;
+        if (z[i] < cone)
+            z[i] = cone;
+    }
+    // Backward cone from the end pin (zb seeds z[ib]). Endpoints stay
+    // exact.
+    for (U32 i = ib; i-- > ia + 1;) {
+        const F64 du = std::max(0.0, u[i + 1] - u[i]);
+        const F64 cone = z[i + 1] - maxSlope * du;
+        if (z[i] < cone)
+            z[i] = cone;
+    }
+
+    // Did the pins force a grade break? Check overall span + pin-adjacent
+    // edges.
+    constexpr F64 eps = 1e-6;
+    const F64 spanLen = u[ib] - u[ia];
+    bool violated =
+        (spanLen > 0.0 && std::abs(zb - za) / spanLen > maxSlope + eps);
+    if (ib > ia + 1) {
+        const F64 d0 = std::max(1e-9, u[ia + 1] - u[ia]);
+        const F64 d1 = std::max(1e-9, u[ib] - u[ib - 1]);
+        if (std::abs(z[ia + 1] - za) / d0 > maxSlope + eps)
+            violated = true;
+        if (std::abs(zb - z[ib - 1]) / d1 > maxSlope + eps)
+            violated = true;
+    }
+    return violated;
+}
+
 } // namespace nv
