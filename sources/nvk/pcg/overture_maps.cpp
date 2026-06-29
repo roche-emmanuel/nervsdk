@@ -360,4 +360,191 @@ void free_profile_ground_ends(const Vector<RoadRib>& ribs, F64 maxSlope,
     adj[n - 1] = ribs[n - 1].z;               // tack end to ground
 }
 
+void resample_profile(const Vector<RoadRib>& ribs, F64 stepCm,
+                      Vector<F64>& outU, Vector<F64>& outZ) {
+    outU.clear();
+    outZ.clear();
+
+    const U32 n = U32(ribs.size());
+    if (n == 0 || stepCm <= 0.0)
+        return;
+    if (n == 1) {
+        outU.push_back(ribs[0].u);
+        outZ.push_back(ribs[0].z);
+        return;
+    }
+
+    const F64 uMax = ribs.back().u;
+
+    // Reserve approximate output count to avoid repeated reallocation.
+    const U32 approxCount = U32(std::ceil(uMax / stepCm)) + 2;
+    outU.reserve(approxCount);
+    outZ.reserve(approxCount);
+
+    // Two-pointer walk: `seg` is the index of the LEFT rib of the current
+    // interpolation bracket [ribs[seg].u, ribs[seg+1].u).  We advance it
+    // forward as the query u crosses each rib boundary.
+    U32 seg = 0;
+
+    const U32 nSamples = U32(std::ceil(uMax / stepCm));
+    for (U32 i = 0; i <= nSamples; ++i) {
+        const F64 u = (i < nSamples) ? F64(i) * stepCm : uMax;
+
+        // Advance bracket so that ribs[seg].u <= u < ribs[seg+1].u.
+        // The guard (seg + 2 < n) keeps seg+1 a valid index.
+        while (seg + 2 < n && ribs[seg + 1].u <= u)
+            ++seg;
+
+        const F64 u0 = ribs[seg].u;
+        const F64 u1 = ribs[seg + 1].u;
+        const F64 z0 = ribs[seg].z;
+        const F64 z1 = ribs[seg + 1].z;
+
+        F64 z;
+        const F64 du = u1 - u0;
+        if (du < 1e-12) {
+            // Coincident-u pair (inner pivot of a tight corner fan): take the
+            // higher z to stay above ground.
+            z = std::max(z0, z1);
+        } else {
+            const F64 t = (u - u0) / du;
+            z = z0 + t * (z1 - z0);
+        }
+
+        outU.push_back(u);
+        outZ.push_back(z);
+    }
+}
+void smooth_savitzky_golay_cubic(const Vector<F64>& z, U32 halfRad,
+                                 Vector<F64>& out) {
+    const U32 n = U32(z.size());
+    out.resize(n);
+    if (n == 0)
+        return;
+    if (halfRad < 2) {
+        // Window too small for a cubic fit; fall back gracefully.
+        smooth_gaussian(z, halfRad, out);
+        return;
+    }
+
+    // Analytical S-G coefficients for cubic/quartic (they coincide) are:
+    //   c(j) = [ (3m^2 - 1)(3m^2 + 3 - 5*j^2) * (2m+3) ] / [8m(2m-1)(2m+3)]
+    // where m = halfRad, j in [-m, m].  We compute them numerically here for
+    // generality and normalise so they sum to 1.
+    const U32 kLen = 2 * halfRad + 1;
+    Vector<F64> kernel(kLen);
+    {
+        const F64 m = F64(halfRad);
+        const F64 m2 = m * m;
+        F64 kSum = 0.0;
+        for (U32 j = 0; j < kLen; ++j) {
+            const F64 jc = F64(j) - m; // centred index
+            kernel[j] = (3.0 * m2 - 1.0) * (3.0 * m2 + 3.0 - 5.0 * jc * jc);
+            kSum += kernel[j];
+        }
+        for (F64& w : kernel)
+            w /= kSum;
+    }
+
+    for (U32 i = 0; i < n; ++i) {
+        F64 acc = 0.0;
+        for (U32 j = 0; j < kLen; ++j) {
+            const U32 idx =
+                U32(std::clamp(I32(i) + I32(j) - I32(halfRad), 0, I32(n) - 1));
+            acc += kernel[j] * z[idx];
+        }
+        out[i] = acc;
+    }
+}
+void smooth_median(const Vector<F64>& z, U32 halfRad, Vector<F64>& out) {
+    const U32 n = U32(z.size());
+    out.resize(n);
+    if (n == 0)
+        return;
+    if (halfRad == 0) {
+        out = z;
+        return;
+    }
+
+    const U32 kLen = 2 * halfRad + 1;
+    Vector<F64> window(kLen);
+    const U32 medPos = halfRad; // index of median in sorted window
+
+    for (U32 i = 0; i < n; ++i) {
+        for (U32 j = 0; j < kLen; ++j) {
+            const U32 idx =
+                U32(std::clamp(I32(i) + I32(j) - I32(halfRad), 0, I32(n) - 1));
+            window[j] = z[idx];
+        }
+        std::nth_element(window.begin(), window.begin() + medPos, window.end());
+        out[i] = window[medPos];
+    }
+}
+void smooth_gaussian(const Vector<F64>& z, U32 halfRad, Vector<F64>& out,
+                     F64 sigma) {
+    const U32 n = U32(z.size());
+    out.resize(n);
+    if (n == 0)
+        return;
+    if (halfRad == 0) {
+        out = z;
+        return;
+    }
+
+    if (sigma <= 0.0)
+        sigma = F64(halfRad) / 2.0;
+
+    // Precompute normalised kernel once.
+    const U32 kLen = 2 * halfRad + 1;
+    Vector<F64> kernel(kLen);
+    F64 kSum = 0.0;
+    for (U32 j = 0; j < kLen; ++j) {
+        const F64 x = F64(j) - F64(halfRad);
+        kernel[j] = std::exp(-0.5 * (x / sigma) * (x / sigma));
+        kSum += kernel[j];
+    }
+    for (F64& w : kernel)
+        w /= kSum;
+
+    for (U32 i = 0; i < n; ++i) {
+        F64 acc = 0.0;
+        for (U32 j = 0; j < kLen; ++j) {
+            const U32 idx =
+                U32(std::clamp(I32(i) + I32(j) - I32(halfRad), 0, I32(n) - 1));
+            acc += kernel[j] * z[idx];
+        }
+        out[i] = acc;
+    }
+}
+void smooth_box(const Vector<F64>& z, U32 halfRad, Vector<F64>& out) {
+    const U32 n = U32(z.size());
+    out.resize(n);
+    if (n == 0)
+        return;
+    if (halfRad == 0) {
+        out = z;
+        return;
+    }
+
+    // Running sum with clamped boundary reads.
+    // Seed the accumulator for i=0: window [-halfRad, +halfRad].
+    F64 sum = 0.0;
+    for (I32 k = -I32(halfRad); k <= I32(halfRad); ++k) {
+        const U32 idx = U32(std::clamp(k, 0, I32(n) - 1));
+        sum += z[idx];
+    }
+    const F64 winWidth = F64(2 * halfRad + 1);
+    out[0] = sum / winWidth;
+
+    for (U32 i = 1; i < n; ++i) {
+        // Remove sample that left the window on the left.
+        const U32 removeIdx =
+            U32(std::clamp(I32(i) - I32(halfRad) - 1, 0, I32(n) - 1));
+        // Add sample that entered the window on the right.
+        const U32 addIdx =
+            U32(std::clamp(I32(i) + I32(halfRad), 0, I32(n) - 1));
+        sum += z[addIdx] - z[removeIdx];
+        out[i] = sum / winWidth;
+    }
+}
 } // namespace nv

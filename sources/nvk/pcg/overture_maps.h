@@ -255,6 +255,105 @@ void pin_segment_profile(Vector<RoadRib>& ribs,
 void free_profile_ground_ends(const Vector<RoadRib>& ribs, F64 maxSlope,
                               Vector<F64>& adj);
 
+// ---------------------------------------------------------------------------
+// resample_profile
+//
+// Resamples a piecewise-linear elevation profile at uniform arc-length steps.
+//
+// Input:  ribs   — rib array (u is cumulative centreline distance in cm,
+//                  non-decreasing; z is the raw ground elevation in cm).
+//         stepCm — desired uniform sampling interval (cm).  Must be > 0.
+//
+// Output: outU   — uniformly-spaced u values: 0, stepCm, 2*stepCm, …, uMax.
+//                  The last sample is always clamped to ribs.back().u so the
+//                  endpoint is always included exactly.
+//         outZ   — linearly interpolated z at each outU sample.
+//
+// The first and last samples correspond exactly to ribs.front() and
+// ribs.back() (no extrapolation).  Coincident-u ribs (corner fan pivots) are
+// handled by the bracketing search: the interpolant just returns the shared z.
+//
+// Complexity: O(n + m) where n = ribs.size(), m = number of output samples.
+// ---------------------------------------------------------------------------
+void resample_profile(const Vector<RoadRib>& ribs, F64 stepCm,
+                      Vector<F64>& outU, Vector<F64>& outZ);
+
+// ---------------------------------------------------------------------------
+// Elevation profile smoothing — road-concept-agnostic utilities.
+//
+// All functions operate on a uniformly-sampled signal z[0..n-1] with a
+// uniform sample spacing (implied; not needed by the algorithms themselves).
+// They write their result into `out`, which is resized to match `z`.
+//
+// Boundary convention (all variants):
+//   The signal is extended as a constant beyond both ends:
+//     z[-k]  == z[0]       for k > 0
+//     z[n+k] == z[n-1]     for k > 0
+//   This keeps the smoothed endpoints anchored near the raw ground values at
+//   the road's start and end, avoiding the "slope-pull" artifact that
+//   occurred with free_profile_ground_ends.
+//
+// All functions are safe to call with out == z (in-place).
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// smooth_box
+//
+// Simple unweighted moving average over a window of (2*halfRad + 1) samples.
+// Fast O(n) via a running sum.  Maximally smooths but introduces a flat-top
+// response — peaks and valleys are rounded symmetrically.
+//
+// halfRad == 0  →  identity (no-op copy).
+// ---------------------------------------------------------------------------
+void smooth_box(const Vector<F64>& z, U32 halfRad, Vector<F64>& out);
+
+// ---------------------------------------------------------------------------
+// smooth_gaussian
+//
+// Weighted moving average with a Gaussian kernel truncated at ±halfRad
+// samples (sigma = halfRad / 2.0 by default, giving ~95 % of the kernel
+// weight inside the window).  Better frequency response than box — no flat-
+// top ringing — at the cost of a slightly heavier inner loop.
+//
+// The kernel is recomputed once and normalised so boundary clamping does not
+// reduce the total weight near the ends (renormalised per-sample is NOT done
+// here; the constant kernel is intentional — endpoint anchoring comes from
+// the clamped reads, not weight renormalisation).
+//
+// halfRad == 0  →  identity.
+// ---------------------------------------------------------------------------
+void smooth_gaussian(const Vector<F64>& z, U32 halfRad, Vector<F64>& out,
+                     F64 sigma = 0.0);
+
+// ---------------------------------------------------------------------------
+// smooth_median
+//
+// Sliding median over a window of (2*halfRad + 1) samples.  Resistant to
+// spikes and terrain noise — does not blur sharp legitimate transitions as
+// much as box/Gaussian.  O(n * halfRad * log(halfRad)) via std::nth_element.
+//
+// halfRad == 0  →  identity.
+// ---------------------------------------------------------------------------
+void smooth_median(const Vector<F64>& z, U32 halfRad, Vector<F64>& out);
+
+// ---------------------------------------------------------------------------
+// smooth_savitzky_golay_cubic
+//
+// Savitzky-Golay smoothing with a cubic polynomial fit over a window of
+// (2*halfRad + 1) samples.  Preserves peaks and inflection points better
+// than box/Gaussian while still suppressing noise.  Good choice for
+// elevation profiles where you care about grade continuity.
+//
+// Coefficients are computed analytically for cubic (degree-3) S-G filters.
+// Only odd window sizes 5..25 are supported (halfRad 2..12); outside that
+// range the function falls back to smooth_gaussian.
+//
+// halfRad == 0  →  identity.
+// halfRad == 1  →  falls back to smooth_gaussian (window too small for cubic).
+// ---------------------------------------------------------------------------
+void smooth_savitzky_golay_cubic(const Vector<F64>& z, U32 halfRad,
+                                 Vector<F64>& out);
+
 } // namespace nv
 
 #endif
