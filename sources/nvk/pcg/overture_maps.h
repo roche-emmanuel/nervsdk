@@ -194,6 +194,45 @@ enum class LandClass : U8 {
 auto overture_land_class_from_string(const String& name) -> LandClass;
 auto overture_land_class_to_string(LandClass cls) -> String;
 
+// One road cross-section. left/right are world-XY (cm). z is the shared
+// surface elevation (cm, terrain max under the cross-section, WITHOUT the road
+// Z bias — tessellation adds that). u is cumulative centreline distance (cm).
+//
+// Invariant produced by build_ribs(): |left - right| == 2 * halfWidth for every
+// rib, and both sides share z, so the surface is always level across its width.
+struct RoadRib {
+    Vec2d left;
+    Vec2d right;
+    F64 z{0.0};
+    F64 u{0.0};
+};
+
+// Default along-road grade caps, in degrees. tan(deg) ≈ grade %:
+//   4° ≈ 7%, 6° ≈ 10.5%, 8° ≈ 14%, 12° ≈ 21%, 15° ≈ 27%.
+constexpr F64 kRoadDefaultMaxSlopeDeg = 8.0; // fallback for unknown classes
+constexpr F64 kRoadLinkSlopeBonusDeg = 2.0;  // ramps tolerate a steeper grade
+constexpr F64 kDegToRad = 3.14159265358979323846 / 180.0;
+
+// Default maximum along-road grade (degrees) for an Overture road class.
+// Unknown classes fall back to kRoadDefaultMaxSlopeDeg.
+[[nodiscard]] auto road_default_max_slope_deg(const String& roadClass) -> F64;
+
+// tan() of a grade given in degrees → dimensionless rise/run ratio.
+// u and z are both in cm, so this ratio applies directly to the profile.
+[[nodiscard]] auto slope_ratio_from_deg(F64 deg) -> F64;
+
+// Raise-only, slope-limited conditioning of an elevation profile.
+// Postconditions (for all i): z[i] >= z_in[i]  (never sinks below ground), and
+// |z[i+1]-z[i]| <= maxSlope*(u[i+1]-u[i])  (grade cap honoured). The result is
+// the LOWEST profile satisfying both — i.e. minimal skirt height. u must be
+// non-decreasing; coincident-u samples are levelled to a shared elevation.
+void clamp_profile_slope_raise_only(const Vector<F64>& u, Vector<F64>& z,
+                                    F64 maxSlope);
+
+// Convenience wrapper: extracts (u, z) from ribs, conditions them, writes the
+// shared z back. No-op for < 2 ribs or maxSlope <= 0.
+void adjust_rib_elevations(Vector<RoadRib>& ribs, F64 maxSlope);
+
 } // namespace nv
 
 #endif

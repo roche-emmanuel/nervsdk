@@ -196,4 +196,60 @@ auto overture_land_class_to_string(LandClass cls) -> String {
     return {};
 }
 
+auto road_default_max_slope_deg(const String& roadClass) -> F64 {
+    static const UnorderedMap<String, F64> kTable = {
+        {"motorway", 4.0},      {"trunk", 4.0},        {"primary", 5.0},
+        {"secondary", 6.0},     {"tertiary", 6.0},     {"residential", 8.0},
+        {"living_street", 8.0}, {"unclassified", 8.0}, {"service", 12.0},
+        {"track", 15.0},        {"path", 15.0},        {"bridleway", 15.0},
+        {"footway", 15.0},      {"cycleway", 12.0},    {"pedestrian", 12.0},
+        {"steps", 45.0},
+    };
+    const auto it = kTable.find(roadClass);
+    return it != kTable.end() ? it->second : kRoadDefaultMaxSlopeDeg;
+}
+
+auto slope_ratio_from_deg(F64 deg) -> F64 { return std::tan(deg * kDegToRad); }
+
+void clamp_profile_slope_raise_only(const Vector<F64>& u, Vector<F64>& z,
+                                    F64 maxSlope) {
+    const U32 n = U32(z.size());
+    if (n < 2 || maxSlope <= 0.0)
+        return;
+
+    // Forward sweep: a peak behind us caps how fast the road may descend, so
+    // each sample is pulled up to at least (previous − maxSlope·Δu).
+    for (U32 i = 1; i < n; ++i) {
+        const F64 du = std::max(0.0, u[i] - u[i - 1]);
+        const F64 floorFromPrev = z[i - 1] - maxSlope * du;
+        if (z[i] < floorFromPrev)
+            z[i] = floorFromPrev;
+    }
+    // Backward sweep: symmetrically, a peak ahead caps the descent looking
+    // back. After both sweeps z[i] == max_j (z_in[j] − maxSlope·|u[i]−u[j]|),
+    // the minimal raise-only slope-limited majorant.
+    for (U32 i = n - 1; i-- > 0;) {
+        const F64 du = std::max(0.0, u[i + 1] - u[i]);
+        const F64 floorFromNext = z[i + 1] - maxSlope * du;
+        if (z[i] < floorFromNext)
+            z[i] = floorFromNext;
+    }
+}
+
+void adjust_rib_elevations(Vector<RoadRib>& ribs, F64 maxSlope) {
+    const U32 n = U32(ribs.size());
+    if (n < 2 || maxSlope <= 0.0)
+        return;
+
+    Vector<F64> u(n);
+    Vector<F64> z(n);
+    for (U32 i = 0; i < n; ++i) {
+        u[i] = ribs[i].u;
+        z[i] = ribs[i].z;
+    }
+    clamp_profile_slope_raise_only(u, z, maxSlope);
+    for (U32 i = 0; i < n; ++i)
+        ribs[i].z = z[i]; // both left/right of a rib still share this single z
+}
+
 } // namespace nv
