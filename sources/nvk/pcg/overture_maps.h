@@ -247,6 +247,14 @@ void pin_segment_profile(Vector<RoadRib>& ribs,
                                      U32 ia, U32 ib, F64 za, F64 zb,
                                      F64 maxSlope) -> bool;
 
+// Phase-1 "free" profile: raise-only slope-limited majorant of the segment's
+// ground, with both endpoints tacked back down to ground level. Result goes in
+// `adj`; ribs are NOT modified, so ribs[].z stays the raw ground floor that
+// phase 3 needs. Endpoints sit at ground (so endpoint-only connectors suggest
+// ground); interior stations carry the lifted, smoothed value.
+void free_profile_ground_ends(const Vector<RoadRib>& ribs, F64 maxSlope,
+                              Vector<F64>& adj);
+
 } // namespace nv
 
 #endif

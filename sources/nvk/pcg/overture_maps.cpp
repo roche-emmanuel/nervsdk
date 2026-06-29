@@ -343,4 +343,21 @@ auto pin_and_fill_span(const Vector<F64>& u, const Vector<F64>& ground,
     return violated;
 }
 
+void free_profile_ground_ends(const Vector<RoadRib>& ribs, F64 maxSlope,
+                              Vector<F64>& adj) {
+    const U32 n = U32(ribs.size());
+    adj.resize(n);
+    if (n == 0)
+        return;
+    Vector<F64> u(n);
+    for (U32 i = 0; i < n; ++i) {
+        u[i] = ribs[i].u;
+        adj[i] = ribs[i].z; // seed with raw ground
+    }
+    clamp_profile_slope_raise_only(u, adj,
+                                   maxSlope); // lifts interior (and ends)
+    adj[0] = ribs[0].z;                       // tack start to ground
+    adj[n - 1] = ribs[n - 1].z;               // tack end to ground
+}
+
 } // namespace nv
