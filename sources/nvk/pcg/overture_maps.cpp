@@ -547,4 +547,20 @@ void smooth_box(const Vector<F64>& z, U32 halfRad, Vector<F64>& out) {
         out[i] = sum / winWidth;
     }
 }
+auto sample_profile(const Vector<F64>& z, F64 stepCm, F64 u) -> F64 {
+    const U32 n = U32(z.size());
+    if (n == 0)
+        return 0.0;
+    if (n == 1)
+        return z[0];
+
+    // Compute left bracket index directly from step size.
+    const F64 uClamped = std::clamp(u, 0.0, F64(n - 1) * stepCm);
+    const F64 fIdx = uClamped / stepCm;
+    const U32 i0 = U32(fIdx);               // left sample
+    const U32 i1 = std::min(i0 + 1, n - 1); // right sample (clamped at end)
+    const F64 t = fIdx - F64(i0);           // interpolation weight in [0, 1)
+
+    return z[i0] + t * (z[i1] - z[i0]);
+}
 } // namespace nv

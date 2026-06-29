@@ -354,6 +354,27 @@ void smooth_median(const Vector<F64>& z, U32 halfRad, Vector<F64>& out);
 void smooth_savitzky_golay_cubic(const Vector<F64>& z, U32 halfRad,
                                  Vector<F64>& out);
 
+// ---------------------------------------------------------------------------
+// sample_profile
+//
+// Samples a uniformly-resampled elevation profile at an arbitrary u value
+// using linear interpolation.
+//
+// z       — uniformly-spaced elevation samples (produced by resample_profile
+//           then any smooth_* pass).
+// stepCm  — the uniform spacing used when the profile was resampled.  Must
+//           match exactly what was passed to resample_profile.
+// u       — query arc-length position (cm).  Clamped to [0, (n-1)*stepCm]
+//           so out-of-range queries return the nearest endpoint value rather
+//           than extrapolating.
+//
+// Returns the interpolated elevation (cm).
+//
+// Complexity: O(1) — no search, no loop.
+// ---------------------------------------------------------------------------
+[[nodiscard]] auto sample_profile(const Vector<F64>& z, F64 stepCm, F64 u)
+    -> F64;
+
 } // namespace nv
 
 #endif
