@@ -375,6 +375,65 @@ void smooth_savitzky_golay_cubic(const Vector<F64>& z, U32 halfRad,
 [[nodiscard]] auto sample_profile(const Vector<F64>& z, F64 stepCm, F64 u)
     -> F64;
 
+// ---------------------------------------------------------------------------
+// build_anticipatory_profile
+//
+// Generates a smooth, ground-hugging elevation profile for a road segment by
+// running a forward and backward anticipatory pass over a uniformly-resampled
+// smoothed elevation profile, then combining the results and enforcing the
+// grade cap.
+//
+// Algorithm per pass (described for forward; backward is symmetric):
+//   - Start anchored to the raw ground at the first rib.
+//   - At each rib, look ahead by `lookaheadCm` in the smoothed profile to
+//     get a target elevation.  The current rib should be at a fraction
+//     (deltaU / lookaheadCm) of the way between the previous rib elevation
+//     and that target.
+//   - Clamp to raw ground (road never sinks below terrain).
+//
+// After both passes, the per-rib elevation is max(forward, backward), then
+// a final clamp_profile_slope_raise_only enforces the grade cap.
+//
+// Parameters:
+//   ribs          — rib array from build_ribs() (u non-decreasing, z raw
+//                   ground elevation in cm).
+//   maxSlope      — grade cap (dimensionless rise/run, from
+//                   slope_ratio_from_deg).
+//   stepCm        — resampling interval used internally (cm).  Typically the
+//                   road sampling distance, e.g. 100 cm.
+//   lookaheadCm   — arc-length lookahead distance (cm).  Controls how far
+//                   ahead the road "sees" when anticipating elevation changes.
+//                   A value of 10 * stepCm is a reasonable starting point.
+//   adj           — output: per-rib adjusted elevation (cm), parallel to
+//                   ribs[].  Caller writes adj[i] back into ribs[i].z.
+// ---------------------------------------------------------------------------
+void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
+                                F64 stepCm, F64 lookaheadCm, Vector<F64>& adj);
+
+// ---------------------------------------------------------------------------
+// build_anticipatory_profile  (pinned variant — Phase 3)
+//
+// Same anticipatory smoothing as the unpinned variant, but connector pins are
+// honoured as hard constraints: each pin is an exact elevation anchor, and
+// the anticipatory passes run independently within each inter-pin span.
+//
+// This replaces the Phase-3 call to pin_segment_profile for segments that
+// already have a smoothed profile: instead of linearly interpolating between
+// pins and then cone-raising to ground, we run the full anticipatory logic
+// within each span so the interior still gets smooth grade anticipation rather
+// than a flat ramp.
+//
+// pins     — sorted (rib index, target elevation) pairs, raise-only guarded
+//            by the caller (i.e. pin elev >= ribs[ridx].z already enforced).
+//            Must include the endpoint pins (ridx 0 and last) — the caller
+//            in Phase 3 already guarantees this.
+// adj      — output: per-rib adjusted elevation (cm), parallel to ribs[].
+// ---------------------------------------------------------------------------
+void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
+                                F64 stepCm, F64 lookaheadCm,
+                                const Vector<std::pair<U32, F64>>& pins,
+                                Vector<F64>& adj);
+
 } // namespace nv
 
 #endif

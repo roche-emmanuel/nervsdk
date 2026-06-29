@@ -563,4 +563,256 @@ auto sample_profile(const Vector<F64>& z, F64 stepCm, F64 u) -> F64 {
 
     return z[i0] + t * (z[i1] - z[i0]);
 }
+
+struct UniformProfile {
+    Vector<F64> z;
+    F64 stepCm{0.0};
+
+    [[nodiscard]] auto sample(F64 u) const -> F64 {
+        return sample_profile(z, stepCm, u);
+    }
+};
+
+void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
+                                F64 stepCm, F64 lookaheadCm, Vector<F64>& adj) {
+    const U32 n = U32(ribs.size());
+    adj.resize(n);
+    if (n == 0)
+        return;
+    if (n == 1) {
+        adj[0] = ribs[0].z;
+        return;
+    }
+
+    // ── Step 1: resample raw rib z values onto a uniform u grid ─────────────
+    UniformProfile profile;
+    profile.stepCm = stepCm;
+    // resample_profile(ribs, stepCm, profile.z /* outU discarded */,
+    // profile.z); resample_profile writes both outU and outZ; we only need outZ
+    // here, so use a temp for outU:
+    {
+        Vector<F64> tmpU;
+        resample_profile(ribs, stepCm, tmpU, profile.z);
+    }
+
+    // ── Step 2: smooth the resampled profile ────────────────────────────────
+    // Median pre-pass to kill DEM spikes, then Savitzky-Golay for grade
+    // continuity.  Window radii expressed in samples.
+    const U32 medHalfRad =
+        std::max(1u, U32(std::round(lookaheadCm / stepCm / 4.0)));
+    const U32 sgHalfRad =
+        std::max(2u, U32(std::round(lookaheadCm / stepCm / 2.0)));
+
+    Vector<F64> tmp;
+    smooth_median(profile.z, medHalfRad, tmp);
+    smooth_savitzky_golay_cubic(tmp, sgHalfRad, profile.z);
+
+    // ── Step 3 & 4: forward pass ─────────────────────────────────────────────
+    Vector<F64> fwd(n);
+    fwd[0] = ribs[0].z; // anchor start to raw ground
+
+    for (U32 i = 1; i < n; ++i) {
+        const F64 prevU = ribs[i - 1].u;
+        const F64 currU = ribs[i].u;
+        const F64 deltaU = currU - prevU;
+
+        // Look ahead from current rib position.
+        const F64 aheadU = currU + lookaheadCm;
+        const F64 aheadZ = profile.sample(aheadU);
+
+        // How much should we have climbed by now, as a fraction of the full
+        // lookahead distance?
+        const F64 fraction = (lookaheadCm > 0.0) ? deltaU / lookaheadCm : 0.0;
+        const F64 ribZ = fwd[i - 1] + (aheadZ - fwd[i - 1]) * fraction;
+
+        // Never sink below raw ground.
+        fwd[i] = std::max(ribZ, ribs[i].z);
+    }
+
+    // ── Step 3 & 4: backward pass (reverse direction) ────────────────────────
+    Vector<F64> bwd(n);
+    bwd[n - 1] = ribs[n - 1].z; // anchor end to raw ground
+
+    for (U32 i = n - 1; i-- > 0;) {
+        const F64 prevU = ribs[i + 1].u; // "previous" in reverse
+        const F64 currU = ribs[i].u;
+        const F64 deltaU = prevU - currU; // always positive
+
+        // Look ahead in the reverse direction.
+        const F64 aheadU = currU - lookaheadCm;
+        const F64 aheadZ = profile.sample(aheadU); // clamped to u=0 at boundary
+
+        const F64 fraction = (lookaheadCm > 0.0) ? deltaU / lookaheadCm : 0.0;
+        const F64 ribZ = bwd[i + 1] + (aheadZ - bwd[i + 1]) * fraction;
+
+        bwd[i] = std::max(ribZ, ribs[i].z);
+    }
+
+    // ── Step 10: combine passes ──────────────────────────────────────────────
+    // max() rather than average: guarantees neither pass's anticipatory lift
+    // is discarded, and the result is always >= raw ground by construction.
+    Vector<F64> u(n);
+    for (U32 i = 0; i < n; ++i) {
+        // adj[i] = std::max(fwd[i], bwd[i]);
+        adj[i] = (fwd[i] + bwd[i]) * 0.5;
+        u[i] = ribs[i].u;
+    }
+
+    // ── Final: enforce grade cap ─────────────────────────────────────────────
+    // clamp_profile_slope_raise_only(u, adj, maxSlope);
+}
+
+void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
+                                F64 stepCm, F64 lookaheadCm,
+                                const Vector<std::pair<U32, F64>>& pins,
+                                Vector<F64>& adj) {
+    const U32 n = U32(ribs.size());
+    adj.resize(n);
+    if (n == 0)
+        return;
+    if (n == 1) {
+        adj[0] = ribs[0].z;
+        return;
+    }
+
+    // Build the smoothed uniform profile once for the whole segment —
+    // same as the unpinned variant.
+    UniformProfile profile;
+    {
+        Vector<F64> tmpU;
+        resample_profile(ribs, stepCm, tmpU, profile.z);
+    }
+    profile.stepCm = stepCm;
+
+    const U32 medHalfRad =
+        std::max(1u, U32(std::round(lookaheadCm / stepCm / 4.0)));
+    const U32 sgHalfRad =
+        std::max(2u, U32(std::round(lookaheadCm / stepCm / 2.0)));
+    Vector<F64> tmp;
+    smooth_median(profile.z, medHalfRad, tmp);
+    smooth_savitzky_golay_cubic(tmp, sgHalfRad, profile.z);
+
+    // Seed everything with raw ground as the floor.
+    for (U32 i = 0; i < n; ++i)
+        adj[i] = ribs[i].z;
+
+    // Process each inter-pin span independently.
+    // pins is already sorted and includes the endpoint pins.
+    for (U32 k = 0; k + 1 < U32(pins.size()); ++k) {
+        const U32 ia = pins[k].first;
+        const U32 ib = pins[k + 1].first;
+        const F64 za = pins[k].second;
+        const F64 zb = pins[k + 1].second;
+
+        if (ib <= ia) {
+            // Duplicate pin on same rib — just enforce the value.
+            adj[ia] = std::max(adj[ia], za);
+            continue;
+        }
+
+        // ── Forward pass within [ia, ib] ────────────────────────────────
+        Vector<F64> fwd(ib - ia + 1);
+        fwd[0] = za; // anchored to pin
+
+        for (U32 i = ia + 1; i <= ib; ++i) {
+            const F64 prevU = ribs[i - 1].u;
+            const F64 currU = ribs[i].u;
+            const F64 deltaU = currU - prevU;
+
+            // Look ahead — but cap the lookahead at the span end so we
+            // don't bleed the anticipation across a pin boundary.
+            const F64 aheadU = std::min(currU + lookaheadCm, ribs[ib].u);
+            const F64 aheadZ = profile.sample(aheadU);
+
+            // Blend toward the forward pin as we approach it:
+            // once we're within lookaheadCm of ib, start honouring zb.
+            const F64 distToEnd = ribs[ib].u - currU;
+            const F64 targetZ =
+                (distToEnd <= lookaheadCm)
+                    ? zb + (aheadZ - zb) * (distToEnd / lookaheadCm)
+                    : aheadZ;
+
+            const F64 fraction =
+                (lookaheadCm > 0.0) ? deltaU / lookaheadCm : 0.0;
+            const F64 ribZ =
+                fwd[i - ia - 1] + (targetZ - fwd[i - ia - 1]) * fraction;
+
+            fwd[i - ia] = std::max(ribZ, ribs[i].z);
+        }
+        fwd[ib - ia] = std::max(fwd[ib - ia], zb); // enforce end pin
+
+        // ── Backward pass within [ia, ib] ───────────────────────────────
+        Vector<F64> bwd(ib - ia + 1);
+        bwd[ib - ia] = zb; // anchored to pin
+
+        for (U32 i = ib; i-- > ia;) {
+            const F64 prevU = ribs[i + 1].u;
+            const F64 currU = ribs[i].u;
+            const F64 deltaU = prevU - currU;
+
+            const F64 aheadU = std::max(currU - lookaheadCm, ribs[ia].u);
+            const F64 aheadZ = profile.sample(aheadU);
+
+            const F64 distToStart = currU - ribs[ia].u;
+            const F64 targetZ =
+                (distToStart <= lookaheadCm)
+                    ? za + (aheadZ - za) * (distToStart / lookaheadCm)
+                    : aheadZ;
+
+            const F64 fraction =
+                (lookaheadCm > 0.0) ? deltaU / lookaheadCm : 0.0;
+            const F64 ribZ =
+                bwd[i - ia + 1] + (targetZ - bwd[i - ia + 1]) * fraction;
+
+            bwd[i - ia] = std::max(ribZ, ribs[i].z);
+        }
+        bwd[0] = std::max(bwd[0], za); // enforce start pin
+
+        // ── Combine and write into adj ───────────────────────────────────
+        for (U32 i = ia; i <= ib; ++i) {
+
+            // adj[i] = std::max(fwd[i - ia], bwd[i - ia]);
+            adj[i] = (fwd[i - ia] + bwd[i - ia]) * 0.5;
+        }
+    }
+
+    // Enforce the grade cap across the whole segment now that all spans
+    // are filled.
+    Vector<F64> u(n);
+    for (U32 i = 0; i < n; ++i)
+        u[i] = ribs[i].u;
+
+    // clamp_profile_slope_raise_only(u, adj, maxSlope);
+
+    // Re-enforce pins after the grade clamp — the clamp is raise-only so
+    // it can only push values up, meaning pins are still a valid floor.
+    // But they must still be exact, so stamp them again.
+    // for (const auto& [ridx, z] : pins)
+    //     adj[ridx] = std::max(adj[ridx], z);
+
+    // ── Pin reconciliation: blend anticipatory result toward each pin ────────
+    // For each pin, within a radius of lookaheadCm (arc-length) on both sides,
+    // mix adj[i] toward the pin elevation.  Weight is linear: 0.0 at the edge
+    // of the blend zone, 1.0 exactly at the pin rib.  This avoids the kink
+    // that stamping a single rib would create, and avoids the wrong direction
+    // that max() would introduce.
+    for (const auto& [pinRib, pinZ] : pins) {
+        const F64 pinU = ribs[pinRib].u;
+
+        // Scan outward in both directions from pinRib while within lookaheadCm.
+        // We iterate over all ribs rather than just left/right to handle
+        // irregular rib spacing cleanly.
+        for (U32 i = 0; i < n; ++i) {
+            const F64 dist = std::abs(ribs[i].u - pinU);
+            if (dist >= lookaheadCm)
+                continue;
+            const F64 w = 1.0 - dist / lookaheadCm; // 1.0 at pin, 0.0 at edge
+            adj[i] = adj[i] + w * (pinZ - adj[i]);  // lerp toward pin
+        }
+    }
+
+    for (U32 i = 0; i < n; ++i)
+        adj[i] = std::max(adj[i], ribs[i].z);
+}
+
 } // namespace nv
