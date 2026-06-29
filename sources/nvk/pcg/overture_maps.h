@@ -207,6 +207,12 @@ struct RoadRib {
     F64 u{0.0};
 };
 
+struct RoadConnectorInfos {
+    F64 elev{0.0};
+    U32 count{0};
+    F32 maxHalfWidth{0.0};
+};
+
 // Default along-road grade caps, in degrees. tan(deg) ≈ grade %:
 //   4° ≈ 7%, 6° ≈ 10.5%, 8° ≈ 14%, 12° ≈ 21%, 15° ≈ 27%.
 constexpr F64 kRoadDefaultMaxSlopeDeg = 8.0; // fallback for unknown classes
@@ -429,11 +435,10 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
 //            in Phase 3 already guarantees this.
 // adj      — output: per-rib adjusted elevation (cm), parallel to ribs[].
 // ---------------------------------------------------------------------------
-void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
-                                F64 stepCm, F64 lookaheadCm,
-                                F64 connectFlatSize,
-                                const Vector<std::pair<U32, F64>>& pins,
-                                Vector<F64>& adj);
+void build_anticipatory_profile(
+    const Vector<RoadRib>& ribs, F64 maxSlope, F64 stepCm, F64 lookaheadCm,
+    F64 connectPlateauFactor,
+    const Vector<std::pair<U32, RoadConnectorInfos>>& pins, Vector<F64>& adj);
 
 } // namespace nv
 

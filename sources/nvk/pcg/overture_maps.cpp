@@ -662,11 +662,10 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
     // clamp_profile_slope_raise_only(u, adj, maxSlope);
 }
 
-void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
-                                F64 stepCm, F64 lookaheadCm,
-                                F64 connectFlatSize,
-                                const Vector<std::pair<U32, F64>>& pins,
-                                Vector<F64>& adj) {
+void build_anticipatory_profile(
+    const Vector<RoadRib>& ribs, F64 maxSlope, F64 stepCm, F64 lookaheadCm,
+    F64 connectPlateauFactor,
+    const Vector<std::pair<U32, RoadConnectorInfos>>& pins, Vector<F64>& adj) {
     const U32 n = U32(ribs.size());
     adj.resize(n);
     if (n == 0)
@@ -702,8 +701,8 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
     for (U32 k = 0; k + 1 < U32(pins.size()); ++k) {
         const U32 ia = pins[k].first;
         const U32 ib = pins[k + 1].first;
-        const F64 za = pins[k].second;
-        const F64 zb = pins[k + 1].second;
+        const F64 za = pins[k].second.elev;
+        const F64 zb = pins[k + 1].second.elev;
 
         if (ib <= ia) {
             // Duplicate pin on same rib — just enforce the value.
@@ -797,23 +796,24 @@ void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
     // of the blend zone, 1.0 exactly at the pin rib.  This avoids the kink
     // that stamping a single rib would create, and avoids the wrong direction
     // that max() would introduce.
-    for (const auto& [pinRib, pinZ] : pins) {
+    for (const auto& [pinRib, infos] : pins) {
         const F64 pinU = ribs[pinRib].u;
 
         // Scan outward in both directions from pinRib while within lookaheadCm.
         // We iterate over all ribs rather than just left/right to handle
         // irregular rib spacing cleanly.
 
+        F64 plateauHalfSize = infos.maxHalfWidth * connectPlateauFactor;
         for (U32 i = 0; i < n; ++i) {
             F64 dist = std::abs(ribs[i].u - pinU);
-            if (dist >= (connectFlatSize + lookaheadCm))
+            if (dist >= (plateauHalfSize + lookaheadCm))
                 continue;
-            if (dist <= connectFlatSize) {
-                adj[i] = pinZ;
+            if (dist <= plateauHalfSize) {
+                adj[i] = infos.elev;
             } else {
-                const F64 w = 1.0 - (dist - connectFlatSize) /
+                const F64 w = 1.0 - (dist - plateauHalfSize) /
                                         lookaheadCm; // 1.0 at pin, 0.0 at edge
-                adj[i] = adj[i] + w * (pinZ - adj[i]); // lerp toward pin
+                adj[i] = adj[i] + w * (infos.elev - adj[i]); // lerp toward pin
             }
         }
     }
