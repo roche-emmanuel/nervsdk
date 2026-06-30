@@ -209,7 +209,9 @@ struct RoadRib {
 
 struct RoadConnectorInfos {
     F64 elev{0.0};
+    Vec2d pos;
     U32 count{0};
+    F64 groundElev{-1e6};
     F32 maxHalfWidth{0.0};
 };
 
