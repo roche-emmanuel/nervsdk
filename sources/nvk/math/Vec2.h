@@ -344,6 +344,16 @@ inline void from_json(const nlohmann::json& j, Vec2<T>& vec) {
 } // end of namespace nv
 
 namespace std {
+inline auto operator<<(std::ostream& os, const nv::Vec2i& vec)
+    -> std::ostream& {
+    os << "nv::Vec2i(" << vec.x() << ", " << vec.y() << ")";
+    return os;
+}
+inline auto operator<<(std::ostream& os, const nv::Vec2u& vec)
+    -> std::ostream& {
+    os << "nv::Vec2u(" << vec.x() << ", " << vec.y() << ")";
+    return os;
+}
 inline auto operator<<(std::ostream& os, const nv::Vec2f& vec)
     -> std::ostream& {
     os << "nv::Vec2f(" << vec.x() << ", " << vec.y() << ")";
