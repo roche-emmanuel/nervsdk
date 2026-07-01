@@ -17,6 +17,19 @@ void to_json(Json& j, const CellTextureEntry& e);
 
 void from_json(const Json& j, CellTextureEntry& e);
 
+struct CellTextureAtlasDesc {
+    // Per-slot texel size; each layer is slotSize*gridXSize ×
+    // slotSize*gridYSize.
+    I32 slotSize = 512;
+    I32 gridXSize = 1;
+    I32 gridYSize = 1;
+    Vector<CellTextureEntry> content;
+};
+
+void to_json(Json& j, const CellTextureAtlasDesc& c);
+
+void from_json(const Json& j, CellTextureAtlasDesc& c);
+
 // Resolved placement of one texture id inside the shared cells texture
 // array. Computed deterministically from the ordered cells_material.content
 // list, so PCGen (mesh UV baking) and ArgusWorldBuilder (UTexture2DArray
@@ -31,13 +44,16 @@ struct CellTextureDesc {
 
 class CellTextureAtlasLayout {
   public:
+    CellTextureAtlasLayout() = default;
+    explicit CellTextureAtlasLayout(const CellTextureAtlasDesc& desc);
+
+    [[nodiscard]] auto get_cell_texture_desc(const String& id) const
+        -> const CellTextureDesc&;
+
     // Packs `content` in list order. Layers are created on demand — there
     // is no fixed cap; grid_xsize/grid_ysize bound each layer only.
     void build(I32 slotSize, I32 gridXSize, I32 gridYSize,
                const Vector<CellTextureEntry>& content);
-
-    [[nodiscard]] auto get_cell_texture_desc(const String& id) const
-        -> const CellTextureDesc&;
 
     [[nodiscard]] auto layer_width_px() const -> I32 { return _layerWidthPx; }
     [[nodiscard]] auto layer_height_px() const -> I32 { return _layerHeightPx; }

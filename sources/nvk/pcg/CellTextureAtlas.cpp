@@ -19,6 +19,28 @@ void from_json(const Json& j, CellTextureEntry& e) {
     }
 }
 
+void to_json(Json& j, const CellTextureAtlasDesc& c) {
+    j = {
+        {"slot_size", c.slotSize},
+        {"grid_xsize", c.gridXSize},
+        {"grid_ysize", c.gridYSize},
+    };
+    Json arr = Json::array();
+    for (const CellTextureEntry& e : c.content)
+        arr.push_back(e);
+    j["content"] = arr;
+}
+void from_json(const Json& j, CellTextureAtlasDesc& c) {
+    get_opt(j, "slot_size", c.slotSize);
+    get_opt(j, "grid_xsize", c.gridXSize);
+    get_opt(j, "grid_ysize", c.gridYSize);
+    if (j.contains("content")) {
+        c.content.clear();
+        for (const auto& item : j.at("content"))
+            c.content.emplace_back(item.get<CellTextureEntry>());
+    }
+}
+
 void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
                                    const Vector<CellTextureEntry>& content) {
     _slotSize = std::max(slotSize, 1);
@@ -142,5 +164,9 @@ void remap_uv_to_atlas(F32 rawU, F32 rawV, const CellTextureDesc& desc,
     const F32 fv = rawV - std::floor(rawV);
     outU = F32(desc.uv.xmin) + fu * F32(desc.uv.width());
     outV = F32(desc.uv.ymin) + fv * F32(desc.uv.height());
+}
+CellTextureAtlasLayout::CellTextureAtlasLayout(
+    const CellTextureAtlasDesc& desc) {
+    build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content);
 }
 } // namespace nv
