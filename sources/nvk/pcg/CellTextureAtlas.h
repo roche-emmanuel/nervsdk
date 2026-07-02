@@ -52,6 +52,8 @@ struct CellTextureDesc {
     String category;
     Set<String> styles;
     Vec2f dimsM;
+
+    void scale_uv(F32 u, F32 v, F32& scaledU, F32& scaledV) const;
 };
 
 class CellTextureAtlasLayout {

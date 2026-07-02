@@ -350,4 +350,8 @@ auto CellTextureAtlasLayout::pick_texture_desc(
     return get_cell_texture_desc(descId);
 };
 
+void CellTextureDesc::scale_uv(F32 u, F32 v, F32& scaledU, F32& scaledV) const {
+    scaledU = u / dimsM.x();
+    scaledV = v / dimsM.y();
+}
 } // namespace nv
