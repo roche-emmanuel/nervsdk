@@ -90,6 +90,8 @@ void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
             "({}x{} slots of {}px -> {}x{}px per layer).",
             _descById.size(), _numLayers, _gridXSize, _gridYSize, _slotSize,
             _layerWidthPx, _layerHeightPx);
+
+    generate_style_map();
 }
 
 auto CellTextureAtlasLayout::get_cell_texture_desc(const String& id) const
@@ -244,4 +246,30 @@ CellTextureAtlasLayout::CellTextureAtlasLayout(const CellTextureAtlasDesc& desc,
                                                const String& dataDir) {
     build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content, dataDir);
 }
+void CellTextureAtlasLayout::generate_style_map() {
+    // Generate the style map for all the type/subtype pairs:
+
+    _stylesMap.clear();
+    for (const auto& it : _descById) {
+        String prefix = it.second.type + "_";
+        for (const auto& stype : it.second.subtypes) {
+            auto key = prefix + stype;
+            auto it2 = _stylesMap.find(key);
+            if (it2 == _stylesMap.end()) {
+                // Insert the set of styles as starting point:
+                _stylesMap.insert(std::make_pair(key, it.second.styles));
+            } else {
+                // Append the new styles:
+                it2->second.insert(it.second.styles.begin(),
+                                   it.second.styles.end());
+            }
+        }
+    }
+
+    logDEBUG("Generated style map:");
+    for (const auto& it : _stylesMap) {
+        logDEBUG("  - {}: {}", it.first, it.second);
+    }
+};
+
 } // namespace nv

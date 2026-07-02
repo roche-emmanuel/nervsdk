@@ -86,6 +86,8 @@ class CellTextureAtlasLayout {
     [[nodiscard]] auto compute_uv(const Vec2i& slot, I32 xsize, I32 ysize) const
         -> Box2d;
 
+    void generate_style_map();
+
     I32 _slotSize{512};
     I32 _gridXSize{1};
     I32 _gridYSize{1};
@@ -96,6 +98,9 @@ class CellTextureAtlasLayout {
     Vector<Vector<bool>> _occupancy; // one bitmap per layer
     UnorderedMap<String, CellTextureDesc> _descById;
     CellTextureDesc _invalidDesc;
+
+    // Style map:
+    UnorderedMap<String, Set<String>> _stylesMap;
 };
 
 // Wraps a repeating [0, N) UV coordinate and remaps it into desc.uv.
