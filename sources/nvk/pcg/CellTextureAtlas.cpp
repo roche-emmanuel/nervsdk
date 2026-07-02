@@ -92,6 +92,7 @@ void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
             _layerWidthPx, _layerHeightPx);
 
     generate_style_map();
+    generate_category_map();
 }
 
 auto CellTextureAtlasLayout::get_cell_texture_desc(const String& id) const
@@ -232,7 +233,9 @@ void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry,
              "size [{}x{}] uv {}.",
              entry.id, layer, slot.x(), slot.y(), xsize, ysize, desc.uv);
 
-    _descById.emplace(entry.id, desc);
+    auto res = _descById.insert(std::make_pair(entry.id, desc));
+    NVCHK(res.second, "Could not insert CellTextureDesc: duplicated id: {}",
+          entry.id);
 }
 
 void remap_uv_to_atlas(F32 rawU, F32 rawV, const CellTextureDesc& desc,
@@ -299,6 +302,52 @@ auto CellTextureAtlasLayout::pick_style(const String& type,
     U32 hash = hash_id_with_seed(elemId, _seed);
     U32 idx = hash % it->second.size();
     return it->second[idx];
+};
+
+void CellTextureAtlasLayout::generate_category_map() {
+    _categoryMap.clear();
+
+    for (const auto& it : _descById) {
+        String prefix = it.second.type + "_";
+        for (const auto& stype : it.second.subtypes) {
+            for (const auto& style : it.second.styles) {
+
+                auto key =
+                    prefix + stype + "_" + style + "_" + it.second.category;
+
+                auto it2 = _categoryMap.find(key);
+                if (it2 == _categoryMap.end()) {
+                    // Insert the set of styles as starting point:
+                    _categoryMap.insert(
+                        std::make_pair(key, Vector<String>{it.first}));
+                } else {
+                    // Append the new styles:
+                    it2->second.emplace_back(it.first);
+                }
+            }
+        }
+    }
+
+    logDEBUG("Generated category maps:");
+    for (const auto& it : _categoryMap) {
+        logDEBUG("  - {}: {}", it.first, it.second);
+    }
+};
+
+auto CellTextureAtlasLayout::pick_texture_desc(
+    const String& type, const String& subtype, const String& style,
+    const String& category, U64 elemId) -> const CellTextureDesc& {
+
+    auto key = format_msg("{}_{}_{}_{}", type, subtype, style, category);
+
+    auto it = _categoryMap.find(key);
+    NVCHK(it != _categoryMap.end(), "No entry for texture category {}", key);
+
+    StringID catId = SID(category.c_str());
+    U32 hash = hash_id_with_seed(elemId + catId, _seed);
+    U32 idx = hash % it->second.size();
+    const auto& descId = it->second[idx];
+    return get_cell_texture_desc(descId);
 };
 
 } // namespace nv

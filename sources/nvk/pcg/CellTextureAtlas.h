@@ -76,6 +76,10 @@ class CellTextureAtlasLayout {
     auto pick_style(const String& type, const String& subtype, U64 elemId)
         -> const String&;
 
+    auto pick_texture_desc(const String& type, const String& subtype,
+                           const String& style, const String& category,
+                           U64 elemId) -> const CellTextureDesc&;
+
   private:
     void place_entry(const CellTextureEntry& entry, const String& dataDir);
     // Returns the entry footprint in slot units. Uses xsize/ysize directly
@@ -92,6 +96,8 @@ class CellTextureAtlasLayout {
 
     void generate_style_map();
 
+    void generate_category_map();
+
     I32 _slotSize{512};
     I32 _gridXSize{1};
     I32 _gridYSize{1};
@@ -106,6 +112,9 @@ class CellTextureAtlasLayout {
 
     // Style map:
     UnorderedMap<String, Vector<String>> _stylesMap;
+
+    // Category maps
+    UnorderedMap<String, Vector<String>> _categoryMap;
 };
 
 // Wraps a repeating [0, N) UV coordinate and remaps it into desc.uv.
