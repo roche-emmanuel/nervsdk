@@ -46,6 +46,11 @@ struct CellTextureDesc {
     Vec2i slot{0, 0}; // slot coords within the layer
     Vec2i sizeInSlots{1, 1};
     Box2d uv; // half-texel-inset uv rect for one tile
+    String type;
+    Set<String> subtypes;
+    String category;
+    Set<String> styles;
+    Vec2f dimsM;
 };
 
 class CellTextureAtlasLayout {

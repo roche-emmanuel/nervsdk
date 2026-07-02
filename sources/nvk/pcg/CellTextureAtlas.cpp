@@ -39,6 +39,13 @@ void from_json(const Json& j, CellTextureEntry& e) {
     j.at("dimsM").get_to(e.dimsM);
     get_opt(j, "subtypes", e.subtypes);
     get_opt(j, "styles", e.styles);
+
+    if (e.subtypes.empty()) {
+        e.subtypes.insert("default");
+    }
+    if (e.styles.empty()) {
+        e.styles.insert("default");
+    }
 }
 
 void to_json(Json& j, const CellTextureAtlasDesc& c) {
@@ -210,6 +217,12 @@ void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry,
     desc.layer = layer;
     desc.index = _descById.size();
     desc.slot = slot;
+    desc.type = entry.type;
+    desc.subtypes = entry.subtypes;
+    desc.category = entry.category;
+    desc.styles = entry.styles;
+    desc.dimsM = entry.dimsM;
+
     desc.sizeInSlots = {xsize, ysize};
     desc.uv = compute_uv(slot, xsize, ysize);
 
