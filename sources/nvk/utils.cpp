@@ -7,6 +7,8 @@
 #include <charconv>
 #include <codecvt>
 
+#include <external/stb/stb_image.h>
+
 #include <cstddef>
 
 #if defined(__EMSCRIPTEN__)
@@ -1491,4 +1493,18 @@ auto get_f64(const Json& obj, const String& key, F64 defVal) -> F64 {
 void write_json_file(const String& fname, const Json& content, I32 indent) {
     write_json_file(fname.c_str(), content, indent);
 }
+auto get_image_size(const String& path, I32* numChannels) -> Vec2i {
+    int w = 0, h = 0, channels = 0;
+    if (stbi_info(path.c_str(), &w, &h, &channels) == 0) {
+        THROW_MSG("Cannot read image header for "
+                  "'{}': {}",
+                  path, stbi_failure_reason());
+        return {0, 0};
+    }
+    if (numChannels != nullptr) {
+        *numChannels = channels;
+    }
+    return {w, h};
+}
+
 } // namespace nv

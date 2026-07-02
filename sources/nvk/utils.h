@@ -451,6 +451,10 @@ inline auto percentile(const T* ptr, U64 num, F64 percentile) -> T {
                           fraction * upperValue);
 }
 
+// Header-only probe: reads just enough of the file to parse dimensions,
+// no full pixel decode.
+auto get_image_size(const String& path, I32* numChannels = nullptr) -> Vec2i;
+
 } // namespace nv
 
 #endif
