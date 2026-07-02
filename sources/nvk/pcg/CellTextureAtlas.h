@@ -29,6 +29,7 @@ struct CellTextureAtlasDesc {
     I32 gridXSize = 1;
     I32 gridYSize = 1;
     Vector<CellTextureEntry> content;
+    U32 seed = 1234;
 };
 
 void to_json(Json& j, const CellTextureAtlasDesc& c);
@@ -72,6 +73,9 @@ class CellTextureAtlasLayout {
     [[nodiscard]] auto layer_height_px() const -> I32 { return _layerHeightPx; }
     [[nodiscard]] auto num_layers() const -> U32 { return _numLayers; }
 
+    auto pick_style(const String& type, const String& subtype, U64 elemId)
+        -> const String&;
+
   private:
     void place_entry(const CellTextureEntry& entry, const String& dataDir);
     // Returns the entry footprint in slot units. Uses xsize/ysize directly
@@ -94,13 +98,14 @@ class CellTextureAtlasLayout {
     I32 _layerWidthPx{0};
     I32 _layerHeightPx{0};
     U32 _numLayers{0};
+    U32 _seed{1234};
 
     Vector<Vector<bool>> _occupancy; // one bitmap per layer
     UnorderedMap<String, CellTextureDesc> _descById;
     CellTextureDesc _invalidDesc;
 
     // Style map:
-    UnorderedMap<String, Set<String>> _stylesMap;
+    UnorderedMap<String, Vector<String>> _stylesMap;
 };
 
 // Wraps a repeating [0, N) UV coordinate and remaps it into desc.uv.

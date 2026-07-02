@@ -455,6 +455,11 @@ inline auto percentile(const T* ptr, U64 num, F64 percentile) -> T {
 // no full pixel decode.
 auto get_image_size(const String& path, I32* numChannels = nullptr) -> Vec2i;
 
+// splitmix64 finalizer — excellent avalanche properties, cheap, no branching.
+auto mix_bits64(U64 x) -> U64;
+
+auto hash_id_with_seed(U64 id, U32 seed) -> U32;
+
 } // namespace nv
 
 #endif

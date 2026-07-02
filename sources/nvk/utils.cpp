@@ -1507,4 +1507,25 @@ auto get_image_size(const String& path, I32* numChannels) -> Vec2i {
     return {w, h};
 }
 
+auto mix_bits64(U64 x) -> U64 {
+    x ^= x >> 30;
+    x *= 0xbf58476d1ce4e5b9ULL;
+    x ^= x >> 27;
+    x *= 0x94d049bb133111ebULL;
+    x ^= x >> 31;
+    return x;
+}
+
+auto hash_id_with_seed(U64 id, U32 seed) -> U32 {
+    // Fold the seed into the 64-bit id so both influence every output bit.
+    // Multiplying the seed by a large odd constant before XOR-ing spreads
+    // its bits across the full 64-bit range instead of just the low 32 bits.
+    U64 state = id ^ (static_cast<U64>(seed) * 0x9e3779b97f4a7c15ULL);
+
+    U64 mixed = mix_bits64(state);
+
+    // Fold down to 32 bits by XOR-ing the halves rather than truncating,
+    // so entropy from the high bits isn't discarded.
+    return static_cast<U32>(mixed ^ (mixed >> 32));
+}
 } // namespace nv

@@ -243,21 +243,24 @@ void remap_uv_to_atlas(F32 rawU, F32 rawV, const CellTextureDesc& desc,
     outV = F32(desc.uv.ymin) + fv * F32(desc.uv.height());
 }
 CellTextureAtlasLayout::CellTextureAtlasLayout(const CellTextureAtlasDesc& desc,
-                                               const String& dataDir) {
+                                               const String& dataDir)
+    : _seed(desc.seed) {
     build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content, dataDir);
 }
 void CellTextureAtlasLayout::generate_style_map() {
     // Generate the style map for all the type/subtype pairs:
 
     _stylesMap.clear();
+    UnorderedMap<String, Set<String>> tempMap;
+
     for (const auto& it : _descById) {
         String prefix = it.second.type + "_";
         for (const auto& stype : it.second.subtypes) {
             auto key = prefix + stype;
-            auto it2 = _stylesMap.find(key);
-            if (it2 == _stylesMap.end()) {
+            auto it2 = tempMap.find(key);
+            if (it2 == tempMap.end()) {
                 // Insert the set of styles as starting point:
-                _stylesMap.insert(std::make_pair(key, it.second.styles));
+                tempMap.insert(std::make_pair(key, it.second.styles));
             } else {
                 // Append the new styles:
                 it2->second.insert(it.second.styles.begin(),
@@ -265,11 +268,37 @@ void CellTextureAtlasLayout::generate_style_map() {
             }
         }
     }
+    for (const auto& it : tempMap) {
+        _stylesMap.insert(std::make_pair(
+            it.first, Vector<String>{it.second.begin(), it.second.end()}));
+    }
 
     logDEBUG("Generated style map:");
     for (const auto& it : _stylesMap) {
         logDEBUG("  - {}: {}", it.first, it.second);
     }
+};
+
+auto CellTextureAtlasLayout::pick_style(const String& type,
+                                        const String& subtype, U64 elemId)
+    -> const String& {
+    String key = type + "_" + subtype;
+    auto it = _stylesMap.find(key);
+    if (it == _stylesMap.end()) {
+        key = type + "_default";
+        it = _stylesMap.find(key);
+    }
+    NVCHK(it != _stylesMap.end(), "No style available for {}", key);
+
+    // Once we have the style map we should select a style for this element.
+    // Note: eventually we could assign weights/probability to each style,
+    // And then generate an U32 value in range [0, 100000] for instance and
+    // partition range range proportionally between all available style weights.
+    // But for now, a simple uniform selection will do:
+
+    U32 hash = hash_id_with_seed(elemId, _seed);
+    U32 idx = hash % it->second.size();
+    return it->second[idx];
 };
 
 } // namespace nv
