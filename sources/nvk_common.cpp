@@ -4,8 +4,8 @@
 // Note we cannot include this here as this will conflict with Unreal engine
 // libraries:
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <external/stb/stb_image.h>
+// #define STB_IMAGE_IMPLEMENTATION
+// #include <external/stb/stb_image.h>
 
 // #define STB_IMAGE_RESIZE_IMPLEMENTATION
 // #include <external/stb/stb_image_resize.h>
