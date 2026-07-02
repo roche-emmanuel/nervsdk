@@ -10,8 +10,16 @@ void to_json(Json& j, const CellTextureEntry& e) {
     };
 }
 void from_json(const Json& j, CellTextureEntry& e) {
+    j.at("file").get_to(e.file);
+
+    if (j.contains("id")) {
+        j.at("id").get_to(e.id);
+    } else {
+        // Use the filename as id:
+        e.id = get_filename(e.file, false);
+    }
+
     get_opt(j, "id", e.id);
-    get_opt(j, "file", e.file);
     if (j.contains("size") && j.at("size").is_array() &&
         j.at("size").size() >= 2) {
         e.xsize = j.at("size")[0].get<I32>();
