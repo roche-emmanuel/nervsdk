@@ -46,22 +46,30 @@ struct CellTextureDesc {
 class CellTextureAtlasLayout {
   public:
     CellTextureAtlasLayout() = default;
-    explicit CellTextureAtlasLayout(const CellTextureAtlasDesc& desc);
+    // dataDir resolves relative `file` paths for entries that need
+    // auto-detected sizes (xsize<=0 or ysize<=0).
+    explicit CellTextureAtlasLayout(const CellTextureAtlasDesc& desc,
+                                    const String& dataDir);
 
     [[nodiscard]] auto get_cell_texture_desc(const String& id) const
         -> const CellTextureDesc&;
 
-    // Packs `content` in list order. Layers are created on demand — there
-    // is no fixed cap; grid_xsize/grid_ysize bound each layer only.
     void build(I32 slotSize, I32 gridXSize, I32 gridYSize,
-               const Vector<CellTextureEntry>& content);
+               const Vector<CellTextureEntry>& content,
+               const String& dataDir = "");
 
     [[nodiscard]] auto layer_width_px() const -> I32 { return _layerWidthPx; }
     [[nodiscard]] auto layer_height_px() const -> I32 { return _layerHeightPx; }
     [[nodiscard]] auto num_layers() const -> U32 { return _numLayers; }
 
   private:
-    void place_entry(const CellTextureEntry& entry);
+    void place_entry(const CellTextureEntry& entry, const String& dataDir);
+    // Returns the entry footprint in slot units. Uses xsize/ysize directly
+    // when both are set (>0); otherwise probes the image file's pixel size
+    // (stb_image header read, no full decode) and rounds up to whole slots.
+    [[nodiscard]] auto resolve_footprint(const CellTextureEntry& entry,
+                                         const String& dataDir) const -> Vec2i;
+
     [[nodiscard]] auto find_free_slot(U32 layer, I32 xsize, I32 ysize,
                                       Vec2i& outSlot) const -> bool;
     void mark_occupied(U32 layer, const Vec2i& slot, I32 xsize, I32 ysize);

@@ -42,7 +42,8 @@ void from_json(const Json& j, CellTextureAtlasDesc& c) {
 }
 
 void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
-                                   const Vector<CellTextureEntry>& content) {
+                                   const Vector<CellTextureEntry>& content,
+                                   const String& dataDir) {
     _slotSize = std::max(slotSize, 1);
     _gridXSize = std::max(gridXSize, 1);
     _gridYSize = std::max(gridYSize, 1);
@@ -53,7 +54,7 @@ void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
     _descById.clear();
 
     for (const auto& entry : content) {
-        place_entry(entry);
+        place_entry(entry, dataDir);
     }
 
     logINFO("CellTextureAtlasLayout: {} textures packed into {} layer(s) "
@@ -119,9 +120,47 @@ auto CellTextureAtlasLayout::compute_uv(const Vec2i& slot, I32 xsize,
                  y0 / F64(_layerHeightPx), y1 / F64(_layerHeightPx));
 }
 
-void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry) {
-    const I32 xsize = std::max(entry.xsize, 1);
-    const I32 ysize = std::max(entry.ysize, 1);
+auto CellTextureAtlasLayout::resolve_footprint(const CellTextureEntry& entry,
+                                               const String& dataDir) const
+    -> Vec2i {
+    if (entry.xsize > 0 && entry.ysize > 0) {
+        return {entry.xsize, entry.ysize};
+    }
+
+    NVCHK(!entry.file.empty(),
+          "CellTextureAtlasLayout: '{}' has no explicit size and no file "
+          "to auto-detect it from.",
+          entry.id);
+
+    const String path = nv::is_absolute_path(entry.file)
+                            ? entry.file
+                            : nv::get_path(dataDir, entry.file);
+
+    NVCHK(system_file_exists(path), "Missing image file: {}", path);
+
+    const Vec2i pxSize = get_image_size(path);
+    if (pxSize.x() <= 0 || pxSize.y() <= 0) {
+        logWARN("CellTextureAtlasLayout: '{}' auto-detect failed for "
+                "'{}' — defaulting to 1x1 slot.",
+                entry.id, path);
+        return {1, 1};
+    }
+
+    const I32 xslots = std::max(1, (pxSize.x() + _slotSize - 1) / _slotSize);
+    const I32 yslots = std::max(1, (pxSize.y() + _slotSize - 1) / _slotSize);
+
+    logDEBUG("CellTextureAtlasLayout: '{}' auto-detected {}x{}px -> "
+             "{}x{} slots.",
+             entry.id, pxSize.x(), pxSize.y(), xslots, yslots);
+
+    return {xslots, yslots};
+}
+
+void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry,
+                                         const String& dataDir) {
+    const Vec2i footprint = resolve_footprint(entry, dataDir);
+    const I32 xsize = std::max(footprint.x(), 1);
+    const I32 ysize = std::max(footprint.y(), 1);
 
     if (xsize > _gridXSize || ysize > _gridYSize) {
         logERROR("CellTextureAtlasLayout: '{}' is {}x{} slots, larger than "
@@ -166,8 +205,8 @@ void remap_uv_to_atlas(F32 rawU, F32 rawV, const CellTextureDesc& desc,
     outU = F32(desc.uv.xmin) + fu * F32(desc.uv.width());
     outV = F32(desc.uv.ymin) + fv * F32(desc.uv.height());
 }
-CellTextureAtlasLayout::CellTextureAtlasLayout(
-    const CellTextureAtlasDesc& desc) {
-    build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content);
+CellTextureAtlasLayout::CellTextureAtlasLayout(const CellTextureAtlasDesc& desc,
+                                               const String& dataDir) {
+    build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content, dataDir);
 }
 } // namespace nv
