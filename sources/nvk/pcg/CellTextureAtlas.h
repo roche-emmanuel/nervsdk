@@ -9,8 +9,13 @@ namespace nv {
 struct CellTextureEntry {
     String id;
     String file;
-    I32 xsize = 1;
-    I32 ysize = 1;
+    I32 xsize = -1;
+    I32 ysize = -1;
+    String type;
+    Set<String> subtypes;
+    String category;
+    Set<String> styles;
+    Vec2f dimsM;
 };
 
 void to_json(Json& j, const CellTextureEntry& e);

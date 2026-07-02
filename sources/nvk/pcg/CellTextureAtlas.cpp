@@ -7,7 +7,16 @@ void to_json(Json& j, const CellTextureEntry& e) {
         {"id", e.id},
         {"file", e.file},
         {"size", Json::array({e.xsize, e.ysize})},
+        {"type", e.type},
+        {"category", e.category},
+        {"dimsM", e.dimsM},
     };
+    if (!e.subtypes.empty()) {
+        j["subtypes"] = e.subtypes;
+    }
+    if (!e.styles.empty()) {
+        j["styles"] = e.styles;
+    }
 }
 void from_json(const Json& j, CellTextureEntry& e) {
     j.at("file").get_to(e.file);
@@ -25,6 +34,11 @@ void from_json(const Json& j, CellTextureEntry& e) {
         e.xsize = j.at("size")[0].get<I32>();
         e.ysize = j.at("size")[1].get<I32>();
     }
+    j.at("type").get_to(e.type);
+    j.at("category").get_to(e.category);
+    j.at("dimsM").get_to(e.dimsM);
+    get_opt(j, "subtypes", e.subtypes);
+    get_opt(j, "styles", e.styles);
 }
 
 void to_json(Json& j, const CellTextureAtlasDesc& c) {
