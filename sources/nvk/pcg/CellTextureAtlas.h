@@ -36,7 +36,8 @@ void from_json(const Json& j, CellTextureAtlasDesc& c);
 // construction) always agree as long as they build from the same config.
 struct CellTextureDesc {
     bool valid{false};
-    U32 layer{0};     // texture-array slice == vertex tex_idx
+    U32 layer{0}; // texture-array slice == vertex tex_idx
+    U32 index{0};
     Vec2i slot{0, 0}; // slot coords within the layer
     Vec2i sizeInSlots{1, 1};
     Box2d uv; // half-texel-inset uv rect for one tile

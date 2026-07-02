@@ -147,6 +147,7 @@ void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry) {
     CellTextureDesc desc;
     desc.valid = true;
     desc.layer = layer;
+    desc.index = _descById.size();
     desc.slot = slot;
     desc.sizeInSlots = {xsize, ysize};
     desc.uv = compute_uv(slot, xsize, ysize);
