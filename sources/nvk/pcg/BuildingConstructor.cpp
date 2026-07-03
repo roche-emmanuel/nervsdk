@@ -26,6 +26,21 @@ BuildingConstructor::BuildingConstructor(U64 bid, String stype,
     subtype = std::move(stype);
 };
 
+void BuildingConstructor::push_vertex(const Vec2d& p, F64 z, const Vec3d& n,
+                                      const Vec2d& uv,
+                                      const CellTextureDesc& tdesc) {
+    CellVertex v{};
+    v.px = F32(p.x() - origin.x());
+    v.py = F32(p.y() - origin.y());
+    v.pz = F32(z);
+    v.nx = F32(n.x());
+    v.ny = F32(n.y());
+    v.nz = F32(n.z());
+    tdesc.scale_uv(F32(uv.x()), F32(uv.y()), v.u0, v.v0);
+    v.texIdx = F32(tdesc.index);
+    geom->verts.push_back(v);
+};
+
 auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     -> bool {
 
@@ -40,20 +55,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     // CCW ring):
     const F32 nx = F32(edgeDir.y());
     const F32 ny = F32(-edgeDir.x());
-
-    const auto pushVertex = [&](const Vec2d& p, F64 z, F64 u0, F64 v0,
-                                const CellTextureDesc& tdesc) {
-        CellVertex v{};
-        v.px = F32(p.x() - origin.x());
-        v.py = F32(p.y() - origin.y());
-        v.pz = F32(z);
-        v.nx = nx;
-        v.ny = ny;
-        v.nz = 0.F;
-        tdesc.scale_uv(F32(u0), F32(v0), v.u0, v.v0);
-        v.texIdx = F32(tdesc.index);
-        geom->verts.push_back(v);
-    };
+    Vec3d norm{nx, ny, 0};
 
     // bl = bottom-left corner (world cm, z absolute); xdir = along-wall vector
     // (cm); height = cm; uv0 = tiling UV origin in *metres* (scale_uv divides
@@ -61,19 +63,22 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     // maps exactly one 0..1 tile; a filler passes the running metre offset so
     // the wall texture tiles continuously.
     const auto pushQuad = [&](const Vec3d& bl, const Vec2d& xdir, F64 height,
-                              const Vec2d& uv0, const CellTextureDesc& tdesc) {
+                              const Vec3d& n, const Vec2d& uv0,
+                              const CellTextureDesc& tdesc) {
         const Vec2d p0 = bl.xy();
         const Vec2d p1 = p0 + xdir;
         const F64 len = xdir.length();
         const U32 base = U32(geom->verts.size());
 
-        pushVertex(p0, bl.z(), uv0.x(), uv0.y(), tdesc); // bottom-left
-        pushVertex(p0, bl.z() + height, uv0.x(),         // top-left
-                   uv0.y() + height * uvScale, tdesc);
-        pushVertex(p1, bl.z(), uv0.x() + len * uvScale, uv0.y(), // bottom-right
-                   tdesc);
-        pushVertex(p1, bl.z() + height, uv0.x() + len * uvScale, // top-right
-                   uv0.y() + height * uvScale, tdesc);
+        push_vertex(p0, bl.z(), n, uv0, tdesc); // bottom-left
+        push_vertex(p0, bl.z() + height, n,     // top-left
+                    uv0 + Vec2d(0, height * uvScale), tdesc);
+        push_vertex(p1, bl.z(), n, uv0 + Vec2d(len * uvScale, 0),
+                    // bottom-right
+                    tdesc);
+        push_vertex(p1, bl.z() + height, n,
+                    uv0 + Vec2d(len * uvScale, height * uvScale), // top-right
+                    tdesc);
 
         // CCW winding viewed from outside (BL, TL, BR, TR = base 0,1,2,3):
         geom->indices.push_back(base + 0);
@@ -101,7 +106,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
             return; // skip degenerate slivers
         const Vec2d uv0 = {xM, (zBottomCm - bottomHeight) * uvScale};
         pushQuad({xyAt(xM), zBottomCm}, edgeDir * (widthM / uvScale), heightCm,
-                 uv0, wallDesc);
+                 norm, uv0, wallDesc);
     };
 
     // One element (door/window) drawn as a single 0..1 tile at its physical
@@ -109,7 +114,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     const auto emitElement = [&](F64 xM, F64 zBottomCm,
                                  const CellTextureDesc& desc) {
         pushQuad({xyAt(xM), zBottomCm}, edgeDir * (desc.dimsM.x() / uvScale),
-                 desc.dimsM.y() / uvScale, {0, 0}, desc);
+                 desc.dimsM.y() / uvScale, norm, {0, 0}, desc);
     };
 
     const F64 edgeLenM = edgeLen * uvScale;

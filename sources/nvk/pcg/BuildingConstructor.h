@@ -28,6 +28,10 @@ struct BuildingConstructor {
     auto create_facade(const Vec2d& a, const Vec2d& b) -> bool;
 
     void create_roof(const Vector<Vec2d>& ring);
+
+  private:
+    void push_vertex(const Vec2d& p, F64 z, const Vec3d& n, const Vec2d& uv,
+                     const CellTextureDesc& tdesc);
 };
 
 } // namespace nv
