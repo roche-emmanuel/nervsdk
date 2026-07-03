@@ -47,6 +47,9 @@ void from_json(const Json& j, CellTextureEntry& e) {
     if (e.styles.empty()) {
         e.styles.insert("default");
     }
+
+    NVCHK(e.dimsM.x() > 0.0 && e.dimsM.y() > 0.0,
+          "Invalid dimensions in CettTextureEntry.");
 }
 
 void to_json(Json& j, const CellTextureAtlasDesc& c) {
@@ -99,10 +102,8 @@ void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
 auto CellTextureAtlasLayout::get_cell_texture_desc(const String& id) const
     -> const CellTextureDesc& {
     auto it = _descById.find(id);
-    if (it == _descById.end()) {
-        logERROR("CellTextureAtlasLayout: unknown texture id '{}'.", id);
-        return _invalidDesc;
-    }
+    NVCHK(it != _descById.end(),
+          "CellTextureAtlasLayout: unknown texture id '{}'.", id);
     return it->second;
 }
 
@@ -197,10 +198,9 @@ void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry,
     const I32 ysize = std::max(footprint.y(), 1);
 
     if (xsize > _gridXSize || ysize > _gridYSize) {
-        logERROR("CellTextureAtlasLayout: '{}' is {}x{} slots, larger than "
-                 "the layer grid {}x{}.",
-                 entry.id, xsize, ysize, _gridXSize, _gridYSize);
-        NVCHK(false, "Texture larger than layer grid.");
+        THROW_MSG("CellTextureAtlasLayout: '{}' is {}x{} slots, larger than "
+                  "the layer grid {}x{}.",
+                  entry.id, xsize, ysize, _gridXSize, _gridYSize);
     }
 
     U32 layer = 0;
