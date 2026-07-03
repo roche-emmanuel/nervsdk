@@ -41,6 +41,42 @@ void BuildingConstructor::push_vertex(const Vec2d& p, F64 z, const Vec3d& n,
     geom->verts.push_back(v);
 };
 
+void BuildingConstructor::push_tri_indices(U32 i0, U32 i1, U32 i2) const {
+    geom->indices.push_back(i0);
+    geom->indices.push_back(i1);
+    geom->indices.push_back(i2);
+}
+
+// bl = bottom-left corner (world cm, z absolute); xdir = along-wall vector
+// (cm); height = cm; uv0 = tiling UV origin in *metres* (scale_uv divides
+// by dimsM). An element passes uv0={0,0} and sizes the quad to dimsM so it
+// maps exactly one 0..1 tile; a filler passes the running metre offset so
+// the wall texture tiles continuously.
+void BuildingConstructor::push_vquad(const Vec3d& bl, const Vec2d& xdir,
+                                     F64 height, const Vec2d& n,
+                                     const Vec2d& uv0,
+                                     const CellTextureDesc& tdesc) {
+    const Vec2d p0 = bl.xy();
+    const Vec2d p1 = p0 + xdir;
+    const F64 len = xdir.length();
+    const U32 base = U32(geom->verts.size());
+    Vec3d norm{n, 0};
+
+    push_vertex(p0, bl.z(), norm, uv0, tdesc); // bottom-left
+    push_vertex(p0, bl.z() + height, norm,     // top-left
+                uv0 + Vec2d(0, height * uvScale), tdesc);
+    push_vertex(p1, bl.z(), norm, uv0 + Vec2d(len * uvScale, 0),
+                // bottom-right
+                tdesc);
+    push_vertex(p1, bl.z() + height, norm,
+                uv0 + Vec2d(len * uvScale, height * uvScale), // top-right
+                tdesc);
+
+    // CCW winding viewed from outside (BL, TL, BR, TR = base 0,1,2,3):
+    push_tri_indices(base + 0, base + 2, base + 1);
+    push_tri_indices(base + 1, base + 2, base + 3);
+};
+
 auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     -> bool {
 
@@ -55,39 +91,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     // CCW ring):
     const F32 nx = F32(edgeDir.y());
     const F32 ny = F32(-edgeDir.x());
-    Vec3d norm{nx, ny, 0};
-
-    // bl = bottom-left corner (world cm, z absolute); xdir = along-wall vector
-    // (cm); height = cm; uv0 = tiling UV origin in *metres* (scale_uv divides
-    // by dimsM). An element passes uv0={0,0} and sizes the quad to dimsM so it
-    // maps exactly one 0..1 tile; a filler passes the running metre offset so
-    // the wall texture tiles continuously.
-    const auto pushQuad = [&](const Vec3d& bl, const Vec2d& xdir, F64 height,
-                              const Vec3d& n, const Vec2d& uv0,
-                              const CellTextureDesc& tdesc) {
-        const Vec2d p0 = bl.xy();
-        const Vec2d p1 = p0 + xdir;
-        const F64 len = xdir.length();
-        const U32 base = U32(geom->verts.size());
-
-        push_vertex(p0, bl.z(), n, uv0, tdesc); // bottom-left
-        push_vertex(p0, bl.z() + height, n,     // top-left
-                    uv0 + Vec2d(0, height * uvScale), tdesc);
-        push_vertex(p1, bl.z(), n, uv0 + Vec2d(len * uvScale, 0),
-                    // bottom-right
-                    tdesc);
-        push_vertex(p1, bl.z() + height, n,
-                    uv0 + Vec2d(len * uvScale, height * uvScale), // top-right
-                    tdesc);
-
-        // CCW winding viewed from outside (BL, TL, BR, TR = base 0,1,2,3):
-        geom->indices.push_back(base + 0);
-        geom->indices.push_back(base + 2);
-        geom->indices.push_back(base + 1);
-        geom->indices.push_back(base + 1);
-        geom->indices.push_back(base + 2);
-        geom->indices.push_back(base + 3);
-    };
+    Vec2d norm{nx, ny};
 
     const auto& wallDesc = get_texture("wall");
     const auto& doorDesc = get_texture("door");
@@ -105,16 +109,16 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
         if (widthM <= 1e-4 || heightCm <= 1e-2)
             return; // skip degenerate slivers
         const Vec2d uv0 = {xM, (zBottomCm - bottomHeight) * uvScale};
-        pushQuad({xyAt(xM), zBottomCm}, edgeDir * (widthM / uvScale), heightCm,
-                 norm, uv0, wallDesc);
+        push_vquad({xyAt(xM), zBottomCm}, edgeDir * (widthM / uvScale),
+                   heightCm, norm, uv0, wallDesc);
     };
 
     // One element (door/window) drawn as a single 0..1 tile at its physical
     // size. zBottomCm in cm.
     const auto emitElement = [&](F64 xM, F64 zBottomCm,
                                  const CellTextureDesc& desc) {
-        pushQuad({xyAt(xM), zBottomCm}, edgeDir * (desc.dimsM.x() / uvScale),
-                 desc.dimsM.y() / uvScale, norm, {0, 0}, desc);
+        push_vquad({xyAt(xM), zBottomCm}, edgeDir * (desc.dimsM.x() / uvScale),
+                   desc.dimsM.y() / uvScale, norm, {0, 0}, desc);
     };
 
     const F64 edgeLenM = edgeLen * uvScale;

@@ -32,6 +32,10 @@ struct BuildingConstructor {
   private:
     void push_vertex(const Vec2d& p, F64 z, const Vec3d& n, const Vec2d& uv,
                      const CellTextureDesc& tdesc);
+    void push_vquad(const Vec3d& bl, const Vec2d& xdir, F64 height,
+                    const Vec2d& n, const Vec2d& uv0,
+                    const CellTextureDesc& tdesc);
+    void push_tri_indices(U32 i0, U32 i1, U32 i2) const;
 };
 
 } // namespace nv
