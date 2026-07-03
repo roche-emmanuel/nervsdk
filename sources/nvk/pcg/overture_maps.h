@@ -194,6 +194,13 @@ enum class LandClass : U8 {
 auto overture_land_class_from_string(const String& name) -> LandClass;
 auto overture_land_class_to_string(LandClass cls) -> String;
 
+struct CellVertex {
+    F32 px, py, pz;
+    F32 nx, ny, nz;
+    F32 u0, v0;
+    F32 texIdx;
+};
+
 // One road cross-section. left/right are world-XY (cm). z is the shared
 // surface elevation (cm, terrain max under the cross-section, WITHOUT the road
 // Z bias — tessellation adds that). u is cumulative centreline distance (cm).

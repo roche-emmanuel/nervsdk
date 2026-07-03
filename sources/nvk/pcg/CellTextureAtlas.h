@@ -2,6 +2,7 @@
 #define _NV_CELLTEXTUREATLAS_H_
 
 #include <nvk/math/Box2.h>
+#include <nvk/pcg/overture_maps.h>
 #include <nvk_common.h>
 
 namespace nv {
@@ -75,12 +76,13 @@ class CellTextureAtlasLayout {
     [[nodiscard]] auto layer_height_px() const -> I32 { return _layerHeightPx; }
     [[nodiscard]] auto num_layers() const -> U32 { return _numLayers; }
 
-    auto pick_style(const String& type, const String& subtype, U64 elemId)
+    auto pick_style(const String& type, String& subtype, U64 elemId) const
         -> const String&;
 
-    auto pick_texture_desc(const String& type, const String& subtype,
-                           const String& style, const String& category,
-                           U64 elemId) -> const CellTextureDesc&;
+    [[nodiscard]] auto
+    pick_texture_desc(const String& type, const String& subtype,
+                      const String& style, const String& category,
+                      U64 elemId) const -> const CellTextureDesc&;
 
   private:
     void place_entry(const CellTextureEntry& entry, const String& dataDir);
@@ -124,6 +126,28 @@ class CellTextureAtlasLayout {
 // — replaces the "whole layer is my texture" assumption.
 void remap_uv_to_atlas(F32 rawU, F32 rawV, const CellTextureDesc& desc,
                        F32& outU, F32& outV);
+
+struct BuildingConstructionContext {
+    U64 id;
+    String subtype;
+    String style;
+    UnorderedMap<String, const CellTextureDesc*> textures;
+    F64 uvScale{1.0};
+    F64 bottomHeight{0.0};
+    F64 topHeight{0.0};
+    F64 buriedHeight{0.0};
+    Vec2d origin;
+    const CellTextureAtlasLayout* atlasLayout{nullptr};
+
+    BuildingConstructionContext(U64 bid, String stype,
+                                const CellTextureAtlasLayout& atlas);
+
+    auto get_texture(const String& tname) -> const CellTextureDesc&;
+
+    auto create_building_facade(const Vec2d& a, const Vec2d& b,
+                                Vector<CellVertex>& vertices,
+                                Vector<U32>& indices) -> bool;
+};
 
 } // namespace nv
 

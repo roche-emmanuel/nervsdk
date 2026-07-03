@@ -282,13 +282,13 @@ void CellTextureAtlasLayout::generate_style_map() {
     }
 };
 
-auto CellTextureAtlasLayout::pick_style(const String& type,
-                                        const String& subtype, U64 elemId)
-    -> const String& {
+auto CellTextureAtlasLayout::pick_style(const String& type, String& subtype,
+                                        U64 elemId) const -> const String& {
     String key = type + "_" + subtype;
     auto it = _stylesMap.find(key);
     if (it == _stylesMap.end()) {
-        key = type + "_default";
+        subtype = "default";
+        key = type + "_" + subtype;
         it = _stylesMap.find(key);
     }
     NVCHK(it != _stylesMap.end(), "No style available for {}", key);
@@ -336,7 +336,7 @@ void CellTextureAtlasLayout::generate_category_map() {
 
 auto CellTextureAtlasLayout::pick_texture_desc(
     const String& type, const String& subtype, const String& style,
-    const String& category, U64 elemId) -> const CellTextureDesc& {
+    const String& category, U64 elemId) const -> const CellTextureDesc& {
 
     auto key = format_msg("{}_{}_{}_{}", type, subtype, style, category);
 
@@ -354,4 +354,86 @@ void CellTextureDesc::scale_uv(F32 u, F32 v, F32& scaledU, F32& scaledV) const {
     scaledU = u / dimsM.x();
     scaledV = v / dimsM.y();
 }
+auto BuildingConstructionContext::get_texture(const String& tname)
+    -> const CellTextureDesc& {
+    auto it = textures.find(tname);
+    if (it != textures.end()) {
+        return *it->second;
+    }
+
+    // Get the texture from the layout:
+    const auto& desc =
+        atlasLayout->pick_texture_desc("building", subtype, style, tname, id);
+    textures.insert(std::make_pair(tname, &desc));
+    return desc;
+}
+BuildingConstructionContext::BuildingConstructionContext(
+    U64 bid, String stype, const CellTextureAtlasLayout& atlas)
+    : id(bid), style(atlas.pick_style("building", stype, id)),
+      atlasLayout(&atlas) {
+
+    subtype = std::move(stype);
+};
+
+auto BuildingConstructionContext::create_building_facade(
+    const Vec2d& a, const Vec2d& b, Vector<CellVertex>& vertices,
+    Vector<U32>& indices) -> bool {
+
+    auto edgeDir = b - a;
+    auto edgeLen = edgeDir.length();
+
+    if (edgeLen < 1.0)
+        return false; // degenerate edge < 1 unit
+
+    edgeDir = edgeDir / edgeLen;
+
+    const auto& wallDesc = get_texture("wall");
+
+    // Outward normal (CW 90° of forward direction = right-hand side of CCW
+    // ring):
+    const F32 nx = F32(edgeDir.y());
+    const F32 ny = F32(-edgeDir.x());
+
+    const F32 edgeLenM = F32(edgeLen) * uvScale; // cm -> metres for UV
+    const F32 wallH =
+        (topHeight - bottomHeight) * uvScale; // total wall height (m) for UV
+
+    const U32 base = U32(vertices.size());
+
+    const auto pushWallVertex = [&](const Vec2d& p, F32 z, F32 u0, F32 v0) {
+        CellVertex v{};
+        v.px = F32(p.x() - origin.x());
+        v.py = F32(p.y() - origin.y());
+        v.pz = z;
+        v.nx = nx;
+        v.ny = ny;
+        v.nz = 0.F;
+        // v.u0 = u0;
+        // v.v0 = v0;
+        // remap_uv_to_atlas(u0, v0, wallTex, v.u0, v.v0);
+        wallDesc.scale_uv(u0, v0, v.u0, v.v0);
+        v.texIdx = F32(wallDesc.index);
+        vertices.push_back(v);
+    };
+
+    // Here we should construct a wall facade:
+
+    pushWallVertex(a, bottomHeight, 0.F, 0.F);      // bottom-left
+    pushWallVertex(a, topHeight, 0.f, wallH);       // top-left
+    pushWallVertex(b, bottomHeight, edgeLenM, 0.f); // bottom-right
+    pushWallVertex(b, topHeight, edgeLenM, wallH);  // top-right
+
+    // Indices: CCW winding viewed from outside (outward normal side).
+    // Quad layout: BL=base+0, TL=base+1, BR=base+2, TR=base+3
+    // Tri 1: BL, BR, TL
+    indices.push_back(base + 0);
+    indices.push_back(base + 2);
+    indices.push_back(base + 1);
+    // Tri 2: TL, BR, TR
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base + 3);
+
+    return true;
+};
 } // namespace nv
