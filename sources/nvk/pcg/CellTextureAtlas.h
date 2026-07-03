@@ -144,9 +144,12 @@ struct BuildingConstructionContext {
 
     auto get_texture(const String& tname) -> const CellTextureDesc&;
 
-    auto create_building_facade(const Vec2d& a, const Vec2d& b,
-                                Vector<CellVertex>& vertices,
-                                Vector<U32>& indices) -> bool;
+    auto create_facade(const Vec2d& a, const Vec2d& b,
+                       Vector<CellVertex>& vertices, Vector<U32>& indices)
+        -> bool;
+
+    void create_roof(const Vector<Vec2d>& ring, Vector<CellVertex>& vertices,
+                     Vector<U32>& indices);
 };
 
 } // namespace nv

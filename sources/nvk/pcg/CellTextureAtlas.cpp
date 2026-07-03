@@ -1,3 +1,4 @@
+#include <external/earcut.hpp>
 #include <nvk/pcg/CellTextureAtlas.h>
 
 namespace nv {
@@ -375,9 +376,9 @@ BuildingConstructionContext::BuildingConstructionContext(
     subtype = std::move(stype);
 };
 
-auto BuildingConstructionContext::create_building_facade(
-    const Vec2d& a, const Vec2d& b, Vector<CellVertex>& vertices,
-    Vector<U32>& indices) -> bool {
+auto BuildingConstructionContext::create_facade(const Vec2d& a, const Vec2d& b,
+                                                Vector<CellVertex>& vertices,
+                                                Vector<U32>& indices) -> bool {
 
     auto edgeDir = b - a;
     auto edgeLen = edgeDir.length();
@@ -436,4 +437,61 @@ auto BuildingConstructionContext::create_building_facade(
 
     return true;
 };
+void BuildingConstructionContext::create_roof(const Vector<Vec2d>& ring,
+                                              Vector<CellVertex>& vertices,
+                                              Vector<U32>& indices) {
+    // Triangulate the closed footprint ring at roofZ using earcut.
+    // UV0: (world_X_m, world_Y_m) — planar projection, tile-local.
+    using EarcutPoint = std::array<float, 2>;
+    std::vector<std::vector<EarcutPoint>> polygon;
+    const U32 n = U32(ring.size());
+
+    auto& outerRing = polygon.emplace_back();
+    outerRing.reserve(n);
+
+    const auto& roofDesc = get_texture("roof");
+
+    const U32 roofBase = U32(vertices.size());
+
+    for (U32 i = 0; i < n; ++i) {
+        const Vec2d& pt = ring[i];
+        const F32 lx = F32(pt.x() - origin.x());
+        const F32 ly = F32(pt.y() - origin.y());
+
+        outerRing.push_back({lx, ly});
+
+        CellVertex v{};
+        v.px = lx;
+        v.py = ly;
+        v.pz = topHeight;
+        v.nx = 0.f;
+        v.ny = 0.f;
+        v.nz = 1.f;
+        // Planar UV in metres (world coords, not tile-local, to match
+        // building_placer.py which uses world_X_m / world_Y_m).
+        F32 u0 = (F32(pt.x()) / 100.0F);
+        F32 v0 = (F32(pt.y()) / 100.0F);
+        // v.u0 = u0;
+        // v.v0 = v0;
+        // remap_uv_to_atlas(u0, v0, roofTex, v.u0, v.v0);
+        roofDesc.scale_uv(u0, v0, v.u0, v.v0);
+        v.texIdx = F32(roofDesc.index);
+        vertices.push_back(v);
+    }
+
+    // earcut returns indices into the ring (0-based); shift by roofBase.
+    auto rawIdx = mapbox::earcut<U32>(polygon);
+
+    // earcut produces CW winding in screen space (Y-down); UE uses Y-up
+    // with CCW front-face convention.  Since the UE viewport has Y pointing
+    // north (up in world), earcut's XY matches the UE XY plane and the
+    // winding is already CCW when viewed from above (Z+).  Reverse each
+    // triangle to match the expected outward (Z+) normal.
+    for (U32 t = 0; t + 2 < U32(rawIdx.size()); t += 3) {
+        indices.push_back(roofBase + rawIdx[t + 0]);
+        indices.push_back(roofBase + rawIdx[t + 2]); // swap t+1/t+2
+        indices.push_back(roofBase + rawIdx[t + 1]);
+    }
+};
+
 } // namespace nv
