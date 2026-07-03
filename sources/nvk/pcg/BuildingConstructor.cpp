@@ -41,6 +41,13 @@ void BuildingConstructor::push_vertex(const Vec2d& p, F64 z, const Vec3d& n,
     geom->verts.push_back(v);
 };
 
+// 3D-position overload used by push_quad for reveals that leave the wall plane.
+void BuildingConstructor::push_vertex(const Vec3d& p, const Vec3d& n,
+                                      const Vec2d& uv,
+                                      const CellTextureDesc& tdesc) {
+    push_vertex(p.xy(), p.z(), n, uv, tdesc);
+}
+
 void BuildingConstructor::push_tri_indices(U32 i0, U32 i1, U32 i2) const {
     geom->indices.push_back(i0);
     geom->indices.push_back(i1);
@@ -77,6 +84,163 @@ void BuildingConstructor::push_vquad(const Vec3d& bl, const Vec2d& xdir,
     push_tri_indices(base + 1, base + 2, base + 3);
 };
 
+// General quad from an arbitrary 3D basis. origin is the BL corner (world cm);
+// xspan/yspan are the edge vectors in cm; uSpanM/vSpanM are the UV extents in
+// metres. Winding matches push_vquad, so xspan x yspan must point along n for
+// the geometric front face to agree with the shading normal.
+void BuildingConstructor::push_quad(const Vec3d& originCm, const Vec3d& xspanCm,
+                                    const Vec3d& yspanCm, const Vec3d& n,
+                                    const Vec2d& uv0, F64 uSpanM, F64 vSpanM,
+                                    const CellTextureDesc& tdesc) {
+    const U32 base = U32(geom->verts.size());
+
+    push_vertex(originCm, n, uv0, tdesc); // BL
+    push_vertex(originCm + yspanCm, n,    // TL
+                uv0 + Vec2d(0, vSpanM), tdesc);
+    push_vertex(originCm + xspanCm, n, // BR
+                uv0 + Vec2d(uSpanM, 0), tdesc);
+    push_vertex(originCm + xspanCm + yspanCm, n, // TR
+                uv0 + Vec2d(uSpanM, vSpanM), tdesc);
+
+    push_tri_indices(base + 0, base + 2, base + 1);
+    push_tri_indices(base + 1, base + 2, base + 3);
+}
+
+void BuildingConstructor::start_facade(const Vec2d& a, const Vec2d& dir,
+                                       F64 baseHeight) {
+    facadeOrigin = a;
+    facadeDir = dir.normalized();
+    // Outward normal (CW 90 deg of the forward direction = right-hand side of
+    // a CCW ring):
+    facadeNormal = Vec2d(facadeDir.y(), -facadeDir.x());
+    facadeBaseZ = baseHeight;
+    cursorU = 0.0;
+    cursorZ = baseHeight;
+}
+
+void BuildingConstructor::move_by(F64 duM, F64 dzM) {
+    cursorU += duM;
+    cursorZ += m_to_cm(dzM);
+}
+
+void BuildingConstructor::move_to(F64 uM, F64 zCm) {
+    cursorU = uM;
+    cursorZ = zCm;
+}
+
+// Core emitter: draw one quad at the cursor, then advance cursorU by widthM.
+// Continuous tiling reads the running metre offset (cursorU) and the height
+// above facadeBaseZ; element tiling maps a single 0..1 tile sized to dimsM.
+void BuildingConstructor::emit_facade_quad(F64 widthM, F64 heightM,
+                                           F64 zOffsetM,
+                                           const CellTextureDesc& desc,
+                                           bool tile) {
+    const F64 zBottomCm = cursorZ + m_to_cm(zOffsetM);
+
+    if (widthM > 1e-4 && heightM > 1e-4) {
+        const Vec2d uv0 = tile
+                              ? Vec2d(cursorU, cm_to_m(zBottomCm - facadeBaseZ))
+                              : Vec2d(0.0, 0.0);
+        push_vquad({cursor_xy(), zBottomCm}, facadeDir * m_to_cm(widthM),
+                   m_to_cm(heightM), facadeNormal, uv0, desc);
+    }
+
+    cursorU += widthM; // always advance, even for a skipped degenerate quad
+}
+
+void BuildingConstructor::emit_facade_filler(F64 lengthM, F64 heightM,
+                                             F64 zOffsetM) {
+    const F64 h = (heightM < 0.0) ? curFloorHeightM : heightM;
+    emit_facade_quad(lengthM, h, zOffsetM, *wallDesc, /*tile=*/true);
+}
+
+void BuildingConstructor::emit_facade_element(const CellTextureDesc& desc,
+                                              F64 zOffsetM, F64 insetM,
+                                              F64 widthM, F64 heightM) {
+    const F64 w = (widthM < 0.0) ? F64(desc.dimsM.x()) : widthM;
+    const F64 h = (heightM < 0.0) ? F64(desc.dimsM.y()) : heightM;
+
+    if (insetM <= 1e-4) {
+        emit_facade_quad(w, h, zOffsetM, desc, /*tile=*/false);
+        return;
+    }
+
+    // ── Recessed element: draw the face pushed inward, then box the reveal ──
+    const F64 zBottomCm = cursorZ + m_to_cm(zOffsetM);
+    const F64 wCm = m_to_cm(w);
+    const F64 hCm = m_to_cm(h);
+    const F64 dCm = m_to_cm(insetM);
+
+    const Vec3d eu{facadeDir, 0.0};       // along-wall
+    const Vec3d en{facadeNormal, 0.0};    // outward
+    const Vec3d ez{Vec2d(0.0, 0.0), 1.0}; // up
+
+    const Vec3d outerBL{cursor_xy(), zBottomCm};
+    const Vec3d innerBL = outerBL - en * dCm;
+
+    // Recessed face (still faces outward):
+    push_vquad(innerBL, facadeDir * wCm, hCm, facadeNormal, {0, 0}, desc);
+
+    // Four reveals with the wall texture (spans ordered so front == normal):
+    // left jamb faces +u; right jamb -u; sill +z; head -z.
+    push_quad(outerBL, en * (-dCm), ez * hCm, eu, {0, 0}, insetM, h, *wallDesc);
+    push_quad(outerBL + eu * wCm, ez * hCm, en * (-dCm), eu * (-1.0), {0, 0}, h,
+              insetM, *wallDesc);
+    push_quad(outerBL, eu * wCm, en * (-dCm), ez, {0, 0}, w, insetM, *wallDesc);
+    push_quad(outerBL + ez * hCm, en * (-dCm), eu * wCm, ez * (-1.0), {0, 0},
+              insetM, w, *wallDesc);
+
+    cursorU += w;
+}
+
+// window column = [under-sill filler] [glass] [head filler], stacked at one U.
+void BuildingConstructor::emit_facade_window() {
+    const F64 headM = curFloorHeightM - (sillM + winHeightM);
+
+    emit_facade_filler(winWidthM, sillM, 0.0); // under-sill band
+    move_by(-winWidthM, 0.0);
+    emit_facade_element(*windowDesc, sillM, windowInsetM); // glass at sill
+    move_by(-winWidthM, 0.0);
+    emit_facade_filler(winWidthM, std::max(0.0, headM),
+                       sillM + winHeightM); // head band
+}
+
+// door column = [door on the floor] [head filler above].
+void BuildingConstructor::emit_facade_door() {
+    const F64 headM = curFloorHeightM - doorHeightM;
+
+    emit_facade_element(*doorDesc, 0.0, 0.0); // door sits on the floor line
+    move_by(-doorWidthM, 0.0);
+    emit_facade_filler(doorWidthM, std::max(0.0, headM), doorHeightM);
+}
+
+void BuildingConstructor::build_floor(F64 floorBaseZcm, I32 nDoorsF,
+                                      I32 nWindowsF, I32 doorSlotF) {
+    const I32 nelems = nDoorsF + nWindowsF;
+    const F64 usedM = nDoorsF * doorWidthM + nWindowsF * winWidthM;
+    const F64 pierM =
+        nelems > 0 ? (facadeRunM - usedM) / F64(nelems + 1) : facadeRunM;
+
+    move_to(0.0, floorBaseZcm); // cursor to the start of this floor's run
+
+    if (pierM < 0.0) { // openings don't fit — fall back to a plain wall
+        emit_facade_filler(facadeRunM, curFloorHeightM, 0.0);
+        return;
+    }
+
+    emit_facade_filler(pierM); // leading pier (full-floor height)
+
+    for (I32 j = 0; j < nelems; ++j) {
+        const bool isDoor = (nDoorsF > 0) && (j == doorSlotF);
+        if (isDoor)
+            emit_facade_door();
+        else
+            emit_facade_window();
+
+        emit_facade_filler(pierM); // trailing pier
+    }
+}
+
 auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     -> bool {
 
@@ -87,48 +251,22 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
 
     edgeDir = edgeDir / edgeLen;
 
-    start_facade(a, edgeDir, bottomHeight, {0, 0});
+    start_facade(a, edgeDir, bottomHeight);
 
-    // Outward normal (CW 90° of the forward direction = right-hand side of a
-    // CCW ring):
-    const F32 nx = F32(edgeDir.y());
-    const F32 ny = F32(-edgeDir.x());
-    Vec2d norm{nx, ny};
-
-    const auto& wallDesc = get_texture("wall");
-    const auto& doorDesc = get_texture("door");
-    const auto& windowDesc = get_texture("window");
-
-    // World XY (cm) at along-wall offset xM (metres) from `a`.
-    const auto xyAt = [&](F64 xM) -> Vec2d {
-        return a + edgeDir * (xM / uvScale);
-    };
-
-    // One wall-filler quad with continuous tiling UVs. widthM in metres,
-    // zBottomCm/heightCm in cm.
-    const auto emitFiller = [&](F64 xM, F64 zBottomCm, F64 widthM,
-                                F64 heightCm) {
-        if (widthM <= 1e-4 || heightCm <= 1e-2)
-            return; // skip degenerate slivers
-        const Vec2d uv0 = {xM, (zBottomCm - bottomHeight) * uvScale};
-        push_vquad({xyAt(xM), zBottomCm}, edgeDir * (widthM / uvScale),
-                   heightCm, norm, uv0, wallDesc);
-    };
-
-    // One element (door/window) drawn as a single 0..1 tile at its physical
-    // size. zBottomCm in cm.
-    const auto emitElement = [&](F64 xM, F64 zBottomCm,
-                                 const CellTextureDesc& desc) {
-        push_vquad({xyAt(xM), zBottomCm}, edgeDir * (desc.dimsM.x() / uvScale),
-                   desc.dimsM.y() / uvScale, norm, {0, 0}, desc);
-    };
+    wallDesc = &get_texture("wall");
+    doorDesc = &get_texture("door");
+    windowDesc = &get_texture("window");
 
     const F64 edgeLenM = edgeLen * uvScale;
+    facadeRunM = edgeLenM;
 
     // ── Skirt (below the finished-floor elevation): one plain wall band ─────
     const F64 skirtCm = std::max(0.0, buriedHeight - bottomHeight);
-    if (skirtCm > 1.0)
-        emitFiller(0.0, bottomHeight, edgeLenM, skirtCm);
+    if (skirtCm > 1.0) {
+        move_to(0.0, bottomHeight);
+        curFloorHeightM = cm_to_m(skirtCm);
+        emit_facade_filler(edgeLenM); // full skirt band, continuous tiling
+    }
 
     // ── Floor grid spans [buriedHeight (ffe) .. topHeight] ─────────────────
     const F64 archHeightCm = std::max(0.0, topHeight - buriedHeight);
@@ -138,11 +276,11 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
     const F64 floorHeightCm = archHeightCm / F64(nfloors);
     const F64 floorHeightM = floorHeightCm * uvScale;
 
-    const F64 doorWidthM = doorDesc.dimsM.x();
-    const F64 doorHeightM = doorDesc.dimsM.y();
-    const F64 winWidthM = windowDesc.dimsM.x();
-    const F64 winHeightM = windowDesc.dimsM.y(); // was .x() — height bug
-    const F64 sillM = 1.0;    // window sill height above the floor line
+    doorWidthM = doorDesc->dimsM.x();
+    doorHeightM = doorDesc->dimsM.y();
+    winWidthM = windowDesc->dimsM.x();
+    winHeightM = windowDesc->dimsM.y();
+    sillM = 1.0;              // window sill height above the floor line
     const F64 minPierM = 0.5; // minimum wall gap between/around openings
 
     const bool doorFits =
@@ -182,55 +320,14 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
                              ? rng.uniform_int(0, groundElems - 1)
                              : -1;
 
-    // Lay out one floor: piers evenly distributed, elements sized to dimsM,
-    // wall fillers above/under each opening.
-    const auto buildFloor = [&](F64 floorBaseZ, I32 nDoorsF, I32 nWindowsF,
-                                I32 doorSlotF) {
-        const I32 nelems = nDoorsF + nWindowsF;
-        const F64 usedM = nDoorsF * doorWidthM + nWindowsF * winWidthM;
-        const F64 pierM =
-            nelems > 0 ? (edgeLenM - usedM) / F64(nelems + 1) : edgeLenM;
-
-        if (pierM < 0.0) { // openings don't fit — fall back to a plain wall
-            emitFiller(0.0, floorBaseZ, edgeLenM, floorHeightCm);
-            return;
-        }
-
-        F64 xM = 0.0;
-        emitFiller(xM, floorBaseZ, pierM, floorHeightCm); // leading pier
-        xM += pierM;
-
-        for (I32 j = 0; j < nelems; ++j) {
-            const bool isDoor = (nDoorsF > 0) && (j == doorSlotF);
-
-            if (isDoor) {
-                emitElement(xM, floorBaseZ, doorDesc);
-                const F64 doorTopCm = floorBaseZ + doorHeightM / uvScale;
-                emitFiller(xM, doorTopCm, doorWidthM,
-                           floorBaseZ + floorHeightCm - doorTopCm);
-                xM += doorWidthM;
-            } else {
-                const F64 sillTopCm = floorBaseZ + sillM / uvScale;
-                const F64 winTopCm = sillTopCm + winHeightM / uvScale;
-                emitFiller(xM, floorBaseZ, winWidthM, sillTopCm - floorBaseZ);
-                emitElement(xM, sillTopCm, windowDesc);
-                emitFiller(xM, winTopCm, winWidthM,
-                           floorBaseZ + floorHeightCm - winTopCm);
-                xM += winWidthM;
-            }
-
-            emitFiller(xM, floorBaseZ, pierM, floorHeightCm); // trailing pier
-            xM += pierM;
-        }
-    };
-
     // Ground floor carries the door; every upper floor reuses one pattern.
     F64 floorBaseZ = buriedHeight;
     for (U32 fi = 0; fi < nfloors; ++fi) {
+        curFloorHeightM = floorHeightM;
         if (fi == 0)
-            buildFloor(floorBaseZ, nDoors, nWinGround, doorSlot);
+            build_floor(floorBaseZ, nDoors, nWinGround, doorSlot);
         else
-            buildFloor(floorBaseZ, 0, nWinUpper, -1);
+            build_floor(floorBaseZ, 0, nWinUpper, -1);
         floorBaseZ += floorHeightCm;
     }
 
@@ -294,13 +391,5 @@ void BuildingConstructor::create_roof(const Vector<Vec2d>& ring) {
         geom->indices.push_back(roofBase + rawIdx[t + 1]);
     }
 };
-
-void BuildingConstructor::start_facade(const Vec2d& a, const Vec2d& dir,
-                                       F64 baseHeight, const Vec2d& offsetUV) {
-    currentBL = a;
-    facadeDir = dir.normalized();
-    currentheight = baseHeight;
-    currentUV = offsetUV;
-}
 
 } // namespace nv
