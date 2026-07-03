@@ -14,6 +14,9 @@ struct BuildingConstructor {
     F64 bottomHeight{0.0};
     F64 topHeight{0.0};
     F64 buriedHeight{0.0};
+    F64 levelHeight{350.0};
+    U32 numPlacedDoors{0};
+
     Vec2d origin;
     const CellTextureAtlasLayout* atlasLayout{nullptr};
 

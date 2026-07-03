@@ -93,12 +93,120 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b,
     const auto& doorDesc = get_texture("door");
     const auto& windowDesc = get_texture("window");
 
-    pushQuad({a, bottomHeight}, b - a, topHeight - bottomHeight, {0, 0},
-             wallDesc);
+    // Whole facade:
+    // pushQuad({a, bottomHeight}, b - a, topHeight - bottomHeight, {0, 0},
+    //          wallDesc);
 
-    // // Push basement:
-    // if(buriedHeight>0.0) {
-    // }
+    F64 remainingHeight = topHeight - bottomHeight;
+
+    // Push basement:
+    if (buriedHeight > 0.0) {
+        pushQuad({a, bottomHeight}, b - a, buriedHeight, {0, 0}, wallDesc);
+        remainingHeight -= buriedHeight;
+    }
+
+    // Compute the number of floors:
+    U32 nfloors = std::max(1U, (U32)round(remainingHeight / levelHeight));
+
+    // Actual floor height:
+    F64 actualFloorHeight = remainingHeight / nfloors;
+
+    const auto& rng = RandGen::instance();
+
+    F64 edgeLenM = edgeLen * uvScale;
+    // Compute number of doors to add:
+    I32 nDoors = (actualFloorHeight < doorDesc.dimsM.y() ||
+                  edgeLenM < doorDesc.dimsM.x() || numPlacedDoors > 0)
+                     ? 0
+                     : 1;
+
+    F64 doorWidthM = doorDesc.dimsM.x();
+    F64 doorHeightM = doorDesc.dimsM.y();
+    F64 windowWidthM = windowDesc.dimsM.x();
+    F64 windowHeightM = windowDesc.dimsM.x();
+    F64 winBaseM = 1.0;
+
+    // Check how many windows we could fit on this facade:
+    I32 maxNWindows = actualFloorHeight < (windowDesc.dimsM.y() + winBaseM)
+                          ? 0U
+                          : (I32)std::floor((edgeLenM) / windowDesc.dimsM.x());
+    I32 maxNWindows0 = actualFloorHeight < (windowDesc.dimsM.y() + winBaseM)
+                           ? 0U
+                           : (I32)std::floor((edgeLenM - nDoors * doorWidthM) /
+                                             windowDesc.dimsM.x());
+
+    I32 nWindows = rng.uniform_int(0, maxNWindows);
+    I32 nWindows0 = rng.uniform_int(0, maxNWindows0);
+
+    I32 nElems0 = nDoors + nWindows0;
+    I32 doorIdx = rng.uniform_int(0, nElems0 - 1);
+
+    F64 currentHeight = bottomHeight + buriedHeight;
+
+    auto buildFloor = [&](I32 nDoors, I32 nWindows, Vec3d pos) {
+        // First floor
+        F64 usedLenM = nDoors * doorWidthM + nWindows * windowWidthM;
+        I32 nelems = nDoors + nWindows;
+        F64 flen =
+            nelems > 0.0 ? (edgeLenM - usedLenM) / (nelems + 1) : edgeLenM;
+        Vec2d uv0 = {0.0, (currentHeight - bottomHeight) * uvScale};
+
+        // Place a first filler:
+        pushQuad(pos, edgeDir * flen / uvScale, actualFloorHeight, uv0,
+                 wallDesc);
+        uv0.x() += flen;
+        pos += Vec3d(edgeDir * flen / uvScale, 0.0);
+
+        for (I32 j = 0; j < nelems; ++j) {
+
+            F64 ww = windowWidthM / uvScale;
+            F64 hh = windowHeightM / uvScale;
+
+            if (j == doorIdx) {
+                // Place a door:
+                ww = doorWidthM / uvScale;
+                hh = doorHeightM / uvScale;
+
+                pushQuad(pos, edgeDir * ww, hh, {0, 0}, doorDesc);
+                // Place filler above door:
+                pushQuad(pos + Vec3d(0, 0, hh), edgeDir * ww,
+                         actualFloorHeight - hh, uv0 + Vec2d(0.0, doorHeightM),
+                         wallDesc);
+
+            } else {
+                // filler below:
+                pushQuad(pos, edgeDir * ww, winBaseM, uv0, wallDesc);
+                // Window:
+                pushQuad(pos + Vec3d(0, 0, winBaseM), edgeDir * ww, hh, {0, 0},
+                         windowDesc);
+                pushQuad(pos + Vec3d(0, 0, winBaseM + windowHeightM),
+                         edgeDir * ww,
+                         actualFloorHeight - hh - winBaseM / uvScale,
+                         uv0 + Vec2d(0, winBaseM + windowHeightM), wallDesc);
+            }
+
+            uv0.x() += flen;
+            pos += Vec3d(edgeDir * flen / uvScale, 0.0);
+
+            // Place filler:
+            pushQuad(pos, edgeDir * flen / uvScale, actualFloorHeight, uv0,
+                     wallDesc);
+        }
+    };
+
+    for (I32 fi = 0; fi < nfloors; ++fi) {
+        auto pos = Vec3d(a, currentHeight);
+
+        // Build one floor:
+        if (fi == 0) {
+            buildFloor(nDoors, nWindows0, pos);
+        } else {
+            // Other floors:
+            buildFloor(0, nWindows, pos);
+        }
+
+        currentHeight += actualFloorHeight;
+    }
 
     return true;
 };
