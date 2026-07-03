@@ -18,16 +18,16 @@ auto BuildingConstructor::get_texture(const String& tname)
 }
 
 BuildingConstructor::BuildingConstructor(U64 bid, String stype,
-                                         const CellTextureAtlasLayout& atlas)
-    : id(bid), style(atlas.pick_style("building", stype, id)),
+                                         const CellTextureAtlasLayout& atlas,
+                                         TileGeom* out)
+    : id(bid), style(atlas.pick_style("building", stype, id)), geom(out),
       atlasLayout(&atlas) {
-
+    NVCHK(out != nullptr, "Invalid tile geom.");
     subtype = std::move(stype);
 };
 
-auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b,
-                                        Vector<CellVertex>& vertices,
-                                        Vector<U32>& indices) -> bool {
+auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
+    -> bool {
 
     Vec2d edgeDir = b - a;
     const F64 edgeLen = edgeDir.length();
@@ -52,7 +52,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b,
         v.nz = 0.F;
         tdesc.scale_uv(F32(u0), F32(v0), v.u0, v.v0);
         v.texIdx = F32(tdesc.index);
-        vertices.push_back(v);
+        geom->verts.push_back(v);
     };
 
     // bl = bottom-left corner (world cm, z absolute); xdir = along-wall vector
@@ -65,7 +65,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b,
         const Vec2d p0 = bl.xy();
         const Vec2d p1 = p0 + xdir;
         const F64 len = xdir.length();
-        const U32 base = U32(vertices.size());
+        const U32 base = U32(geom->verts.size());
 
         pushVertex(p0, bl.z(), uv0.x(), uv0.y(), tdesc); // bottom-left
         pushVertex(p0, bl.z() + height, uv0.x(),         // top-left
@@ -76,12 +76,12 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b,
                    uv0.y() + height * uvScale, tdesc);
 
         // CCW winding viewed from outside (BL, TL, BR, TR = base 0,1,2,3):
-        indices.push_back(base + 0);
-        indices.push_back(base + 2);
-        indices.push_back(base + 1);
-        indices.push_back(base + 1);
-        indices.push_back(base + 2);
-        indices.push_back(base + 3);
+        geom->indices.push_back(base + 0);
+        geom->indices.push_back(base + 2);
+        geom->indices.push_back(base + 1);
+        geom->indices.push_back(base + 1);
+        geom->indices.push_back(base + 2);
+        geom->indices.push_back(base + 3);
     };
 
     const auto& wallDesc = get_texture("wall");
@@ -229,9 +229,7 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b,
     return true;
 };
 
-void BuildingConstructor::create_roof(const Vector<Vec2d>& ring,
-                                      Vector<CellVertex>& vertices,
-                                      Vector<U32>& indices) {
+void BuildingConstructor::create_roof(const Vector<Vec2d>& ring) {
     // Triangulate the closed footprint ring at roofZ using earcut.
     // UV0: (world_X_m, world_Y_m) — planar projection, tile-local.
     using EarcutPoint = std::array<float, 2>;
@@ -243,7 +241,7 @@ void BuildingConstructor::create_roof(const Vector<Vec2d>& ring,
 
     const auto& roofDesc = get_texture("roof");
 
-    const U32 roofBase = U32(vertices.size());
+    const U32 roofBase = U32(geom->verts.size());
 
     for (U32 i = 0; i < n; ++i) {
         const Vec2d& pt = ring[i];
@@ -268,7 +266,7 @@ void BuildingConstructor::create_roof(const Vector<Vec2d>& ring,
         // remap_uv_to_atlas(u0, v0, roofTex, v.u0, v.v0);
         roofDesc.scale_uv(u0, v0, v.u0, v.v0);
         v.texIdx = F32(roofDesc.index);
-        vertices.push_back(v);
+        geom->verts.push_back(v);
     }
 
     // earcut returns indices into the ring (0-based); shift by roofBase.
@@ -280,9 +278,9 @@ void BuildingConstructor::create_roof(const Vector<Vec2d>& ring,
     // winding is already CCW when viewed from above (Z+).  Reverse each
     // triangle to match the expected outward (Z+) normal.
     for (U32 t = 0; t + 2 < U32(rawIdx.size()); t += 3) {
-        indices.push_back(roofBase + rawIdx[t + 0]);
-        indices.push_back(roofBase + rawIdx[t + 2]); // swap t+1/t+2
-        indices.push_back(roofBase + rawIdx[t + 1]);
+        geom->indices.push_back(roofBase + rawIdx[t + 0]);
+        geom->indices.push_back(roofBase + rawIdx[t + 2]); // swap t+1/t+2
+        geom->indices.push_back(roofBase + rawIdx[t + 1]);
     }
 };
 

@@ -16,21 +16,18 @@ struct BuildingConstructor {
     F64 buriedHeight{0.0};
     F64 levelHeight{350.0};
     U32 numPlacedDoors{0};
-
+    TileGeom* geom;
     Vec2d origin;
     const CellTextureAtlasLayout* atlasLayout{nullptr};
 
     BuildingConstructor(U64 bid, String stype,
-                        const CellTextureAtlasLayout& atlas);
+                        const CellTextureAtlasLayout& atlas, TileGeom* out);
 
     auto get_texture(const String& tname) -> const CellTextureDesc&;
 
-    auto create_facade(const Vec2d& a, const Vec2d& b,
-                       Vector<CellVertex>& vertices, Vector<U32>& indices)
-        -> bool;
+    auto create_facade(const Vec2d& a, const Vec2d& b) -> bool;
 
-    void create_roof(const Vector<Vec2d>& ring, Vector<CellVertex>& vertices,
-                     Vector<U32>& indices);
+    void create_roof(const Vector<Vec2d>& ring);
 };
 
 } // namespace nv

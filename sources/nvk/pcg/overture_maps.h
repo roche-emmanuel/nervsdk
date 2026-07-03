@@ -201,6 +201,11 @@ struct CellVertex {
     F32 texIdx;
 };
 
+struct TileGeom {
+    Vector<CellVertex> verts;
+    Vector<U32> indices;
+};
+
 // One road cross-section. left/right are world-XY (cm). z is the shared
 // surface elevation (cm, terrain max under the cross-section, WITHOUT the road
 // Z bias — tessellation adds that). u is cumulative centreline distance (cm).
