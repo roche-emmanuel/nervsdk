@@ -87,6 +87,8 @@ auto BuildingConstructor::create_facade(const Vec2d& a, const Vec2d& b)
 
     edgeDir = edgeDir / edgeLen;
 
+    start_facade(a, edgeDir, bottomHeight, {0, 0});
+
     // Outward normal (CW 90° of the forward direction = right-hand side of a
     // CCW ring):
     const F32 nx = F32(edgeDir.y());
@@ -292,5 +294,13 @@ void BuildingConstructor::create_roof(const Vector<Vec2d>& ring) {
         geom->indices.push_back(roofBase + rawIdx[t + 1]);
     }
 };
+
+void BuildingConstructor::start_facade(const Vec2d& a, const Vec2d& dir,
+                                       F64 baseHeight, const Vec2d& offsetUV) {
+    currentBL = a;
+    facadeDir = dir.normalized();
+    currentheight = baseHeight;
+    currentUV = offsetUV;
+}
 
 } // namespace nv
