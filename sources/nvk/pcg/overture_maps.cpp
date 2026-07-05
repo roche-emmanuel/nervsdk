@@ -790,31 +790,81 @@ void build_anticipatory_profile(
     // for (const auto& [ridx, z] : pins)
     //     adj[ridx] = std::max(adj[ridx], z);
 
-    // ── Pin reconciliation: blend anticipatory result toward each pin ────────
-    // For each pin, within a radius of lookaheadCm (arc-length) on both sides,
-    // mix adj[i] toward the pin elevation.  Weight is linear: 0.0 at the edge
-    // of the blend zone, 1.0 exactly at the pin rib.  This avoids the kink
-    // that stamping a single rib would create, and avoids the wrong direction
-    // that max() would introduce.
-    for (const auto& [pinRib, infos] : pins) {
+    // ── Pin reconciliation: blend the anticipatory result toward each pin,
+    // confining every pin to its own arc-length territory. Each pin has a flat
+    // plateau of half-width plateauHalf; the free gap between two adjacent
+    // plateaus is split at its midpoint, and that midpoint is the territory
+    // boundary. The linear blend runs from w=1 at the plateau edge to w=0 at
+    // the boundary, over min(lookaheadCm, gapHalf) — capping the length to the
+    // room actually available so w reaches 0 exactly at the midpoint from both
+    // sides (no step). Without the territory clamp a nearby high pin lifts a
+    // junction endpoint; without the length cap the two blends disagree at the
+    // midpoint and step the profile. pins is sorted by rib index.
+    const F64 inf = std::numeric_limits<F64>::infinity();
+    for (U32 k = 0; k < U32(pins.size()); ++k) {
+        const U32 pinRib = pins[k].first;
+        const RoadConnectorInfos& infos = pins[k].second;
         const F64 pinU = ribs[pinRib].u;
+        const F64 plateauHalf = infos.maxHalfWidth * connectPlateauFactor;
 
-        // Scan outward in both directions from pinRib while within lookaheadCm.
-        // We iterate over all ribs rather than just left/right to handle
-        // irregular rib spacing cleanly.
-
-        F64 plateauHalfSize = infos.maxHalfWidth * connectPlateauFactor;
-        for (U32 i = 0; i < n; ++i) {
-            F64 dist = std::abs(ribs[i].u - pinU);
-            if (dist >= (plateauHalfSize + lookaheadCm))
-                continue;
-            if (dist <= plateauHalfSize) {
-                adj[i] = infos.elev;
-            } else {
-                const F64 w = 1.0 - (dist - plateauHalfSize) /
-                                        lookaheadCm; // 1.0 at pin, 0.0 at edge
-                adj[i] = adj[i] + w * (infos.elev - adj[i]); // lerp toward pin
+        // Right side (toward pins[k+1]).
+        F64 rightBoundU = inf;
+        F64 rightBlendLen = lookaheadCm;
+        if (k + 1 < U32(pins.size())) {
+            const F64 nextHalf =
+                pins[k + 1].second.maxHalfWidth * connectPlateauFactor;
+            const F64 thisEdge = pinU + plateauHalf;
+            const F64 nextEdge = ribs[pins[k + 1].first].u - nextHalf;
+            if (nextEdge < thisEdge) {
+                const F64 centreDist = ribs[pins[k + 1].first].u - pinU;
+                const F64 dz = std::abs(pins[k + 1].second.elev - infos.elev);
+                if (centreDist > 0.0 && dz / centreDist > maxSlope) {
+                    logWARN(
+                        "Connector plateaus overlap with un-spannable step: "
+                        "pinU={:.1f} z={:.1f} vs nextU={:.1f} z={:.1f}; "
+                        "dz={:.1f} over {:.1f} cm ({:.1f}x grade cap)",
+                        pinU, infos.elev, ribs[pins[k + 1].first].u,
+                        pins[k + 1].second.elev, dz, centreDist,
+                        (dz / centreDist) / maxSlope);
+                }
+                rightBoundU = 0.5 * (thisEdge + nextEdge);
+                rightBlendLen = std::min(lookaheadCm, rightBoundU - thisEdge);
             }
+            rightBoundU = 0.5 * (thisEdge + nextEdge);
+            rightBlendLen = std::min(lookaheadCm, rightBoundU - thisEdge);
+        }
+
+        // Left side (toward pins[k-1]).
+        F64 leftBoundU = -inf;
+        F64 leftBlendLen = lookaheadCm;
+        if (k > 0) {
+            const F64 prevHalf =
+                pins[k - 1].second.maxHalfWidth * connectPlateauFactor;
+            const F64 thisEdge = pinU - plateauHalf;
+            const F64 prevEdge = ribs[pins[k - 1].first].u + prevHalf;
+            leftBoundU = 0.5 * (prevEdge + thisEdge);
+            leftBlendLen = std::min(lookaheadCm, thisEdge - leftBoundU);
+        }
+
+        for (U32 i = 0; i < n; ++i) {
+            const F64 ui = ribs[i].u;
+            if (ui < leftBoundU || ui >= rightBoundU)
+                continue; // a neighbour owns this rib (right boundary
+                          // exclusive)
+
+            const F64 dist = std::abs(ui - pinU);
+            if (dist <= plateauHalf) {
+                adj[i] = infos.elev;
+                continue;
+            }
+
+            const F64 blendLen = (ui > pinU) ? rightBlendLen : leftBlendLen;
+            const F64 beyond = dist - plateauHalf;
+            if (blendLen <= 0.0 || beyond >= blendLen)
+                continue; // no room, or past the blend zone (w <= 0)
+
+            const F64 w = 1.0 - beyond / blendLen;
+            adj[i] = adj[i] + w * (infos.elev - adj[i]);
         }
     }
 
