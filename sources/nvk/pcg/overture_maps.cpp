@@ -818,6 +818,7 @@ void build_anticipatory_profile(
             if (nextEdge < thisEdge) {
                 const F64 centreDist = ribs[pins[k + 1].first].u - pinU;
                 const F64 dz = std::abs(pins[k + 1].second.elev - infos.elev);
+#if 0
                 if (centreDist > 0.0 && dz / centreDist > maxSlope) {
                     logWARN(
                         "Connector plateaus overlap with un-spannable step: "
@@ -827,6 +828,7 @@ void build_anticipatory_profile(
                         pins[k + 1].second.elev, dz, centreDist,
                         (dz / centreDist) / maxSlope);
                 }
+#endif
                 rightBoundU = 0.5 * (thisEdge + nextEdge);
                 rightBlendLen = std::min(lookaheadCm, rightBoundU - thisEdge);
             }
