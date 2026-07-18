@@ -1,3 +1,6 @@
+#ifndef _SVG_CANVAS_H_
+#define _SVG_CANVAS_H_
+
 // Minimal SVG canvas used by dump_junction_svg(): fits world-cm points into a
 // fixed-width viewport (Y axis flipped: world Y-up -> SVG Y-down) and
 // accumulates shapes as SVG markup.
@@ -33,8 +36,7 @@ struct SvgCanvas {
     // regions). fillColor may be nullptr for an unfilled (stroke-only)
     // polygon.
     void polygon(const Vector<Vec2d>& pts, const char* fillColor,
-                 const char* strokeColor, F64 strokePx,
-                 F64 fillOpacity = 1.0);
+                 const char* strokeColor, F64 strokePx, F64 fillOpacity = 1.0);
 
     void line(const Vec2d& a, const Vec2d& b, const char* color, F64 strokePx,
               bool dashed = false);
@@ -68,3 +70,5 @@ struct SvgCanvas {
 };
 
 } // namespace nv
+
+#endif
