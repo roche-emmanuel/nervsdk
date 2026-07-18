@@ -816,9 +816,9 @@ void build_anticipatory_profile(
             const F64 thisEdge = pinU + plateauHalf;
             const F64 nextEdge = ribs[pins[k + 1].first].u - nextHalf;
             if (nextEdge < thisEdge) {
+#if 0
                 const F64 centreDist = ribs[pins[k + 1].first].u - pinU;
                 const F64 dz = std::abs(pins[k + 1].second.elev - infos.elev);
-#if 0
                 if (centreDist > 0.0 && dz / centreDist > maxSlope) {
                     logWARN(
                         "Connector plateaus overlap with un-spannable step: "
