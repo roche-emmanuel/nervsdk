@@ -17,6 +17,10 @@ class LogManager;
 #define logDEBUG nv::LogManager::debug
 #endif
 
+#ifndef logDEBUGif
+#define logDEBUGif nv::LogManager::debug_if
+#endif
+
 #ifndef logDEBUG_1S
 #define logDEBUG_1S nv::LogManager::debug_1s
 #endif

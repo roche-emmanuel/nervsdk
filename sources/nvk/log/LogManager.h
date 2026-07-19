@@ -82,6 +82,11 @@ class LogManager {
     static void debug(const char* msg) {
         LogManager::instance().log_message(L_DEBUG, msg);
     }
+    static void debug_if(bool cond, const char* msg) {
+        if (!cond)
+            return;
+        LogManager::instance().log_message(L_DEBUG, msg);
+    }
 
     static void fatal(const char* msg) {
         LogManager::instance().log_message(L_FATAL, msg);
@@ -94,6 +99,14 @@ class LogManager {
 
     template <typename... Args>
     static void debug(fmt::format_string<Args...> fmt, Args&&... args) {
+        LogManager::instance().log(L_DEBUG, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    static void debug_if(bool cond, fmt::format_string<Args...> fmt,
+                         Args&&... args) {
+        if (!cond)
+            return;
         LogManager::instance().log(L_DEBUG, fmt, std::forward<Args>(args)...);
     }
 
