@@ -380,6 +380,38 @@ template <typename T> using Polyline2Vector = Vector<Polyline2<T>>;
 using Polyline2f = Polyline2<F32>;
 using Polyline2d = Polyline2<F64>;
 
+template <typename T> struct SampleVal {
+    T t{0.0};
+    T v{0.0};
+};
+
+using SampleValf = SampleVal<F32>;
+using SampleVald = SampleVal<F64>;
+
+template <typename T> struct SampleVec2 {
+    T t{0.0};
+    Vec2<T> v;
+};
+
+using SampleVec2f = SampleVec2<F32>;
+using SampleVec2d = SampleVec2<F64>;
+
+template <typename T> struct SampleVec3 {
+    T t{0.0};
+    Vec3<T> v;
+};
+
+using SampleVec3f = SampleVec3<F32>;
+using SampleVec3d = SampleVec3<F64>;
+
+template <typename T> struct SampleVec4 {
+    T t{0.0};
+    Vec4<T> v;
+};
+
+using SampleVec4f = SampleVec4<F32>;
+using SampleVec4d = SampleVec4<F64>;
+
 template <typename T> struct PolylineRayHit {
     T tRay{0.0};   // distance parameter along the ray
     U32 segIdx{0}; // index of the polyline segment that was hit
