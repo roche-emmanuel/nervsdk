@@ -227,13 +227,6 @@ struct RoadConnectorInfos {
     F32 maxHalfWidth{0.0};
 };
 
-struct RoadSection {
-    Vector<RoadRib> ribs;
-    Vec2d uRange;
-    U32 startConnIdx{0};
-    U32 endConnIdx{0};
-};
-
 // Default along-road grade caps, in degrees. tan(deg) ≈ grade %:
 //   4° ≈ 7%, 6° ≈ 10.5%, 8° ≈ 14%, 12° ≈ 21%, 15° ≈ 27%.
 constexpr F64 kRoadDefaultMaxSlopeDeg = 8.0; // fallback for unknown classes
