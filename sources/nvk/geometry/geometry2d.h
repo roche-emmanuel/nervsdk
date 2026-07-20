@@ -380,41 +380,131 @@ template <typename T> using Polyline2Vector = Vector<Polyline2<T>>;
 using Polyline2f = Polyline2<F32>;
 using Polyline2d = Polyline2<F64>;
 
-template <typename T> struct SampleVal {
+template <typename T, typename V> struct Sample {
     T t{0.0};
-    T v{0.0};
+    V v{0.0};
 };
 
-using SampleValf = SampleVal<F32>;
-using SampleVald = SampleVal<F64>;
+using SampleValf = Sample<F32, F32>;
+using SampleVald = Sample<F64, F64>;
 
-template <typename T> struct SampleVec2 {
-    T t{0.0};
-    Vec2<T> v;
-};
+using SampleVec2f = Sample<F32, Vec2f>;
+using SampleVec2d = Sample<F64, Vec2d>;
 
-using SampleVec2f = SampleVec2<F32>;
-using SampleVec2d = SampleVec2<F64>;
+using SampleVec3f = Sample<F32, Vec3f>;
+using SampleVec3d = Sample<F64, Vec3d>;
 
-template <typename T> struct SampleVec3 {
-    T t{0.0};
-    Vec3<T> v;
-};
+using SampleVec4f = Sample<F32, Vec4f>;
+using SampleVec4d = Sample<F64, Vec4d>;
 
-using SampleVec3f = SampleVec3<F32>;
-using SampleVec3d = SampleVec3<F64>;
+template <typename T> inline auto distance(const T& a, const T& b) -> T {
+    return std::abs(a - b);
+}
+template <typename T>
+inline auto distance(const Vec2<T>& a, const Vec2<T>& b) -> T {
+    return (a - b).length();
+}
+template <typename T>
+inline auto distance(const Vec3<T>& a, const Vec3<T>& b) -> T {
+    return (a - b).length();
+}
+template <typename T>
+inline auto distance(const Vec4<T>& a, const Vec4<T>& b) -> T {
+    return (a - b).length();
+}
 
-template <typename T> struct SampleVec4 {
-    T t{0.0};
-    Vec4<T> v;
-};
+template <typename T, typename V>
+auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
+                       bool normalizeOutputT = false, T minPointDist = 1e-3)
+    -> Vector<Sample<T, V>> {
 
-using SampleVec4f = SampleVec4<F32>;
-using SampleVec4d = SampleVec4<F64>;
+    NVCHK(startT <= endT, "Invalid start/end T values.");
+    I32 num = (I32)cline.size();
+    NVCHK(num >= 2, "Not enough points in cline.");
 
-auto sample2_sub_range(const Vector<SampleVec2d>& cline, F64 startT, F64 endT,
-                       bool normalizeOutputT = false, F64 minPointDist = 1e-3)
-    -> Vector<SampleVec2d>;
+    T clineMinT = cline.front().t;
+    T clineMaxT = cline.back().t;
+
+    if (endT < clineMinT || startT > clineMaxT) {
+        return {};
+    }
+
+    T clampedStartT = std::clamp(startT, clineMinT, clineMaxT);
+    T clampedEndT = std::clamp(endT, clineMinT, clineMaxT);
+    NVCHK(clampedStartT <= clampedEndT, "Invalid start/end T values.");
+
+    I32 startIdx = -1;
+    I32 endIdx = -1;
+    V startPt;
+    V endPt;
+    bool useStartPt = false;
+    bool useEndPt = false;
+
+    for (I32 i = 1; i < num; ++i) {
+        if (startIdx == -1 && cline[i - 1].t <= clampedStartT &&
+            clampedStartT <= cline[i].t) {
+            auto denom = cline[i].t - cline[i - 1].t;
+            NVCHK(denom > 0.0, "Invalid consecutive T values.");
+            auto r = (clampedStartT - cline[i - 1].t) / denom;
+            startPt = cline[i - 1].v * (1.0 - r) + cline[i].v * r;
+            useStartPt = distance(cline[i].v, startPt) > minPointDist;
+            startIdx = i;
+        }
+        if (endIdx == -1 && cline[i - 1].t <= clampedEndT &&
+            clampedEndT <= cline[i].t) {
+            auto denom = cline[i].t - cline[i - 1].t;
+            NVCHK(denom > 0.0, "Invalid consecutive T values.");
+            auto r = (clampedEndT - cline[i - 1].t) / denom;
+            endPt = cline[i - 1].v * (1.0 - r) + cline[i].v * r;
+            useEndPt = distance(cline[i - 1].v, endPt) > minPointDist;
+            endIdx = i - 1;
+            break;
+        }
+    }
+    NVCHK(startIdx > -1 && endIdx > -1,
+          "Cannot extract sub range from samples.");
+
+    Vector<Sample<T, V>> out;
+    U32 ncopy = (endIdx - startIdx + 1);
+    if (ncopy == 0 && useStartPt && useEndPt &&
+        distance(endPt, startPt) <= minPointDist) {
+        useEndPt = false; // keep only the start point
+    }
+
+    U32 n = ncopy + (useStartPt ? 1 : 0) + (useEndPt ? 1 : 0);
+
+    if (n == 0) {
+        // segment shorter than minPointDist: just emit a single representative
+        // point
+        out.resize(1);
+        out[0].t = clampedStartT;
+        out[0].v = startPt; // or (startPt + endPt) * 0.5
+    } else {
+        out.resize(n);
+        if (useStartPt) {
+            out[0].v = startPt;
+            out[0].t = clampedStartT;
+        }
+        if (useEndPt) {
+            out[n - 1].v = endPt;
+            out[n - 1].t = clampedEndT;
+        }
+
+        if (ncopy > 0) {
+            Sample<T, V>* ptr = out.data() + (useStartPt ? 1 : 0);
+            memcpy(ptr, &cline[startIdx], ncopy * sizeof(T));
+        }
+    }
+
+    if (normalizeOutputT) {
+        T trange = clampedEndT - clampedStartT;
+        for (auto& s : out) {
+            s.t = trange > 0.0 ? (s.t - clampedStartT) / trange : 0.0;
+        }
+    }
+
+    return out;
+}
 
 template <typename T> struct PolylineRayHit {
     T tRay{0.0};   // distance parameter along the ray
