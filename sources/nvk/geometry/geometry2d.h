@@ -506,6 +506,9 @@ auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
     return out;
 }
 
+auto samples_apply_normal_offset(const Vector<SampleVec2d>& cline, F64 offset)
+    -> Vector<SampleVec2d>;
+
 template <typename T> struct PolylineRayHit {
     T tRay{0.0};   // distance parameter along the ray
     U32 segIdx{0}; // index of the polyline segment that was hit
