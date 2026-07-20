@@ -447,7 +447,7 @@ auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
             NVCHK(denom > 0.0, "Invalid consecutive T values.");
             auto r = (clampedStartT - cline[i - 1].t) / denom;
             startPt = cline[i - 1].v * (1.0 - r) + cline[i].v * r;
-            useStartPt = distance(cline[i].v, startPt) > minPointDist;
+            useStartPt = (cline[i].t - clampedStartT) > minPointDist;
             startIdx = i;
         }
         if (endIdx == -1 && cline[i - 1].t <= clampedEndT &&
@@ -456,7 +456,7 @@ auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
             NVCHK(denom > 0.0, "Invalid consecutive T values.");
             auto r = (clampedEndT - cline[i - 1].t) / denom;
             endPt = cline[i - 1].v * (1.0 - r) + cline[i].v * r;
-            useEndPt = distance(cline[i - 1].v, endPt) > minPointDist;
+            useEndPt = (clampedEndT - cline[i - 1].t) > minPointDist;
             endIdx = i - 1;
             break;
         }
@@ -467,7 +467,7 @@ auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
     Vector<Sample<T, V>> out;
     U32 ncopy = (endIdx - startIdx + 1);
     if (ncopy == 0 && useStartPt && useEndPt &&
-        distance(endPt, startPt) <= minPointDist) {
+        (clampedEndT - clampedStartT) <= minPointDist) {
         useEndPt = false; // keep only the start point
     }
 
@@ -492,7 +492,7 @@ auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
 
         if (ncopy > 0) {
             Sample<T, V>* ptr = out.data() + (useStartPt ? 1 : 0);
-            memcpy(ptr, &cline[startIdx], ncopy * sizeof(T));
+            memcpy(ptr, &cline[startIdx], ncopy * sizeof(Sample<T, V>));
         }
     }
 
