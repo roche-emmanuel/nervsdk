@@ -412,6 +412,10 @@ template <typename T> struct SampleVec4 {
 using SampleVec4f = SampleVec4<F32>;
 using SampleVec4d = SampleVec4<F64>;
 
+auto sample2_sub_range(const Vector<SampleVec2d>& cline, F64 startT, F64 endT,
+                       bool normalizeOutputT = false, F64 minPointDist = 1e-3)
+    -> Vector<SampleVec2d>;
+
 template <typename T> struct PolylineRayHit {
     T tRay{0.0};   // distance parameter along the ray
     U32 segIdx{0}; // index of the polyline segment that was hit
