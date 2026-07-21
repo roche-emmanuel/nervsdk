@@ -240,7 +240,7 @@ inline void get_opt(const Json& j, const char* key, T& out) {
 template <typename T, typename V>
 auto get_path(const T& arg0, const V& arg1) -> String {
     String p1(arg0);
-    if (p1.back() == '/') {
+    if (!p1.empty() && (p1.back() == '/' || p1.back() == '\\')) {
         return p1 + String(arg1);
     }
 
@@ -250,7 +250,7 @@ auto get_path(const T& arg0, const V& arg1) -> String {
 template <typename T, typename V, typename... Args>
 auto get_path(const T& arg0, const V& arg1, const Args&... args) -> String {
     String p1(arg0);
-    if (p1.back() == '/') {
+    if (!p1.empty() && (p1.back() == '/' || p1.back() == '\\')) {
         return get_path(p1 + String(arg1), args...);
     }
 
