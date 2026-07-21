@@ -422,6 +422,10 @@ template <typename T, typename V> struct Profile {
         samples.insert(pos, Sample<T, V>{t, v});
     }
 
+    auto operator[](U32 i) const -> const Sample<T, V>& { return samples[i]; }
+    auto operator[](U32 i) -> Sample<T, V>& { return samples[i]; }
+
+    void clear() { return samples.clear(); }
     [[nodiscard]] auto empty() const -> bool { return samples.empty(); }
     [[nodiscard]] auto size() const -> U32 { return U32(samples.size()); }
     [[nodiscard]] auto front() const -> const Sample<T, V>& {
@@ -432,6 +436,8 @@ template <typename T, typename V> struct Profile {
     }
     [[nodiscard]] auto begin() const { return samples.begin(); }
     [[nodiscard]] auto end() const { return samples.end(); }
+    [[nodiscard]] auto begin() { return samples.begin(); }
+    [[nodiscard]] auto end() { return samples.end(); }
 
     void set_v_values(const Vector<V>& vals) {
         NVCHK(vals.size() == samples.size(),
@@ -464,6 +470,97 @@ template <typename T, typename V> struct Profile {
         out.reserve(samples.size());
         for (const auto& s : samples)
             out.push_back(s.v);
+        return out;
+    }
+
+    auto sub_range(T startT, T endT, bool normalizeOutputT = false,
+                   T minPointDist = 1e-3) const -> Profile<T, V> {
+
+        NVCHK(startT <= endT, "Invalid start/end T values.");
+        I32 num = (I32)samples.size();
+        NVCHK(num >= 2, "Not enough points in cline.");
+
+        T clineMinT = samples.front().t;
+        T clineMaxT = samples.back().t;
+
+        if (endT < clineMinT || startT > clineMaxT) {
+            return {};
+        }
+
+        T clampedStartT = std::clamp(startT, clineMinT, clineMaxT);
+        T clampedEndT = std::clamp(endT, clineMinT, clineMaxT);
+        NVCHK(clampedStartT <= clampedEndT, "Invalid start/end T values.");
+
+        I32 startIdx = -1;
+        I32 endIdx = -1;
+        V startPt;
+        V endPt;
+        bool useStartPt = false;
+        bool useEndPt = false;
+
+        for (I32 i = 1; i < num; ++i) {
+            if (startIdx == -1 && samples[i - 1].t <= clampedStartT &&
+                clampedStartT <= samples[i].t) {
+                auto denom = samples[i].t - samples[i - 1].t;
+                NVCHK(denom > 0.0, "Invalid consecutive T values.");
+                auto r = (clampedStartT - samples[i - 1].t) / denom;
+                startPt = samples[i - 1].v * (1.0 - r) + samples[i].v * r;
+                useStartPt = (samples[i].t - clampedStartT) > minPointDist;
+                startIdx = i;
+            }
+            if (endIdx == -1 && samples[i - 1].t <= clampedEndT &&
+                clampedEndT <= samples[i].t) {
+                auto denom = samples[i].t - samples[i - 1].t;
+                NVCHK(denom > 0.0, "Invalid consecutive T values.");
+                auto r = (clampedEndT - samples[i - 1].t) / denom;
+                endPt = samples[i - 1].v * (1.0 - r) + samples[i].v * r;
+                useEndPt = (clampedEndT - samples[i - 1].t) > minPointDist;
+                endIdx = i - 1;
+                break;
+            }
+        }
+        NVCHK(startIdx > -1 && endIdx > -1,
+              "Cannot extract sub range from samples.");
+
+        Profile<T, V> out;
+        U32 ncopy = (endIdx - startIdx + 1);
+        if (ncopy == 0 && useStartPt && useEndPt &&
+            (clampedEndT - clampedStartT) <= minPointDist) {
+            useEndPt = false; // keep only the start point
+        }
+
+        U32 n = ncopy + (useStartPt ? 1 : 0) + (useEndPt ? 1 : 0);
+
+        if (n == 0) {
+            // segment shorter than minPointDist: just emit a single
+            // representative point
+            out.samples.resize(1);
+            out[0].t = clampedStartT;
+            out[0].v = startPt; // or (startPt + endPt) * 0.5
+        } else {
+            out.samples.resize(n);
+            if (useStartPt) {
+                out[0].v = startPt;
+                out[0].t = clampedStartT;
+            }
+            if (useEndPt) {
+                out[n - 1].v = endPt;
+                out[n - 1].t = clampedEndT;
+            }
+
+            if (ncopy > 0) {
+                Sample<T, V>* ptr = out.samples.data() + (useStartPt ? 1 : 0);
+                memcpy(ptr, &samples[startIdx], ncopy * sizeof(Sample<T, V>));
+            }
+        }
+
+        if (normalizeOutputT) {
+            T trange = clampedEndT - clampedStartT;
+            for (auto& s : out) {
+                s.t = trange > 0.0 ? (s.t - clampedStartT) / trange : 0.0;
+            }
+        }
+
         return out;
     }
 
@@ -585,101 +682,8 @@ inline auto distance(const Vec4<T>& a, const Vec4<T>& b) -> T {
     return (a - b).length();
 }
 
-template <typename T, typename V>
-auto samples_sub_range(const Vector<Sample<T, V>>& cline, T startT, T endT,
-                       bool normalizeOutputT = false, T minPointDist = 1e-3)
-    -> Vector<Sample<T, V>> {
-
-    NVCHK(startT <= endT, "Invalid start/end T values.");
-    I32 num = (I32)cline.size();
-    NVCHK(num >= 2, "Not enough points in cline.");
-
-    T clineMinT = cline.front().t;
-    T clineMaxT = cline.back().t;
-
-    if (endT < clineMinT || startT > clineMaxT) {
-        return {};
-    }
-
-    T clampedStartT = std::clamp(startT, clineMinT, clineMaxT);
-    T clampedEndT = std::clamp(endT, clineMinT, clineMaxT);
-    NVCHK(clampedStartT <= clampedEndT, "Invalid start/end T values.");
-
-    I32 startIdx = -1;
-    I32 endIdx = -1;
-    V startPt;
-    V endPt;
-    bool useStartPt = false;
-    bool useEndPt = false;
-
-    for (I32 i = 1; i < num; ++i) {
-        if (startIdx == -1 && cline[i - 1].t <= clampedStartT &&
-            clampedStartT <= cline[i].t) {
-            auto denom = cline[i].t - cline[i - 1].t;
-            NVCHK(denom > 0.0, "Invalid consecutive T values.");
-            auto r = (clampedStartT - cline[i - 1].t) / denom;
-            startPt = cline[i - 1].v * (1.0 - r) + cline[i].v * r;
-            useStartPt = (cline[i].t - clampedStartT) > minPointDist;
-            startIdx = i;
-        }
-        if (endIdx == -1 && cline[i - 1].t <= clampedEndT &&
-            clampedEndT <= cline[i].t) {
-            auto denom = cline[i].t - cline[i - 1].t;
-            NVCHK(denom > 0.0, "Invalid consecutive T values.");
-            auto r = (clampedEndT - cline[i - 1].t) / denom;
-            endPt = cline[i - 1].v * (1.0 - r) + cline[i].v * r;
-            useEndPt = (clampedEndT - cline[i - 1].t) > minPointDist;
-            endIdx = i - 1;
-            break;
-        }
-    }
-    NVCHK(startIdx > -1 && endIdx > -1,
-          "Cannot extract sub range from samples.");
-
-    Vector<Sample<T, V>> out;
-    U32 ncopy = (endIdx - startIdx + 1);
-    if (ncopy == 0 && useStartPt && useEndPt &&
-        (clampedEndT - clampedStartT) <= minPointDist) {
-        useEndPt = false; // keep only the start point
-    }
-
-    U32 n = ncopy + (useStartPt ? 1 : 0) + (useEndPt ? 1 : 0);
-
-    if (n == 0) {
-        // segment shorter than minPointDist: just emit a single representative
-        // point
-        out.resize(1);
-        out[0].t = clampedStartT;
-        out[0].v = startPt; // or (startPt + endPt) * 0.5
-    } else {
-        out.resize(n);
-        if (useStartPt) {
-            out[0].v = startPt;
-            out[0].t = clampedStartT;
-        }
-        if (useEndPt) {
-            out[n - 1].v = endPt;
-            out[n - 1].t = clampedEndT;
-        }
-
-        if (ncopy > 0) {
-            Sample<T, V>* ptr = out.data() + (useStartPt ? 1 : 0);
-            memcpy(ptr, &cline[startIdx], ncopy * sizeof(Sample<T, V>));
-        }
-    }
-
-    if (normalizeOutputT) {
-        T trange = clampedEndT - clampedStartT;
-        for (auto& s : out) {
-            s.t = trange > 0.0 ? (s.t - clampedStartT) / trange : 0.0;
-        }
-    }
-
-    return out;
-}
-
-auto samples_apply_normal_offset(const Vector<SampleVec2d>& cline, F64 offset)
-    -> Vector<SampleVec2d>;
+auto samples_apply_normal_offset(const ProfileVec2d& cline, F64 offset)
+    -> ProfileVec2d;
 
 template <typename T> struct PolylineRayHit {
     T tRay{0.0};   // distance parameter along the ray

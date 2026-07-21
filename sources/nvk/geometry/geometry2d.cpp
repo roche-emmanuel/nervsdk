@@ -336,19 +336,20 @@ auto inflate_polyline2(const Polyline2d& centerLine, F64 offset, I32 joinType,
     return result;
 };
 
-auto samples_apply_normal_offset(const Vector<SampleVec2d>& cline, F64 offset)
-    -> Vector<SampleVec2d> {
-    Vector<SampleVec2d> res;
+auto samples_apply_normal_offset(const ProfileVec2d& cline, F64 offset)
+    -> ProfileVec2d {
+    ProfileVec2d res;
     U32 num = cline.size();
     NVCHK(num >= 2, "Invalid number of points.");
-    res.reserve(num);
+    res.samples.reserve(num);
     Vec2d n;
+    const auto& samples = cline.samples;
     for (I32 i = 0; i < num; ++i) {
         if (i < (num - 1)) {
-            n = (cline[i + 1].v - cline[i].v).normalized().ccw90();
+            n = (samples[i + 1].v - samples[i].v).normalized().ccw90();
         }
-        res.emplace_back(
-            SampleVec2d{.t = cline[i].t, .v = cline[i].v + n * offset});
+        res.samples.emplace_back(
+            SampleVec2d{.t = samples[i].t, .v = samples[i].v + n * offset});
     }
     return res;
 };
