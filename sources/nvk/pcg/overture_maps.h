@@ -1,6 +1,8 @@
 #ifndef _OVERTURE_MAPS_H_
 #define _OVERTURE_MAPS_H_
 
+#include <nvk/geometry/geometry2d.h>
+
 namespace nv {
 // land_use_mask — pixel value is the LandUseClass enum cast to U8.
 // 0 = background (no Overture polygon covers this pixel; WorldCover drives
@@ -430,23 +432,26 @@ void smooth_savitzky_golay_cubic(const Vector<F64>& z, U32 halfRad,
 void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
                                 F64 stepCm, F64 lookaheadCm, Vector<F64>& adj);
 
+auto build_anticipatory_profile(const ProfileVald& rawElevs, F64 stepCm,
+                                F64 lookaheadCm) -> ProfileVald;
+
 // ---------------------------------------------------------------------------
 // build_anticipatory_profile  (pinned variant — Phase 3)
 //
-// Same anticipatory smoothing as the unpinned variant, but connector pins are
-// honoured as hard constraints: each pin is an exact elevation anchor, and
-// the anticipatory passes run independently within each inter-pin span.
+// Same anticipatory smoothing as the unpinned variant, but connector pins
+// are honoured as hard constraints: each pin is an exact elevation anchor,
+// and the anticipatory passes run independently within each inter-pin span.
 //
 // This replaces the Phase-3 call to pin_segment_profile for segments that
-// already have a smoothed profile: instead of linearly interpolating between
-// pins and then cone-raising to ground, we run the full anticipatory logic
-// within each span so the interior still gets smooth grade anticipation rather
-// than a flat ramp.
+// already have a smoothed profile: instead of linearly interpolating
+// between pins and then cone-raising to ground, we run the full
+// anticipatory logic within each span so the interior still gets smooth
+// grade anticipation rather than a flat ramp.
 //
 // pins     — sorted (rib index, target elevation) pairs, raise-only guarded
-//            by the caller (i.e. pin elev >= ribs[ridx].z already enforced).
-//            Must include the endpoint pins (ridx 0 and last) — the caller
-//            in Phase 3 already guarantees this.
+//            by the caller (i.e. pin elev >= ribs[ridx].z already
+//            enforced). Must include the endpoint pins (ridx 0 and last) —
+//            the caller in Phase 3 already guarantees this.
 // adj      — output: per-rib adjusted elevation (cm), parallel to ribs[].
 // ---------------------------------------------------------------------------
 void build_anticipatory_profile(

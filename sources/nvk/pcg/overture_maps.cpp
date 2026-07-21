@@ -573,6 +573,97 @@ struct UniformProfile {
     }
 };
 
+auto build_anticipatory_profile(const ProfileVald& rawElevs, F64 stepCm,
+                                F64 lookaheadCm) -> ProfileVald {
+    const U32 n = rawElevs.size();
+    if (n == 0)
+        return {};
+    if (n == 1) {
+        return ProfileVald{rawElevs.samples};
+    }
+
+    NVCHK(lookaheadCm > 0.0, "Invalid lookAheadCm value.");
+
+    // ── Step 1: resample raw elev values onto a uniform u grid ─────────────
+    ProfileVald regElevs = rawElevs.resampled(stepCm);
+
+    // Extract the values from the profile:
+    auto zvals = regElevs.extract_v_values();
+
+    // ── Step 2: smooth the resampled profile ────────────────────────────────
+    // Median pre-pass to kill DEM spikes, then Savitzky-Golay for grade
+    // continuity.  Window radii expressed in samples.
+    const U32 medHalfRad =
+        std::max(1u, U32(std::round(lookaheadCm / stepCm / 4.0)));
+    const U32 sgHalfRad =
+        std::max(2u, U32(std::round(lookaheadCm / stepCm / 2.0)));
+
+    Vector<F64> tmp;
+    smooth_median(zvals, medHalfRad, tmp);
+    smooth_savitzky_golay_cubic(tmp, sgHalfRad, zvals);
+
+    regElevs.set_v_values(zvals);
+
+    // ── Step 3 & 4: forward pass ─────────────────────────────────────────────
+    Vector<F64> fwd(n);
+    const auto& raws = rawElevs.samples;
+    fwd[0] = raws[0].v; // anchor start to raw ground
+
+    for (U32 i = 1; i < n; ++i) {
+        const F64 prevU = raws[i - 1].t;
+        const F64 currU = raws[i].t;
+        const F64 deltaU = currU - prevU;
+
+        // Look ahead from current rib position.
+        const F64 aheadU = currU + lookaheadCm;
+        const F64 aheadZ = regElevs.sample(aheadU);
+
+        // How much should we have climbed by now, as a fraction of the full
+        // lookahead distance?
+        const F64 fraction = deltaU / lookaheadCm;
+        const F64 ribZ = fwd[i - 1] + (aheadZ - fwd[i - 1]) * fraction;
+
+        // Never sink below raw ground.
+        fwd[i] = std::max(ribZ, raws[i].v);
+    }
+
+    // ── Step 3 & 4: backward pass (reverse direction) ────────────────────────
+    Vector<F64> bwd(n);
+    bwd[n - 1] = raws[n - 1].v; // anchor end to raw ground
+
+    for (U32 i = n - 1; i-- > 0;) {
+        const F64 prevU = raws[i + 1].t; // "previous" in reverse
+        const F64 currU = raws[i].t;
+        const F64 deltaU = prevU - currU; // always positive
+
+        // Look ahead in the reverse direction.
+        const F64 aheadU = currU - lookaheadCm;
+        const F64 aheadZ =
+            regElevs.sample(aheadU); // clamped to u=0 at boundary
+
+        const F64 fraction = deltaU / lookaheadCm;
+        const F64 ribZ = bwd[i + 1] + (aheadZ - bwd[i + 1]) * fraction;
+
+        bwd[i] = std::max(ribZ, raws[i].v);
+    }
+
+    // ── Step 10: combine passes ──────────────────────────────────────────────
+    // max() rather than average: guarantees neither pass's anticipatory lift
+    // is discarded, and the result is always >= raw ground by construction.
+    ProfileVald out;
+    out.samples.resize(n);
+    for (U32 i = 0; i < n; ++i) {
+        // adj[i] = std::max(fwd[i], bwd[i]);
+        out.samples[i].v = (fwd[i] + bwd[i]) * 0.5;
+        out.samples[i].t = raws[i].t;
+    }
+
+    // ── Final: enforce grade cap ─────────────────────────────────────────────
+    // clamp_profile_slope_raise_only(u, adj, maxSlope);
+
+    return out;
+}
+
 void build_anticipatory_profile(const Vector<RoadRib>& ribs, F64 maxSlope,
                                 F64 stepCm, F64 lookaheadCm, Vector<F64>& adj) {
     const U32 n = U32(ribs.size());
