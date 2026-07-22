@@ -829,6 +829,21 @@ enum PathEndType {
     PATH_END_ROUND,
 };
 
+template <typename T> auto polyline2_length(const Vector<Vec2<T>>& pts) -> T {
+    T len = 0;
+    if (pts.size() < 2) {
+        return len;
+    }
+    for (I32 i = 1; i < pts.size(); ++i) {
+        len += (pts[i] - pts[i - 1]).length();
+    }
+    return len;
+}
+
+template <typename T> auto polyline2_length(const Polyline2<T>& line) -> T {
+    return polyline2_length(line.points);
+}
+
 auto inflate_polyline2(const Polyline2f& centerLine, F32 offset,
                        I32 joinType = PATH_JOIN_ROUND,
                        I32 endType = PATH_END_ROUND) -> Vector<Polygon2f>;
