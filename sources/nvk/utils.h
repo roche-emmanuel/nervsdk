@@ -460,6 +460,9 @@ auto mix_bits64(U64 x) -> U64;
 
 auto hash_id_with_seed(U64 id, U32 seed) -> U32;
 
+auto build_connected_chains(const Vector<std::pair<I32, I32>>& links)
+    -> Vector<Vector<I32>>;
+
 } // namespace nv
 
 #endif

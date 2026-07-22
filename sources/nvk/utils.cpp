@@ -1528,4 +1528,80 @@ auto hash_id_with_seed(U64 id, U32 seed) -> U32 {
     // so entropy from the high bits isn't discarded.
     return static_cast<U32>(mixed ^ (mixed >> 32));
 }
+
+auto build_connected_chains(const Vector<std::pair<I32, I32>>& links)
+    -> Vector<Vector<I32>> {
+    // ── Map each distinct I32 value to a dense index [0..n) ────────────────
+    UnorderedMap<I32, U32> valueToIdx;
+    Vector<I32> idxToValue;
+    valueToIdx.reserve(links.size() * 2);
+    idxToValue.reserve(links.size() * 2);
+
+    auto internValue = [&](I32 v) -> U32 {
+        auto it = valueToIdx.find(v);
+        if (it != valueToIdx.end())
+            return it->second;
+        U32 idx = U32(idxToValue.size());
+        idxToValue.push_back(v);
+        valueToIdx.emplace(v, idx);
+        return idx;
+    };
+
+    for (const auto& [a, b] : links) {
+        internValue(a);
+        internValue(b);
+    }
+
+    // ── Disjoint set over dense indices ────────────────────────────────────
+    struct disjointSet {
+        Vector<U32> parent;
+        Vector<U32> rank;
+
+        explicit disjointSet(U32 n) {
+            parent.resize(n);
+            rank.resize(n, 0);
+            for (U32 i = 0; i < n; ++i)
+                parent[i] = i;
+        }
+
+        auto find(U32 x) -> U32 {
+            while (parent[x] != x) {
+                parent[x] = parent[parent[x]]; // path halving
+                x = parent[x];
+            }
+            return x;
+        }
+
+        void unite(U32 a, U32 b) {
+            U32 ra = find(a);
+            U32 rb = find(b);
+            if (ra == rb)
+                return;
+            if (rank[ra] < rank[rb])
+                std::swap(ra, rb);
+            parent[rb] = ra;
+            if (rank[ra] == rank[rb])
+                ++rank[ra];
+        }
+    };
+
+    disjointSet ds(U32(idxToValue.size()));
+
+    for (const auto& [a, b] : links)
+        ds.unite(valueToIdx[a], valueToIdx[b]);
+
+    // ── Group members by root ───────────────────────────────────────────────
+    UnorderedMap<U32, Vector<I32>> clusters;
+    clusters.reserve(idxToValue.size());
+    for (U32 i = 0; i < idxToValue.size(); ++i)
+        clusters[ds.find(i)].push_back(idxToValue[i]);
+
+    Vector<Vector<I32>> chains;
+    chains.reserve(clusters.size());
+    for (auto& [root, members] : clusters)
+        chains.push_back(std::move(members));
+
+    return chains;
+}
+
 } // namespace nv
