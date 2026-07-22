@@ -504,7 +504,8 @@ template <typename T, typename V> struct Profile {
                 auto denom = samples[i].t - samples[i - 1].t;
                 NVCHK(denom > 0.0, "Invalid consecutive T values.");
                 auto r = (clampedStartT - samples[i - 1].t) / denom;
-                startPt = samples[i - 1].v * (1.0 - r) + samples[i].v * r;
+                // startPt = samples[i - 1].v * (1.0 - r) + samples[i].v * r;
+                startPt = lerp_sample(samples[i - 1].v, samples[i].v, r);
                 useStartPt = (samples[i].t - clampedStartT) > minPointDist;
                 startIdx = i;
             }
@@ -513,7 +514,8 @@ template <typename T, typename V> struct Profile {
                 auto denom = samples[i].t - samples[i - 1].t;
                 NVCHK(denom > 0.0, "Invalid consecutive T values.");
                 auto r = (clampedEndT - samples[i - 1].t) / denom;
-                endPt = samples[i - 1].v * (1.0 - r) + samples[i].v * r;
+                // endPt = samples[i - 1].v * (1.0 - r) + samples[i].v * r;
+                endPt = lerp_sample(samples[i - 1].v, samples[i].v, r);
                 useEndPt = (clampedEndT - samples[i - 1].t) > minPointDist;
                 endIdx = i - 1;
                 break;
