@@ -376,8 +376,135 @@ auto polygon_signed_area_2d(const Vec3<T>* polygon, U32 size,
     return signed_twice_area * T(0.5);
 }
 
-template <typename T> void polyline_reverse(Vector<Vec2<T>>& line) {
+template <typename T> void polyline2_reverse(Vector<Vec2<T>>& line) {
     std::reverse(line.begin(), line.end());
+}
+
+template <typename T> auto polyline2_length(const Vector<Vec2<T>>& pts) -> T {
+    T len = 0;
+    if (pts.size() < 2) {
+        return len;
+    }
+    for (I32 i = 1; i < pts.size(); ++i) {
+        len += (pts[i] - pts[i - 1]).length();
+    }
+    return len;
+}
+
+template <typename T> struct Polyline2Hit {
+    Vec2<T> pos;
+    T distA{0.0}; // arc-length along polyline A from its first point
+    T distB{0.0}; // arc-length along polyline B from its first point
+};
+
+// Finds the first intersection between polylines a and b, walking a from its
+// start outward. "First" means the hit with the smallest arc-length along a
+// (and, within a single a-segment, the smallest local distance). Returns true
+// and fills hit when an intersection exists, false otherwise (parallel or
+// diverging polylines).
+//
+// Cost is O(numSegsA * numSegsB) worst case but exits on the first hit, which
+// for junction corner borders is typically found within the first few
+// segments.
+template <typename T>
+auto polyline2_find_first_intersection(const Vector<Vec2<T>>& pa,
+                                       const Vector<Vec2<T>>& pb,
+                                       Polyline2Hit<T>& hit) -> bool {
+    if (pa.size() < 2 || pb.size() < 2) {
+        return false;
+    }
+
+    // Cumulative arc-lengths along b (a's arc-length is accumulated on the
+    // fly in the outer loop):
+    Vector<F64> cumB(pb.size(), 0.0);
+    for (U32 k = 1; k < pb.size(); ++k) {
+        cumB[k] = cumB[k - 1] + (pb[k] - pb[k - 1]).length();
+    }
+
+    F64 cumA = 0.0;
+    for (U32 i = 0; i + 1 < pa.size(); ++i) {
+        const Vec2d& a0 = pa[i];
+        const Vec2d& a1 = pa[i + 1];
+
+        // Keep the hit with the smallest local distance along this a-segment
+        // so "first along a" is well defined even with multiple b crossings:
+        bool found = false;
+        F64 bestDistA = 0.0;
+
+        for (U32 k = 0; k + 1 < pb.size(); ++k) {
+            Vec2d ip;
+            if (!seg2_intersect(a0, a1, pb[k], pb[k + 1], ip)) {
+                continue;
+            }
+            F64 dA = (ip - a0).length();
+            if (!found || dA < bestDistA) {
+                found = true;
+                bestDistA = dA;
+                hit.pos = ip;
+                hit.distA = cumA + dA;
+                hit.distB = cumB[k] + (ip - pb[k]).length();
+            }
+        }
+
+        if (found) {
+            return true;
+        }
+        cumA += (a1 - a0).length();
+    }
+
+    return false;
+}
+
+template <typename T>
+auto polyline2_sample_at(const Vector<Vec2<T>>& pts, T dist) -> Vec2<T> {
+    NVCHK(pts.size() >= 2, "Polyline2::sample_at: need >= 2 points.");
+
+    if (dist <= 0.0) {
+        return pts.front();
+    }
+
+    F64 cum = 0.0;
+    for (U32 i = 1; i < pts.size(); ++i) {
+        F64 len = (pts[i] - pts[i - 1]).length();
+        if (dist <= (cum + len)) {
+            F64 x = len > 0.0 ? (dist - cum) / len : 0.0;
+            return pts[i - 1] * (1.0 - x) + pts[i] * x;
+        }
+        cum += len;
+    }
+
+    return pts.back();
+}
+
+template <typename T>
+auto polyline2_append_slice(Vector<Vec2<T>>& out, const Vector<Vec2<T>>& pts,
+                            T d0, T d1, T eps = 0.01) {
+    // 0.01 cm guard band around the bounds (see header comment):
+    const bool reversed = d0 > d1;
+    T lo = std::min(d0, d1) + eps;
+    T hi = std::max(d0, d1) - eps;
+    if (hi <= lo) {
+        return;
+    }
+
+    auto mark = I64(out.size());
+
+    T cum = 0.0;
+    for (U32 i = 0; i < pts.size(); ++i) {
+        if (i > 0) {
+            cum += (pts[i] - pts[i - 1]).length();
+        }
+        if (cum > hi) {
+            break;
+        }
+        if (cum >= lo) {
+            out.push_back(pts[i]);
+        }
+    }
+
+    if (reversed) {
+        std::reverse(out.begin() + mark, out.end());
+    }
 }
 
 template <typename T> struct Polyline2 {
@@ -385,10 +512,83 @@ template <typename T> struct Polyline2 {
     Vector<Vec2<T>> points;
     bool closedLoop{false};
 
-    void reverse() { polyline_reverse(points); }
+    void reverse() { polyline2_reverse(points); }
     void append(const Polyline2<T>& rhs) {
         points.reserve(points.size() + rhs.points.size());
         points.insert(points.end(), rhs.points.begin(), rhs.points.end());
+    }
+
+    // Returns the point at the given arc-length along the polyline, clamped to
+    // [0, total length].
+    auto sample_at(T dist) const -> Vec2<T> {
+        return polyline2_sample_at(points, dist);
+    }
+
+    auto length() const -> T { return polyline2_length(points); }
+
+    // Appends to out the polyline vertices whose arc-length lies strictly
+    // inside (min(d0,d1)+eps, max(d0,d1)-eps), ordered from d0 towards d1 (i.e.
+    // the output is reversed when d0 > d1). The 1 cm eps guard band avoids
+    // emitting near-duplicates of the boundary points the caller inserts itself
+    // (seam points, corner apexes).
+    void append_slice(const Vector<Vec2<T>>& pts, T d0, T d1, T eps = 0.01) {
+        polyline2_append_slice(points, pts, d0, d1, eps);
+    }
+
+    void append_polyline2_slice(const Polyline2<T>& line, T d0, T d1) {
+        append_polyline2_slice(line.points, d0, d1);
+    }
+
+    // Appends to out the sampled points of an arc around center going from the
+    // angle of `from` to the angle of `to` (endpoints excluded), rotating CCW
+    // when ccw is true, CW otherwise. The radius is linearly interpolated
+    // between |from-center| and |to-center| so slightly off-circle endpoints
+    // still produce a smooth blend. The angular step is derived from
+    // sampleDistCm at the largest radius. No-op when either endpoint coincides
+    // with center.
+    void append_arc_points(const Vec2<T>& center, const Vec2<T>& from,
+                           const Vec2<T>& to, bool ccw, T sampleDistCm) {
+
+        auto va = from - center;
+        auto vb = to - center;
+        T ra = va.length();
+        T rb = vb.length();
+        if (ra < 1e-6 || rb < 1e-6) {
+            return;
+        }
+
+        T a0 = std::atan2(va.y(), va.x());
+        T a1 = std::atan2(vb.y(), vb.x());
+
+        T sweep = a1 - a0;
+        if (ccw) {
+            while (sweep <= 0.0) {
+                sweep += 2.0 * PI;
+            }
+        } else {
+            while (sweep >= 0.0) {
+                sweep -= 2.0 * PI;
+            }
+        }
+
+        NVCHK(sampleDistCm > 0.0,
+              "append_arc_points: invalid sample distance.");
+        F64 rmax = std::max(ra, rb);
+        U32 nsegs =
+            std::max(2u, U32(std::ceil(std::abs(sweep) * rmax / sampleDistCm)));
+
+        for (U32 k = 1; k < nsegs; ++k) {
+            F64 x = F64(k) / F64(nsegs);
+            F64 ang = a0 + sweep * x;
+            F64 r = ra + (rb - ra) * x;
+            points.emplace_back(center +
+                                Vec2d{std::cos(ang), std::sin(ang)} * r);
+        }
+    }
+
+    auto find_first_intersection(const Polyline2<T>& pb, Polyline2Hit<T>& hit)
+        -> bool {
+        return polyline2_find_first_intersection(points, pb.points, hit);
     }
 };
 
@@ -868,21 +1068,6 @@ enum PathEndType {
     PATH_END_SQUARE,
     PATH_END_ROUND,
 };
-
-template <typename T> auto polyline2_length(const Vector<Vec2<T>>& pts) -> T {
-    T len = 0;
-    if (pts.size() < 2) {
-        return len;
-    }
-    for (I32 i = 1; i < pts.size(); ++i) {
-        len += (pts[i] - pts[i - 1]).length();
-    }
-    return len;
-}
-
-template <typename T> auto polyline2_length(const Polyline2<T>& line) -> T {
-    return polyline2_length(line.points);
-}
 
 auto inflate_polyline2(const Polyline2f& centerLine, F32 offset,
                        I32 joinType = PATH_JOIN_ROUND,
