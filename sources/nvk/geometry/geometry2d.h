@@ -853,6 +853,15 @@ auto inflate_polyline2(const Polyline2d& centerLine, F64 offset,
                        I32 endType = PATH_END_ROUND) -> Vector<Polygon2d>;
 
 // ---------------------------------------------------------------------------
+// convex_hull  (Andrew's monotone chain)
+//
+// Lexicographic sort + lower/upper chain. Collinear points are dropped (strict
+// turn test), so the result is a minimal CCW hull with no repeated closing
+// vertex. Returns empty when fewer than 3 non-collinear points remain.
+// ---------------------------------------------------------------------------
+auto build_convex_hull(Vector<Vec2d> pts) -> Vector<Vec2d>;
+
+// ---------------------------------------------------------------------------
 // Region2 — a planar region: one outer boundary ring + zero or more holes.
 //
 // Convention (matches Clipper2 / GeoJSON / earcut expectations):

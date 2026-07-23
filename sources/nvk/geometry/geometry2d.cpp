@@ -353,4 +353,39 @@ auto samples_apply_normal_offset(const ProfileVec2d& cline, F64 offset)
     }
     return res;
 };
+auto build_convex_hull(Vector<Vec2d> pts) -> Vector<Vec2d> {
+    std::sort(pts.begin(), pts.end()); // Vec2d::operator< is (x, then y)
+    pts.erase(std::unique(pts.begin(), pts.end()), pts.end());
+
+    const U32 n = U32(pts.size());
+    if (n < 3)
+        return {};
+
+    // (a-o) x (b-o) > 0  ⇔  o→a→b turns left (CCW).
+    auto turn = [](const Vec2d& o, const Vec2d& a, const Vec2d& b) -> F64 {
+        return (a - o).cross(b - o);
+    };
+
+    Vector<Vec2d> hull(2 * n);
+    U32 k = 0;
+
+    // Lower chain (left→right).
+    for (U32 i = 0; i < n; ++i) {
+        while (k >= 2 && turn(hull[k - 2], hull[k - 1], pts[i]) <= 0.0)
+            --k;
+        hull[k++] = pts[i];
+    }
+    // Upper chain (right→left); starts one past the lower chain's last point.
+    const U32 lower = k + 1;
+    for (I32 i = I32(n) - 2; i >= 0; --i) {
+        while (k >= lower && turn(hull[k - 2], hull[k - 1], pts[i]) <= 0.0)
+            --k;
+        hull[k++] = pts[i];
+    }
+
+    hull.resize(k - 1); // last == first, drop the duplicate
+    if (hull.size() < 3)
+        return {}; // everything was collinear
+    return hull;
+}
 }; // namespace nv
