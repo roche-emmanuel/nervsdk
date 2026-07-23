@@ -507,6 +507,33 @@ auto polyline2_append_slice(Vector<Vec2<T>>& out, const Vector<Vec2<T>>& pts,
     }
 }
 
+// Removes consecutive near-duplicate points (including the wrap-around pair)
+// from a closed polygon point loop.
+template <typename T>
+auto polyline2_dedupe_points(Vector<Vec2<T>>& pts, bool closedLoop = false)
+    -> U32 {
+    constexpr F64 kMinSpacingCm = 0.01;
+
+    U32 count = 0;
+    Vector<Vec2<T>> out;
+    out.reserve(pts.size());
+    for (const auto& pt : pts) {
+        if (!out.empty() && (pt - out.back()).length() < kMinSpacingCm) {
+            count++;
+            continue;
+        }
+        out.push_back(pt);
+    }
+
+    while (closedLoop && out.size() >= 2 &&
+           (out.back() - out.front()).length() < kMinSpacingCm) {
+        count++;
+        out.pop_back();
+    }
+    pts = std::move(out);
+    return count;
+}
+
 template <typename T> struct Polyline2 {
     I32 id{-1};
     Vector<Vec2<T>> points;
@@ -525,6 +552,10 @@ template <typename T> struct Polyline2 {
     }
 
     auto length() const -> T { return polyline2_length(points); }
+
+    auto dedupe_points() -> U32 {
+        return polyline2_dedupe_points(points, closedLoop);
+    }
 
     // Appends to out the polyline vertices whose arc-length lies strictly
     // inside (min(d0,d1)+eps, max(d0,d1)-eps), ordered from d0 towards d1 (i.e.
@@ -969,6 +1000,10 @@ template <typename T> struct Polygon2 {
     explicit Polygon2(Vector<Vec2<T>> input) : coords(std::move(input)) {};
 
     [[nodiscard]] auto size() const -> size_t { return coords.size(); }
+
+    auto dedupe_points() -> U32 {
+        return polyline2_dedupe_points(coords, true);
+    }
 };
 
 using Polygon2f = Polygon2<F32>;
