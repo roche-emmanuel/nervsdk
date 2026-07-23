@@ -7,6 +7,13 @@
 
 namespace nv {
 
+enum PolygonFillRule {
+    FILL_EVENODD,
+    FILL_NONZERO,
+    FILL_POSITIVE,
+    FILL_NEGATIVE,
+};
+
 template <typename T>
 auto seg2_intersect(const Vec2<T>& seg0_a, const Vec2<T>& seg0_b,
                     const Vec2<T>& seg1_a, const Vec2<T>& seg1_b,
@@ -369,10 +376,20 @@ auto polygon_signed_area_2d(const Vec3<T>* polygon, U32 size,
     return signed_twice_area * T(0.5);
 }
 
+template <typename T> void polyline_reverse(Vector<Vec2<T>>& line) {
+    std::reverse(line.begin(), line.end());
+}
+
 template <typename T> struct Polyline2 {
     I32 id{-1};
     Vector<Vec2<T>> points;
     bool closedLoop{false};
+
+    void reverse() { polyline_reverse(points); }
+    void append(const Polyline2<T>& rhs) {
+        points.reserve(points.size() + rhs.points.size());
+        points.insert(points.end(), rhs.points.begin(), rhs.points.end());
+    }
 };
 
 template <typename T> using Polyline2Vector = Vector<Polyline2<T>>;
@@ -747,11 +764,30 @@ auto polyline_ray_intersections(const Vec2<T>& origin, const Vec2<T>& dir,
 template <typename T> struct Polygon2 {
     Vector<Vec2<T>> coords;
 
+    Polygon2() = default;
+    // Polygon2(Polygon2&& rhs) = default;
+    explicit Polygon2(Vector<Vec2<T>> input) : coords(std::move(input)) {};
+
     [[nodiscard]] auto size() const -> size_t { return coords.size(); }
 };
 
 using Polygon2f = Polygon2<F32>;
 using Polygon2d = Polygon2<F64>;
+
+auto polygon2_union(const Vector<Polygon2d>& inputs,
+                    I32 fillRule = FILL_NONZERO) -> Vector<Polygon2d>;
+
+auto polygon2_difference(const Vector<Polygon2d>& subjects,
+                         const Vector<Polygon2d>& clips,
+                         I32 fillRule = FILL_NONZERO) -> Vector<Polygon2d>;
+
+auto polygon2_intersection(const Vector<Polygon2d>& subjects,
+                           const Vector<Polygon2d>& clips,
+                           I32 fillRule = FILL_NONZERO) -> Vector<Polygon2d>;
+
+auto polygon2_xor(const Vector<Polygon2d>& subjects,
+                  const Vector<Polygon2d>& clips, I32 fillRule = FILL_NONZERO)
+    -> Vector<Polygon2d>;
 
 template <typename T> struct Segment2 {
     Vec2<T> a;
@@ -859,7 +895,7 @@ auto inflate_polyline2(const Polyline2d& centerLine, F64 offset,
 // turn test), so the result is a minimal CCW hull with no repeated closing
 // vertex. Returns empty when fewer than 3 non-collinear points remain.
 // ---------------------------------------------------------------------------
-auto build_convex_hull(Vector<Vec2d> pts) -> Vector<Vec2d>;
+auto build_convex_hull(Vector<Vec2d> pts) -> Polygon2d;
 
 // ---------------------------------------------------------------------------
 // Region2 — a planar region: one outer boundary ring + zero or more holes.

@@ -244,6 +244,43 @@ auto findEndpointNearSegments(const Polyline2Vector<T>& paths,
 //     return result;
 // }
 
+auto polygon2_to_path(const Polygon2d& poly) -> Clipper2Lib::PathD {
+    Clipper2Lib::PathD path;
+    path.reserve(poly.coords.size());
+    for (const auto& pt : poly.coords) {
+        path.emplace_back(pt.x(), pt.y());
+    }
+    return path;
+}
+
+auto polygon2_vector_to_paths(const Vector<Polygon2d>& polys)
+    -> Clipper2Lib::PathsD {
+    Clipper2Lib::PathsD paths;
+    paths.reserve(polys.size());
+    for (const auto& poly : polys) {
+        paths.push_back(polygon2_to_path(poly));
+    }
+    return paths;
+}
+
+auto paths_to_polygon2_vector(const Clipper2Lib::PathsD& paths)
+    -> Vector<Polygon2d> {
+    Vector<Polygon2d> result;
+    result.reserve(paths.size());
+    for (const auto& ring : paths) {
+        if (ring.size() < 3) {
+            continue;
+        }
+        Polygon2d poly;
+        poly.coords.reserve(ring.size());
+        for (const auto& pt : ring) {
+            poly.coords.emplace_back(pt.x, pt.y);
+        }
+        result.push_back(std::move(poly));
+    }
+    return result;
+}
+
 } // namespace
 
 auto compute_polyline2_intersections(const Polyline2Vector<F32>& paths,
@@ -353,7 +390,7 @@ auto samples_apply_normal_offset(const ProfileVec2d& cline, F64 offset)
     }
     return res;
 };
-auto build_convex_hull(Vector<Vec2d> pts) -> Vector<Vec2d> {
+auto build_convex_hull(Vector<Vec2d> pts) -> Polygon2d {
     std::sort(pts.begin(), pts.end()); // Vec2d::operator< is (x, then y)
     pts.erase(std::unique(pts.begin(), pts.end()), pts.end());
 
@@ -386,6 +423,41 @@ auto build_convex_hull(Vector<Vec2d> pts) -> Vector<Vec2d> {
     hull.resize(k - 1); // last == first, drop the duplicate
     if (hull.size() < 3)
         return {}; // everything was collinear
-    return hull;
+    return Polygon2d{std::move(hull)};
+}
+
+auto polygon2_union(const Vector<Polygon2d>& inputs, I32 fillRule)
+    -> Vector<Polygon2d> {
+    Clipper2Lib::PathsD subjectPaths = polygon2_vector_to_paths(inputs);
+    Clipper2Lib::PathsD solution =
+        Clipper2Lib::Union(subjectPaths, (Clipper2Lib::FillRule)fillRule);
+    return paths_to_polygon2_vector(solution);
+}
+auto polygon2_difference(const Vector<Polygon2d>& subjects,
+                         const Vector<Polygon2d>& clips, I32 fillRule)
+    -> Vector<Polygon2d> {
+    Clipper2Lib::PathsD subjectPaths = polygon2_vector_to_paths(subjects);
+    Clipper2Lib::PathsD clipPaths = polygon2_vector_to_paths(clips);
+    Clipper2Lib::PathsD solution = Clipper2Lib::Difference(
+        subjectPaths, clipPaths, (Clipper2Lib::FillRule)fillRule);
+    return paths_to_polygon2_vector(solution);
+}
+auto polygon2_intersection(const Vector<Polygon2d>& subjects,
+                           const Vector<Polygon2d>& clips, I32 fillRule)
+    -> Vector<Polygon2d> {
+    Clipper2Lib::PathsD subjectPaths = polygon2_vector_to_paths(subjects);
+    Clipper2Lib::PathsD clipPaths = polygon2_vector_to_paths(clips);
+    Clipper2Lib::PathsD solution = Clipper2Lib::Intersect(
+        subjectPaths, clipPaths, (Clipper2Lib::FillRule)fillRule);
+    return paths_to_polygon2_vector(solution);
+}
+auto polygon2_xor(const Vector<Polygon2d>& subjects,
+                  const Vector<Polygon2d>& clips, I32 fillRule)
+    -> Vector<Polygon2d> {
+    Clipper2Lib::PathsD subjectPaths = polygon2_vector_to_paths(subjects);
+    Clipper2Lib::PathsD clipPaths = polygon2_vector_to_paths(clips);
+    Clipper2Lib::PathsD solution = Clipper2Lib::Xor(
+        subjectPaths, clipPaths, (Clipper2Lib::FillRule)fillRule);
+    return paths_to_polygon2_vector(solution);
 }
 }; // namespace nv
