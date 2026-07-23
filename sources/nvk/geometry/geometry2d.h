@@ -789,6 +789,10 @@ auto polygon2_xor(const Vector<Polygon2d>& subjects,
                   const Vector<Polygon2d>& clips, I32 fillRule = FILL_NONZERO)
     -> Vector<Polygon2d>;
 
+auto polygon2_area(const Polygon2d& poly) -> F64;
+
+auto polygon2_is_positive_orientation(const Polygon2d& poly) -> bool;
+
 template <typename T> struct Segment2 {
     Vec2<T> a;
     Vec2<T> b;

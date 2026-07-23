@@ -460,4 +460,21 @@ auto polygon2_xor(const Vector<Polygon2d>& subjects,
         subjectPaths, clipPaths, (Clipper2Lib::FillRule)fillRule);
     return paths_to_polygon2_vector(solution);
 }
+auto polygon2_area(const Polygon2d& poly) -> F64 {
+    const auto& coords = poly.coords;
+    if (coords.size() < 3) {
+        return 0.0;
+    }
+    F64 area = 0.0;
+    const size_t n = coords.size();
+    for (size_t i = 0; i < n; ++i) {
+        const auto& p0 = coords[i];
+        const auto& p1 = coords[(i + 1) % n];
+        area += p0.x() * p1.y() - p1.x() * p0.y();
+    }
+    return area * 0.5;
+}
+auto polygon2_is_positive_orientation(const Polygon2d& poly) -> bool {
+    return polygon2_area(poly) > 0.0;
+}
 }; // namespace nv
