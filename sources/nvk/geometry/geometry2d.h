@@ -663,6 +663,37 @@ template <typename T, typename V> struct Profile {
                   });
     }
 
+    auto get_segment_index(T t, bool clamp = true) -> I32 {
+        if (samples.empty()) {
+            return -1;
+        }
+
+        if (clamp) {
+            t = std::clamp(t, samples.front().t, samples.back().t);
+        }
+
+        if (t < samples.front().t || t > samples.back().t)
+            return -1;
+
+        for (I32 i = 1; i < samples.size(); ++i) {
+            if (samples[i - 1].t <= t && t < samples[i].t) {
+                return i - 1;
+            }
+        }
+
+        THROW_MSG("Should not be reached.");
+        return -1;
+    }
+
+    auto get_closest_sample_index(T t) -> I32 {
+        if (samples.empty()) {
+            return -1;
+        }
+        auto idx = get_segment_index(t, true);
+        NVCHK(idx >= 0, "Invalid segment index.");
+        return (t - samples[idx].t) > (samples[idx + 1].t - t) ? idx + 1 : idx;
+    }
+
     void add_sample(T t, V v) {
         const auto pos = std::upper_bound(
             samples.begin(), samples.end(), t,
