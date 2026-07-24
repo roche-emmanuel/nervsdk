@@ -13,6 +13,8 @@ template <typename T> struct Polygon2 {
 
     [[nodiscard]] auto size() const -> size_t { return coords.size(); }
 
+    [[nodiscard]] auto empty() const -> bool { return coords.empty(); }
+
     auto dedupe_points() -> U32 {
         return polyline2_dedupe_points(coords, true);
     }
