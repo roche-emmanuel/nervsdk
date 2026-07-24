@@ -139,6 +139,11 @@ template <> inline auto isNaN(uint32_t v) -> bool { return false; }
 
 template <typename T> struct Range;
 
+template <typename T> auto smoothstep01(T t) -> T {
+    t = std::clamp(t, T(0.0), T(1.0));
+    return t * t * (3.0 - 2.0 * t);
+}
+
 } // namespace nv
 
 #endif
