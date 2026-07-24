@@ -50,6 +50,9 @@ auto inflate_polyline2(const Polyline2d& centerLine, F64 offset,
                        I32 joinType = PATH_JOIN_ROUND,
                        I32 endType = PATH_END_ROUND) -> Vector<Polygon2d>;
 
+auto polygon2_triangulate(const Vector<Vec2d>& poly, U32 indexOffset, bool ccw)
+    -> Vector<U32>;
+
 // ---------------------------------------------------------------------------
 // convex_hull  (Andrew's monotone chain)
 //

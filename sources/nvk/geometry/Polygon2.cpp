@@ -189,4 +189,22 @@ auto build_convex_hull(Vector<Vec2d> pts) -> Polygon2d {
     return Polygon2d{std::move(hull)};
 }
 
+auto polygon2_triangulate(const Vector<Vec2d>& poly, U32 indexOffset, bool ccw)
+    -> Vector<U32> {
+    using Point = std::array<F64, 2>;
+    std::vector<std::vector<Point>> polygon;
+    auto& ring = polygon.emplace_back();
+    ring.reserve(poly.size());
+    for (const auto& p : poly)
+        ring.push_back({p.x(), p.y()});
+
+    auto raw = mapbox::earcut<U32>(polygon);
+    for (auto& idx : raw)
+        idx += indexOffset;
+
+    if (!ccw)
+        std::ranges::reverse(raw);
+
+    return raw;
+}
 } // namespace nv
