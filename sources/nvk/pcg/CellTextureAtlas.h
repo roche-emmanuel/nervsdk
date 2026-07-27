@@ -65,6 +65,8 @@ class CellTextureAtlasLayout {
     explicit CellTextureAtlasLayout(const CellTextureAtlasDesc& desc,
                                     const String& dataDir);
 
+    [[nodiscard]] auto find_cell_texture_desc(const String& id) const
+        -> const CellTextureDesc*;
     [[nodiscard]] auto get_cell_texture_desc(const String& id) const
         -> const CellTextureDesc&;
 

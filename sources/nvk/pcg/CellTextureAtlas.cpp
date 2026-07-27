@@ -99,12 +99,21 @@ void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
     generate_category_map();
 }
 
+auto CellTextureAtlasLayout::find_cell_texture_desc(const String& id) const
+    -> const CellTextureDesc* {
+    auto it = _descById.find(id);
+    if (it == _descById.end()) {
+        return nullptr;
+    }
+    return &it->second;
+}
+
 auto CellTextureAtlasLayout::get_cell_texture_desc(const String& id) const
     -> const CellTextureDesc& {
-    auto it = _descById.find(id);
-    NVCHK(it != _descById.end(),
-          "CellTextureAtlasLayout: unknown texture id '{}'.", id);
-    return it->second;
+    const auto* desc = find_cell_texture_desc(id);
+    NVCHK(desc != nullptr, "CellTextureAtlasLayout: unknown texture id '{}'.",
+          id);
+    return *desc;
 }
 
 auto CellTextureAtlasLayout::find_free_slot(U32 layer, I32 xsize, I32 ysize,
