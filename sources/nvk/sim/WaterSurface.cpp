@@ -163,22 +163,51 @@ void GerstnerWaterSurface::build_waves() {
 
     // Distribute the requested steepness across the set so that
     // Σ q_i k_i A_i == cfg.steepness ≤ 1, which is the self-intersection bound.
-    const F64 totalSteepness = clamp(_cfg.steepness, 0.0, 1.0);
+    // Steepness q is the fraction of the *physical* trochoid horizontal
+    // displacement applied, shared by every component: q = 1 reproduces a real
+    // deep-water wave, whose horizontal orbital amplitude equals its vertical
+    // amplitude. Anything above 1 would put more horizontal than vertical
+    // motion into the wave, which inflates the Stokes drift quadratically for
+    // no physical reason, so the knob is clamped to [0, 1].
+    //
+    // Self-intersection additionally requires Σ q kᵢ Aᵢ ≤ 1, and the
+    // fixed-point inversion in invert_position() contracts by exactly that
+    // factor — so a spectrum sitting right on the folding bound would also be
+    // one the inversion cannot solve. Cap well below it, which keeps both
+    // comfortable. On a realistic sea Σ kᵢ Aᵢ is around 0.15 and the guard
+    // never fires; only a hand-authored short-and-tall spectrum trips it.
+    constexpr F64 maxContraction = 0.6;
+
+    F64 effectiveSteepness = clamp(_cfg.steepness, 0.0, 1.0);
+
+    F64 sumKA = 0.0;
+    for (const auto& wave : _waves) {
+        sumKA += wave.waveNumber * wave.amplitude;
+    }
+
+    if (sumKA > 0.0 && effectiveSteepness * sumKA > maxContraction) {
+        const F64 capped = maxContraction / sumKA;
+        logWARN("GerstnerWaterSurface: steepness {:.3f} on a spectrum with "
+                "sum k·A = {:.3f} would approach the trochoid folding bound; "
+                "reducing to {:.3f}.",
+                effectiveSteepness, sumKA, capped);
+        effectiveSteepness = capped;
+    }
+
     for (auto& wave : _waves) {
-        const F64 ka = wave.waveNumber * wave.amplitude;
-        wave.steepness =
-            ka > 0.0 ? totalSteepness / (ka * F64(numWaves)) : 0.0;
+        wave.steepness = effectiveSteepness;
     }
 
     // The fixed-point inversion in invert_position() contracts by exactly
-    // totalSteepness per iteration, so the iteration count has to grow with it
-    // to keep the sampled elevation error in the millimetre range.
-    if (totalSteepness <= 0.5) {
-        _invIters = 3;
-    } else if (totalSteepness <= 0.7) {
-        _invIters = 5;
+    // Σ q kᵢ Aᵢ per iteration. Pick the iteration count from that so the
+    // sampled elevation error stays in the millimetre range whatever the
+    // spectrum, without paying for iterations a gentle sea does not need.
+    const F64 contraction = effectiveSteepness * sumKA;
+    if (contraction <= 0.0) {
+        _invIters = 1;
     } else {
-        _invIters = 8;
+        const F64 needed = std::log(1e-3) / std::log(minimum(contraction, 0.9));
+        _invIters = clamp(U32(std::ceil(needed)), 2U, 8U);
     }
 
     refresh_derived_state();

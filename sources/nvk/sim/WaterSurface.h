@@ -30,6 +30,15 @@ struct WaterSample {
     Vec3d normal{0.0, 0.0, 1.0};
 
     /// Orbital velocity of the water particle at the surface (m/s).
+    ///
+    /// Gerstner particle orbits are closed, so a particle followed over a
+    /// whole period has exactly zero net drift. Averaging this field at a
+    /// *fixed world position* is a different quantity and does not vanish:
+    /// uniform sampling in world space weights source points by the Jacobian
+    /// (1 − q k A sin θ), leaving a small Eulerian mean of −Σ q² ω k A² / 2
+    /// directed against the wave. On a 1 m sea that is a few millimetres per
+    /// second. Anything driving vessel drift from this field should use the
+    /// Lagrangian interpretation, not the Eulerian average.
     Vec3d velocity{};
 };
 
@@ -88,14 +97,19 @@ class FlatWaterSurface : public WaterSurface {
 /// One Gerstner (trochoidal) wave component.
 ///
 /// The surface is the parametric map of a horizontal source position `s`:
-///   xy(s, t) = s + Σ dir_i · (q_i · A_i · cos θ_i)
-///   z (s, t) =     Σ          A_i · sin θ_i
+///   xy(s, t) = s + Σ dir_i · (q · A_i · cos θ_i)
+///   z (s, t) =     Σ         A_i · sin θ_i
 /// with θ_i = k_i (dir_i · s) − ω_i t + φ_i.
 ///
-/// `q` is the per-wave steepness coefficient: q = 0 collapses the model to a
-/// plain sum of sines (crests and troughs equally rounded), while larger q
-/// sharpens the crests and flattens the troughs. Σ q_i k_i A_i must stay ≤ 1
-/// or the surface self-intersects; build_waves() enforces that.
+/// `q` is the trochoid fraction: the horizontal orbital amplitude of a real
+/// deep-water wave equals its vertical amplitude, so q = 1 is the physical
+/// wave and q = 0 collapses the model to a plain sum of sines with equally
+/// rounded crests and troughs. Values above 1 put more horizontal than
+/// vertical motion into the water, which no real wave does and which inflates
+/// the Stokes drift quadratically — build_waves() clamps to [0, 1].
+///
+/// Σ q k_i A_i must additionally stay ≤ 1 or the trochoid folds over on
+/// itself; build_waves() enforces that too.
 struct GerstnerWave {
     /// Unit horizontal propagation direction.
     Vec2d dir{1.0, 0.0};
@@ -109,7 +123,7 @@ struct GerstnerWave {
     /// Phase offset (rad).
     F64 phase{0.0};
 
-    /// Steepness coefficient q (see above). Dimensionless, ≥ 0.
+    /// Trochoid fraction q (see above). Dimensionless, in [0, 1].
     F64 steepness{0.0};
 
     /// Derived: wave number k = 2π / wavelength (rad/m).
@@ -154,7 +168,9 @@ struct GerstnerWaterConfig {
     /// 0 gives a perfectly regular swell; ~0.5 rad looks like a natural sea.
     F64 directionSpreadRad{0.5};
 
-    /// Overall Gerstner steepness in [0, 1]. 0 = sum of sines.
+    /// Trochoid fraction in [0, 1]: 0 = plain sum of sines, 1 = a true
+    /// deep-water trochoid. Reduced automatically if the requested value would
+    /// let the surface fold over on itself.
     F64 steepness{0.4};
 
     /// Ratio between the longest and the shortest wavelength in the set.
@@ -196,6 +212,16 @@ class GerstnerWaterSurface : public WaterSurface {
     [[nodiscard]] auto config() const -> const GerstnerWaterConfig& {
         return _cfg;
     }
+
+    /// Trochoid fraction actually applied, after clamping to [0, 1] and after
+    /// the anti-folding guard. Equals config().steepness unless a guard fired.
+    [[nodiscard]] auto effective_steepness() const -> F64 {
+        return _waves.empty() ? 0.0 : _waves[0].steepness;
+    }
+
+    /// Fixed-point iteration count currently used to invert the horizontal
+    /// displacement. Derived from the spectrum; see set_inversion_iterations().
+    [[nodiscard]] auto inversion_iterations() const -> U32 { return _invIters; }
 
     /// Longest period in the component set (s) — handy for sizing the settling
     /// time of tests and for logging.
