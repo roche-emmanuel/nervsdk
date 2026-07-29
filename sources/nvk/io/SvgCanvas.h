@@ -16,16 +16,25 @@ struct SvgCanvas {
     F64 widthPx{1400.0};
     F64 heightPx{0.0};
     F64 marginPx{50.0};
+    bool flipVertical{false};
     std::ostringstream body;
 
     void fit(const Vector<Vec2d>& pts, F64 targetWidthPx);
+
+    // When enabled, mirrors every mapped (world-space) point about the
+    // horizontal midline of the canvas, on top of whatever flip map()
+    // already applies. Useful when the caller's world convention already
+    // has Y growing downward (eg. raster-convention data), so the default
+    // Y-up -> Y-down flip in map() ends up inverted relative to what the
+    // caller expects.
+    void set_flip_vertical(bool flip) { flipVertical = flip; }
 
     // Same as fit(), but takes an explicit world-space bounding box instead
     // of a point list. Handy when the bbox is already known (eg. accumulated
     // incrementally) and building a Vector<Vec2d> just to call fit() would be
     // wasteful.
     void fit_bounds(F64 minXIn, F64 minYIn, F64 maxXIn, F64 maxYIn,
-                    F64 targetWidthPx);
+                    F64 targetWidthPx, bool flipVertical = false);
 
     [[nodiscard]] auto map(const Vec2d& p) const -> Vec2d;
 

@@ -48,7 +48,7 @@ void SvgCanvas::fit(const Vector<Vec2d>& pts, F64 targetWidthPx) {
     fit_bounds(minXIn, minY, maxX, maxYIn, targetWidthPx);
 }
 void SvgCanvas::fit_bounds(F64 minXIn, F64 minYIn, F64 maxXIn, F64 maxYIn,
-                           F64 targetWidthPx) {
+                           F64 targetWidthPx, bool flipVertical) {
     body << std::fixed << std::setprecision(1);
     widthPx = targetWidthPx;
     minX = minXIn;
@@ -57,10 +57,14 @@ void SvgCanvas::fit_bounds(F64 minXIn, F64 minYIn, F64 maxXIn, F64 maxYIn,
     const F64 spanY = std::max(maxYIn - minYIn, 1.0);
     scale = (widthPx - 2.0 * marginPx) / spanX;
     heightPx = spanY * scale + 2.0 * marginPx;
+    set_flip_vertical(flipVertical);
 }
 auto SvgCanvas::map(const Vec2d& p) const -> Vec2d {
-    return {marginPx + (p.x() - minX) * scale,
-            marginPx + (maxY - p.y()) * scale};
+    const F64 sx = marginPx + (p.x() - minX) * scale;
+    F64 sy = marginPx + (maxY - p.y()) * scale;
+    if (flipVertical)
+        sy = heightPx - sy;
+    return {sx, sy};
 }
 void SvgCanvas::polyline(const Vector<Vec2d>& pts, const char* color,
                          F64 strokePx, bool dashed) {
