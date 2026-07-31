@@ -17,6 +17,15 @@ struct SvgCanvas {
     F64 heightPx{0.0};
     F64 marginPx{50.0};
     bool flipVertical{false};
+    // Clamps applied by stroke_px() / radius_px(). A size given in world
+    // units keeps its real meaning as the view zooms; the clamps stop it
+    // from vanishing on a whole-world dump and from swallowing the drawing
+    // on a 200 m one.
+    F64 minStrokePx{0.3};
+    F64 maxStrokePx{3.0};
+    F64 minRadiusPx{0.5};
+    F64 maxRadiusPx{5.0};
+
     std::ostringstream body;
 
     void fit(const Vector<Vec2d>& pts, F64 targetWidthPx);
@@ -37,6 +46,15 @@ struct SvgCanvas {
                     F64 targetWidthPx, bool flipVertical = false);
 
     [[nodiscard]] auto map(const Vec2d& p) const -> Vec2d;
+
+    // Convert a world-space line width / radius into the px value the draw
+    // calls expect, through the current fit. Use these instead of literal px
+    // sizes whenever the same drawing has to stay readable across several
+    // view spans — with literals, doubling the area covered doubles every
+    // stroke and dot *relative to the content*, which is what makes a large
+    // dump unreadable.
+    [[nodiscard]] auto stroke_px(F64 widthWorld) const -> F64;
+    [[nodiscard]] auto radius_px(F64 radiusWorld) const -> F64;
 
     void polyline(const Vector<Vec2d>& pts, const char* color, F64 strokePx,
                   bool dashed = false);
@@ -67,7 +85,7 @@ struct SvgCanvas {
     void dot(const Vec2d& c, F64 radiusPx, const char* color,
              bool filled = true);
 
-    void circle_world(const Vec2d& c, F64 radiusCm, const char* color);
+    void circle_world(const Vec2d& c, F64 radiusPx, const char* color);
 
     void cross(const Vec2d& c, F64 sizePx, const char* color);
 

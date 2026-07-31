@@ -66,6 +66,15 @@ auto SvgCanvas::map(const Vec2d& p) const -> Vec2d {
         sy = heightPx - sy;
     return {sx, sy};
 }
+
+auto SvgCanvas::stroke_px(F64 widthWorld) const -> F64 {
+    return clamp(widthWorld * scale, minStrokePx, maxStrokePx);
+}
+
+auto SvgCanvas::radius_px(F64 radiusWorld) const -> F64 {
+    return clamp(radiusWorld * scale, minRadiusPx, maxRadiusPx);
+}
+
 void SvgCanvas::polyline(const Vector<Vec2d>& pts, const char* color,
                          F64 strokePx, bool dashed) {
     if (pts.size() < 2)
@@ -173,10 +182,10 @@ void SvgCanvas::dot(const Vec2d& c, F64 radiusPx, const char* color,
         body << "fill=\"none\" stroke=\"" << color
              << "\" stroke-width=\"2\"/>\n";
 }
-void SvgCanvas::circle_world(const Vec2d& c, F64 radiusCm, const char* color) {
+void SvgCanvas::circle_world(const Vec2d& c, F64 radiusPx, const char* color) {
     const Vec2d s = map(c);
     body << "<circle cx=\"" << s.x() << "\" cy=\"" << s.y() << "\" r=\""
-         << radiusCm * scale << "\" fill=\"none\" stroke=\"" << color
+         << radiusPx << "\" fill=\"none\" stroke=\"" << color
          << "\" stroke-width=\"1\" stroke-dasharray=\"3 3\"/>\n";
 }
 void SvgCanvas::cross(const Vec2d& c, F64 sizePx, const char* color) {
