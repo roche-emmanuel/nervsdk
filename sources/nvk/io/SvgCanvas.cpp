@@ -97,6 +97,38 @@ void SvgCanvas::polygon(const Vector<Vec2d>& pts, const char* fillColor,
     }
     body << "\"/>\n";
 }
+void SvgCanvas::polygons(const Vector<Vector<Vec2d>>& rings,
+                         const char* fillColor, const char* strokeColor,
+                         F64 strokePx, F64 fillOpacity) {
+    bool anyRing = false;
+    for (const auto& ring : rings) {
+        if (ring.size() >= 3) {
+            anyRing = true;
+            break;
+        }
+    }
+    if (!anyRing)
+        return;
+
+    body << "<path fill-rule=\"evenodd\" fill=\""
+         << (fillColor != nullptr ? fillColor : "none") << "\"";
+    if (fillColor != nullptr)
+        body << " fill-opacity=\"" << fillOpacity << "\"";
+    body << " stroke=\"" << (strokeColor != nullptr ? strokeColor : "none")
+         << "\" stroke-width=\"" << strokePx << "\" d=\"";
+
+    for (const auto& ring : rings) {
+        if (ring.size() < 3)
+            continue;
+        for (U32 i = 0; i < U32(ring.size()); ++i) {
+            const Vec2d s = map(ring[i]);
+            body << (i == 0 ? "M " : "L ") << s.x() << " " << s.y() << " ";
+        }
+        body << "Z ";
+    }
+    body << "\"/>\n";
+}
+
 void SvgCanvas::line(const Vec2d& a, const Vec2d& b, const char* color,
                      F64 strokePx, bool dashed) {
     polyline({a, b}, color, strokePx, dashed);

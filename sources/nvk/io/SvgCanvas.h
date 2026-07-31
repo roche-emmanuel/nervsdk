@@ -47,6 +47,15 @@ struct SvgCanvas {
     void polygon(const Vector<Vec2d>& pts, const char* fillColor,
                  const char* strokeColor, F64 strokePx, F64 fillOpacity = 1.0);
 
+    // Several closed rings rendered as a single filled path, resolved with
+    // the even-odd rule. That is what a raster-traced coastline needs:
+    // an island inside a lake inside an island comes out right without the
+    // caller having to classify rings as outer or hole. fillColor may be
+    // nullptr for a stroke-only outline, strokeColor may be nullptr for a
+    // fill with no outline.
+    void polygons(const Vector<Vector<Vec2d>>& rings, const char* fillColor,
+                  const char* strokeColor, F64 strokePx, F64 fillOpacity = 1.0);
+
     void line(const Vec2d& a, const Vec2d& b, const char* color, F64 strokePx,
               bool dashed = false);
 
