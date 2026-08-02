@@ -309,6 +309,145 @@ template <typename T, typename V> struct Profile {
 
         return out;
     }
+
+    // Smooths this profile with a Gaussian kernel defined directly in
+    // t-space (irregular spacing handled naturally: weight falls off with
+    // |t_i - t_j|, not with sample count), then optionally re-anchors the
+    // start and/or end so the smoothed curve passes through the ORIGINAL
+    // endpoint value with a flat (zero) tangent there -- not by overwriting
+    // a sample after the fact, but by blending the freely-smoothed curve
+    // into a cubic Hermite segment over `blendLen` of t, near each pinned
+    // end. This keeps the result C1-continuous: value and slope at the
+    // pin match the endpoint constraint exactly, and value/slope at the
+    // far side of the blend zone match the freely-smoothed curve, so there
+    // is no visible kink where the constraint kicks in.
+    //
+    // sigmaT       — Gaussian bandwidth for the core smoothing pass, in the
+    //                same units as `t` (e.g. cm of arc length).
+    // pinStart     — if true, re-anchor samples.front() to its original
+    //                value with zero slope.
+    // pinEnd       — if true, re-anchor samples.back() to its original
+    //                value with zero slope.
+    // cutoffFactor — kernel support radius as a multiple of sigmaT (see
+    //                the core pass below).
+    // blendLen     — length (in t units) of the transition zone used to
+    //                ease a pinned end into the freely-smoothed interior.
+    //                <= 0 defaults to cutoffFactor * sigmaT (i.e. tied to
+    //                the smoothing bandwidth). When both ends are pinned
+    //                on a short profile, blendLen is clamped per-side to
+    //                half the total t-span so the two zones can't overlap.
+    [[nodiscard]] auto
+    smoothed_gaussian(T sigmaT, bool pinStart = false, bool pinEnd = false,
+                      T cutoffFactor = T(3), T blendLen = T(-1)) const
+        -> Profile<T, V> {
+        const U32 n = U32(samples.size());
+        Profile<T, V> out;
+        out.samples.resize(n);
+        if (n == 0)
+            return out;
+        if (n == 1) {
+            out.samples = samples;
+            return out;
+        }
+
+        // ---- Core pass: unconstrained Gaussian kernel regression in
+        // t-space. Two-pointer window exploits `samples` being t-sorted to
+        // stay O(n) rather than O(n^2). ----
+        if (sigmaT <= T(0)) {
+            out.samples = samples;
+        } else {
+            const T radius = sigmaT * cutoffFactor;
+            U32 lo = 0;
+            U32 hi = 0;
+            for (U32 i = 0; i < n; ++i) {
+                const T ti = samples[i].t;
+
+                while (lo < i && (ti - samples[lo].t) > radius)
+                    ++lo;
+                while (hi + 1 < n && (samples[hi + 1].t - ti) <= radius)
+                    ++hi;
+
+                V acc{0.0};
+                F64 wSum = 0.0;
+                for (U32 j = lo; j <= hi; ++j) {
+                    const F64 dt = F64(ti - samples[j].t);
+                    const F64 sig = F64(sigmaT);
+                    const F64 w = std::exp(-0.5 * (dt / sig) * (dt / sig));
+                    acc = acc + samples[j].v * T(w);
+                    wSum += w;
+                }
+
+                out.samples[i].t = ti;
+                out.samples[i].v =
+                    (wSum > 0.0) ? V(acc * T(1.0 / wSum)) : samples[i].v;
+            }
+        }
+
+        if (!pinStart && !pinEnd)
+            return out;
+
+        // ---- Re-anchor pinned ends via cubic Hermite blend ----
+        const T tMin = samples.front().t;
+        const T tMax = samples.back().t;
+        const T span = tMax - tMin;
+        if (span <= T(0))
+            return out; // degenerate (all samples share one t): nothing to
+                        // blend
+
+        T len = (blendLen > T(0)) ? blendLen : sigmaT * cutoffFactor;
+        len = (pinStart && pinEnd) ? std::min(len, span * T(0.5))
+                                   : std::min(len, span);
+
+        auto hermite = [](const V& p0, const V& m0, const V& p1, const V& m1,
+                          T u, T segLen) -> V {
+            const T u2 = u * u;
+            const T u3 = u2 * u;
+            const T h00 = T(2) * u3 - T(3) * u2 + T(1);
+            const T h10 = u3 - T(2) * u2 + u;
+            const T h01 = -T(2) * u3 + T(3) * u2;
+            const T h11 = u3 - u2;
+            return p0 * h00 + m0 * (segLen * h10) + p1 * h01 +
+                   m1 * (segLen * h11);
+        };
+
+        const T eps = std::max(T(1e-6), len * T(0.01));
+
+        if (pinStart) {
+            const T t0 = tMin;
+            const T tA = t0 + len;
+            const V p0 = samples.front().v; // original, unsmoothed anchor
+            const V m0{0.0};                // flat tangent at the pin
+            const V p1 = out.sample(F64(tA));
+            const V m1 =
+                (out.sample(F64(tA + eps)) - out.sample(F64(tA - eps))) *
+                T(1.0 / (2.0 * eps));
+
+            for (U32 i = 0; i < n && out.samples[i].t <= tA; ++i) {
+                const T u = (out.samples[i].t - t0) / len;
+                out.samples[i].v = hermite(p0, m0, p1, m1, u, len);
+            }
+            out.samples.front().v = p0; // exact at u=0, guards float drift
+        }
+
+        if (pinEnd) {
+            const T t1 = tMax;
+            const T tB = t1 - len;
+            const V p1 = samples.back().v; // original, unsmoothed anchor
+            const V m1{0.0};               // flat tangent at the pin
+            const V p0 = out.sample(F64(tB));
+            const V m0 =
+                (out.sample(F64(tB + eps)) - out.sample(F64(tB - eps))) *
+                T(1.0 / (2.0 * eps));
+
+            for (I32 i = I32(n) - 1; i >= 0 && out.samples[i].t >= tB; --i) {
+                const T u = (out.samples[i].t - tB) / len;
+                out.samples[i].v = hermite(p0, m0, p1, m1, u, len);
+            }
+            out.samples.back().v = p1; // exact at u=1, guards float drift
+        }
+
+        return out;
+    }
 };
 
 using ProfileValf = Profile<F32, F32>;
