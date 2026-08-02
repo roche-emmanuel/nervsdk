@@ -11,7 +11,11 @@ void to_json(Json& j, const CellTextureEntry& e) {
         {"type", e.type},
         {"category", e.category},
         {"dimsM", e.dimsM},
+        {"tiling", e.tiling},
     };
+    if (e.pad >= 0) {
+        j["pad"] = e.pad;
+    }
     if (!e.subtypes.empty()) {
         j["subtypes"] = e.subtypes;
     }
@@ -19,6 +23,7 @@ void to_json(Json& j, const CellTextureEntry& e) {
         j["styles"] = e.styles;
     }
 }
+
 void from_json(const Json& j, CellTextureEntry& e) {
     j.at("file").get_to(e.file);
 
@@ -38,6 +43,8 @@ void from_json(const Json& j, CellTextureEntry& e) {
     j.at("type").get_to(e.type);
     j.at("category").get_to(e.category);
     j.at("dimsM").get_to(e.dimsM);
+    get_opt(j, "pad", e.pad);
+    get_opt(j, "tiling", e.tiling);
     get_opt(j, "subtypes", e.subtypes);
     get_opt(j, "styles", e.styles);
 
@@ -57,16 +64,19 @@ void to_json(Json& j, const CellTextureAtlasDesc& c) {
         {"slot_size", c.slotSize},
         {"grid_xsize", c.gridXSize},
         {"grid_ysize", c.gridYSize},
+        {"pad_size", c.padSize},
     };
     Json arr = Json::array();
     for (const CellTextureEntry& e : c.content)
         arr.push_back(e);
     j["content"] = arr;
 }
+
 void from_json(const Json& j, CellTextureAtlasDesc& c) {
     get_opt(j, "slot_size", c.slotSize);
     get_opt(j, "grid_xsize", c.gridXSize);
     get_opt(j, "grid_ysize", c.gridYSize);
+    get_opt(j, "pad_size", c.padSize);
     if (j.contains("content")) {
         c.content.clear();
         for (const auto& item : j.at("content"))
@@ -75,25 +85,42 @@ void from_json(const Json& j, CellTextureAtlasDesc& c) {
 }
 
 void CellTextureAtlasLayout::build(I32 slotSize, I32 gridXSize, I32 gridYSize,
+
                                    const Vector<CellTextureEntry>& content,
-                                   const String& dataDir) {
+                                   const String& dataDir, I32 padSize) {
     _slotSize = std::max(slotSize, 1);
     _gridXSize = std::max(gridXSize, 1);
     _gridYSize = std::max(gridYSize, 1);
+    _padSize = std::max(padSize, 0);
     _layerWidthPx = _slotSize * _gridXSize;
     _layerHeightPx = _slotSize * _gridYSize;
     _numLayers = 0;
     _occupancy.clear();
     _descById.clear();
 
+    NVCHK(2 * _padSize < _slotSize,
+          "CellTextureAtlasLayout: pad_size {} leaves no content room in a "
+          "{}px slot.",
+          _padSize, _slotSize);
+
+    // Content rects start at slot*slotSize + pad. slotSize is invariably a
+    // multiple of 4, so a pad that is not keeps the content rect off the BC
+    // 4x4 block grid and lets the compressor mix content and gutter texels
+    // inside a single block.
+    if (_padSize % 4 != 0) {
+        logWARN("CellTextureAtlasLayout: pad_size {} is not a multiple of 4 — "
+                "content rects will straddle BC block boundaries.",
+                _padSize);
+    }
+
     for (const auto& entry : content) {
         place_entry(entry, dataDir);
     }
 
     logINFO("CellTextureAtlasLayout: {} textures packed into {} layer(s) "
-            "({}x{} slots of {}px -> {}x{}px per layer).",
+            "({}x{} slots of {}px, {}px gutter -> {}x{}px per layer).",
             _descById.size(), _numLayers, _gridXSize, _gridYSize, _slotSize,
-            _layerWidthPx, _layerHeightPx);
+            _padSize, _layerWidthPx, _layerHeightPx);
 
     generate_style_map();
     generate_category_map();
@@ -150,14 +177,34 @@ void CellTextureAtlasLayout::mark_occupied(U32 layer, const Vec2i& slot,
     }
 }
 
-auto CellTextureAtlasLayout::compute_uv(const Vec2i& slot, I32 xsize,
-                                        I32 ysize) const -> Box2d {
-    // Inset half a texel on every border so bilinear/mip sampling never
-    // bleeds into a neighbouring slot.
-    const F64 x0 = F64(slot.x() * _slotSize) + 0.5;
-    const F64 x1 = F64((slot.x() + xsize) * _slotSize) - 0.5;
-    const F64 y0 = F64(slot.y() * _slotSize) + 0.5;
-    const F64 y1 = F64((slot.y() + ysize) * _slotSize) - 0.5;
+auto CellTextureAtlasLayout::resolve_pad(const CellTextureEntry& entry) const
+    -> I32 {
+    const I32 pad = entry.pad >= 0 ? entry.pad : _padSize;
+
+    NVCHK(2 * pad < _slotSize,
+          "CellTextureAtlasLayout: '{}' pad {} leaves no content room in a "
+          "{}px slot.",
+          entry.id, pad, _slotSize);
+
+    return pad;
+}
+
+auto CellTextureAtlasLayout::compute_uv(const Vec2i& originPx,
+                                        const Vec2i& sizePx) const -> Box2d {
+    // Map the repeating uv's [0,1) range onto the *edges* of the content
+    // rect, not its texel centres. The gutter around it holds wrap-around
+    // (or clamped) copies of the content borders, so a filter tap crossing
+    // u=0 or u=1 reads the correct continuation instead of a neighbouring
+    // entry — the same texels hardware TA_Wrap would have fetched.
+    //
+    // The old half-texel inset is deliberately gone: it only ever defended
+    // bilinear at 1:1 magnification (aniso and minification footprints blow
+    // straight through it), while skewing the tiling period to (n-1)/n and
+    // duplicating a texel column at every repeat seam.
+    const F64 x0 = F64(originPx.x());
+    const F64 x1 = F64(originPx.x() + sizePx.x());
+    const F64 y0 = F64(originPx.y());
+    const F64 y1 = F64(originPx.y() + sizePx.y());
 
     return Box2d(x0 / F64(_layerWidthPx), x1 / F64(_layerWidthPx),
                  y0 / F64(_layerHeightPx), y1 / F64(_layerHeightPx));
@@ -202,6 +249,7 @@ auto CellTextureAtlasLayout::resolve_footprint(const CellTextureEntry& entry,
 
 void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry,
                                          const String& dataDir) {
+    const I32 pad = resolve_pad(entry);
     const Vec2i footprint = resolve_footprint(entry, dataDir);
     const I32 xsize = std::max(footprint.x(), 1);
     const I32 ysize = std::max(footprint.y(), 1);
@@ -238,11 +286,26 @@ void CellTextureAtlasLayout::place_entry(const CellTextureEntry& entry,
     desc.dimsM = entry.dimsM;
 
     desc.sizeInSlots = {xsize, ysize};
-    desc.uv = compute_uv(slot, xsize, ysize);
+    desc.pad = pad;
+    desc.tiling = entry.tiling;
+
+    // The gutter is carved out of the footprint the entry already owns, so
+    // packing is unaffected — only the usable content shrinks by 2*pad.
+    desc.originPx = {slot.x() * _slotSize + pad, slot.y() * _slotSize + pad};
+    desc.sizePx = {xsize * _slotSize - 2 * pad, ysize * _slotSize - 2 * pad};
+
+    NVCHK(desc.sizePx.x() > 0 && desc.sizePx.y() > 0,
+          "CellTextureAtlasLayout: '{}' has an empty content rect "
+          "({}x{} slots of {}px, pad {}).",
+          entry.id, xsize, ysize, _slotSize, pad);
+
+    desc.uv = compute_uv(desc.originPx, desc.sizePx);
 
     logDEBUG("CellTextureAtlasLayout: id='{}' -> layer {} slot [{},{}] "
-             "size [{}x{}] uv {}.",
-             entry.id, layer, slot.x(), slot.y(), xsize, ysize, desc.uv);
+             "size [{}x{}] content [{}x{}]px at [{},{}] pad {} ({}) uv {}.",
+             entry.id, layer, slot.x(), slot.y(), xsize, ysize, desc.sizePx.x(),
+             desc.sizePx.y(), desc.originPx.x(), desc.originPx.y(), pad,
+             desc.tiling ? "wrap" : "clamp", desc.uv);
 
     auto res = _descById.insert(std::make_pair(entry.id, desc));
     NVCHK(res.second, "Could not insert CellTextureDesc: duplicated id: {}",
@@ -256,11 +319,14 @@ void remap_uv_to_atlas(F32 rawU, F32 rawV, const CellTextureDesc& desc,
     outU = F32(desc.uv.xmin) + fu * F32(desc.uv.width());
     outV = F32(desc.uv.ymin) + fv * F32(desc.uv.height());
 }
+
 CellTextureAtlasLayout::CellTextureAtlasLayout(const CellTextureAtlasDesc& desc,
                                                const String& dataDir)
     : _seed(desc.seed) {
-    build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content, dataDir);
+    build(desc.slotSize, desc.gridXSize, desc.gridYSize, desc.content, dataDir,
+          desc.padSize);
 }
+
 void CellTextureAtlasLayout::generate_style_map() {
     // Generate the style map for all the type/subtype pairs:
 
