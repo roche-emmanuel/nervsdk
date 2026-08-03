@@ -48,6 +48,17 @@ void from_json(const Json& j, CellTextureEntry& e) {
     get_opt(j, "subtypes", e.subtypes);
     get_opt(j, "styles", e.styles);
 
+    if (j.contains("subtype")) {
+        String subtype;
+        j.at("subtype").get_to(subtype);
+        e.subtypes.insert(subtype);
+    }
+    if (j.contains("style")) {
+        String style;
+        j.at("style").get_to(style);
+        e.styles.insert(style);
+    }
+
     if (e.subtypes.empty()) {
         e.subtypes.insert("default");
     }
