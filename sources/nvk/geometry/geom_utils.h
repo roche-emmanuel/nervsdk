@@ -660,6 +660,39 @@ auto polyline_ray_intersections(const Vec2<T>& origin, const Vec2<T>& dir,
     return hits;
 }
 
+// Collapses consecutive points in `coords` that are closer than `minDist`
+// apart into their mean point. Comparison is done against the last *kept*
+// (possibly already-merged) point, so a run of several close points in a
+// row collapses progressively into one. Returns the number of points
+// removed from `coords`.
+template <typename T>
+auto collapse_close_points_2d(Vector<Vec2<T>>& coords, T minDist) -> I32 {
+    if (coords.size() < 2) {
+        return 0;
+    }
+
+    Vector<Vec2<T>> merged;
+    merged.reserve(coords.size());
+    merged.push_back(coords[0]);
+
+    for (U32 i = 1; i < coords.size(); ++i) {
+        const Vec2<T>& prevPt = merged.back();
+        const Vec2<T>& currPt = coords[i];
+
+        T dist = (currPt - prevPt).length();
+        if (dist < minDist) {
+            // Replace the last kept point with the mean of the pair.
+            merged.back() = (prevPt + currPt) * 0.5;
+        } else {
+            merged.push_back(currPt);
+        }
+    }
+
+    I32 numRemoved = static_cast<I32>(coords.size() - merged.size());
+    coords = std::move(merged);
+    return numRemoved;
+}
+
 } // namespace nv
 
 #endif
