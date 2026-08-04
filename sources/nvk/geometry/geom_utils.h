@@ -693,6 +693,110 @@ auto collapse_close_points_2d(Vector<Vec2<T>>& coords, T minDist) -> I32 {
     return numRemoved;
 }
 
+// File: nvk/geometry/PlaneFit.h
+
+/** Result of a least-squares plane fit z = a*x + b*y + c. */
+template <typename T> struct PlaneFitXY {
+    T slopeX{0.0};  // a: dz/dx
+    T slopeY{0.0};  // b: dz/dy
+    T offsetZ{0.0}; // c: z at (x, y) == (0, 0)
+
+    [[nodiscard]] auto eval(T x, T y) const -> T {
+        return slopeX * x + slopeY * y + offsetZ;
+    }
+
+    [[nodiscard]] auto eval(const Vec2<T>& posXY) const -> T {
+        return eval(posXY.x(), posXY.y());
+    }
+
+    /** Unit normal of the fitted plane, pointing "up" (+Z hemisphere). */
+    [[nodiscard]] auto normal() const -> Vec3<T> {
+        Vec3<T> n(-slopeX, -slopeY, 1.0);
+        n.normalize();
+        return n;
+    }
+};
+
+// Computes the least-squares plane z = a*x + b*y + c fitting the elevation
+// (Z) of the given 3D points, using their (X, Y) as the horizontal position.
+//
+// Returns false if the fit is degenerate (fewer than 3 points, or all points
+// collinear/coincident in XY — a singular normal-equations matrix). In that
+// case, fit.offsetZ is still set to the mean elevation of the input points
+// (or 0 if points is empty), with zero slopes, so the result remains usable
+// as a flat fallback.
+template <typename T>
+auto fit_plane_xy(const Vector<Vec3<T>>& points, PlaneFitXY<T>& fit) -> bool {
+    fit = PlaneFitXY<T>{};
+
+    if (points.empty()) {
+        return false;
+    }
+
+    // Normal equations for z = a*x + b*y + c minimizing sum (z_i - (a*x_i +
+    // b*y_i + c))^2:
+    //   | sumXX sumXY sumX | |a|   |sumXZ|
+    //   | sumXY sumYY sumY | |b| = |sumYZ|
+    //   | sumX  sumY  n    | |c|   |sumZ |
+    T sumX = 0.0;
+    T sumY = 0.0;
+    T sumXX = 0.0;
+    T sumYY = 0.0;
+    T sumXY = 0.0;
+    T sumZ = 0.0;
+    T sumXZ = 0.0;
+    T sumYZ = 0.0;
+
+    for (const auto& p : points) {
+        const T x = p.x();
+        const T y = p.y();
+        const T z = p.z();
+
+        sumX += x;
+        sumY += y;
+        sumXX += x * x;
+        sumYY += y * y;
+        sumXY += x * y;
+        sumZ += z;
+        sumXZ += x * z;
+        sumYZ += y * z;
+    }
+
+    const T n = static_cast<T>(points.size());
+
+    const T m00 = sumXX;
+    const T m01 = sumXY;
+    const T m02 = sumX;
+    const T m11 = sumYY;
+    const T m12 = sumY;
+    const T m22 = n;
+
+    const T cof00 = m11 * m22 - m12 * m12;
+    const T cof01 = m02 * m12 - m01 * m22;
+    const T cof02 = m01 * m12 - m02 * m11;
+
+    const T det = m00 * cof00 + m01 * cof01 + m02 * cof02;
+
+    // Degenerate layout (fewer than 3 distinct points, or all points
+    // collinear in XY): fall back to the mean elevation, zero slopes.
+    if (std::abs(det) < 1e-12) {
+        fit.offsetZ = sumZ / n;
+        return false;
+    }
+
+    const T cof11 = m00 * m22 - m02 * m02;
+    const T cof12 = m01 * m02 - m00 * m12;
+    const T cof22 = m00 * m11 - m01 * m01;
+
+    const T invDet = 1.0 / det;
+
+    fit.slopeX = invDet * (cof00 * sumXZ + cof01 * sumYZ + cof02 * sumZ);
+    fit.slopeY = invDet * (cof01 * sumXZ + cof11 * sumYZ + cof12 * sumZ);
+    fit.offsetZ = invDet * (cof02 * sumXZ + cof12 * sumYZ + cof22 * sumZ);
+
+    return true;
+}
+
 } // namespace nv
 
 #endif
