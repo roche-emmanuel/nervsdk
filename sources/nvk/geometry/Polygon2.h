@@ -12,6 +12,12 @@ template <typename T> struct Polygon2 {
     explicit Polygon2(Vector<Vec2<T>> input) : coords(std::move(input)) {};
 
     [[nodiscard]] auto size() const -> size_t { return coords.size(); }
+    [[nodiscard]] auto area() const -> T {
+        return polygon_signed_area_2d(coords.data(), coords.size());
+    }
+    [[nodiscard]] auto centroid() const -> Vec2<T> {
+        return polygon_centroid_2d(coords.data(), coords.size());
+    }
 
     [[nodiscard]] auto empty() const -> bool { return coords.empty(); }
 

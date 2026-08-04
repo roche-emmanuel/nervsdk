@@ -298,6 +298,16 @@ auto seg2_project_point(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt,
 }
 
 template <typename T>
+auto polygon_centroid_2d(const Vec2<T>* polygon, U32 size) -> T {
+    Vec2d centroid{0.0, 0.0};
+    for (size_t i = 0; i < size; ++i) {
+        centroid = centroid + polygon[i];
+    }
+    centroid = centroid / T(size);
+    return centroid;
+}
+
+template <typename T>
 auto polygon_signed_area_2d(const Vec2<T>* polygon, U32 size) -> T {
     if (size < 3)
         return T(0.0);
@@ -375,9 +385,9 @@ auto polygon_signed_area_2d(const Vec3<T>* polygon, U32 size,
 // ---------------------------------------------------------------------------
 // point_in_convex
 //
-// Winding-agnostic: p is inside (or on the boundary of) the convex polygon iff
-// it never sits strictly on both sides of the polygon's edges. A small epsilon
-// keeps points on an edge classified as inside.
+// Winding-agnostic: p is inside (or on the boundary of) the convex polygon
+// iff it never sits strictly on both sides of the polygon's edges. A small
+// epsilon keeps points on an edge classified as inside.
 // ---------------------------------------------------------------------------
 template <typename T>
 auto point_in_convex(const Vector<Vec2<T>>& hull, const Vec2<T>& p) -> bool {
@@ -406,9 +416,10 @@ auto point_in_convex(const Vector<Vec2<T>>& hull, const Vec2<T>& p) -> bool {
 // segment_intersects_convex
 //
 // True iff segment a→b touches the convex polygon `hull` at all: either
-// endpoint inside (boundary counts), or the segment crosses any hull edge. For
-// a convex hull these cases are exhaustive — a chord passing clean through with
-// both endpoints outside must cross the boundary, so the edge test catches it.
+// endpoint inside (boundary counts), or the segment crosses any hull edge.
+// For a convex hull these cases are exhaustive — a chord passing clean
+// through with both endpoints outside must cross the boundary, so the edge
+// test catches it.
 // ---------------------------------------------------------------------------
 template <typename T>
 auto segment_intersects_convex(const Vector<Vec2<T>>& hull, const Vec2<T>& a,
@@ -449,14 +460,14 @@ template <typename T> struct Polyline2Hit {
     T distB{0.0}; // arc-length along polyline B from its first point
 };
 
-// Finds the first intersection between polylines a and b, walking a from its
-// start outward. "First" means the hit with the smallest arc-length along a
-// (and, within a single a-segment, the smallest local distance). Returns true
-// and fills hit when an intersection exists, false otherwise (parallel or
-// diverging polylines).
+// Finds the first intersection between polylines a and b, walking a from
+// its start outward. "First" means the hit with the smallest arc-length
+// along a (and, within a single a-segment, the smallest local distance).
+// Returns true and fills hit when an intersection exists, false otherwise
+// (parallel or diverging polylines).
 //
-// Cost is O(numSegsA * numSegsB) worst case but exits on the first hit, which
-// for junction corner borders is typically found within the first few
+// Cost is O(numSegsA * numSegsB) worst case but exits on the first hit,
+// which for junction corner borders is typically found within the first few
 // segments.
 template <typename T>
 auto polyline2_find_first_intersection(const Vector<Vec2<T>>& pa,
@@ -478,8 +489,9 @@ auto polyline2_find_first_intersection(const Vector<Vec2<T>>& pa,
         const Vec2d& a0 = pa[i];
         const Vec2d& a1 = pa[i + 1];
 
-        // Keep the hit with the smallest local distance along this a-segment
-        // so "first along a" is well defined even with multiple b crossings:
+        // Keep the hit with the smallest local distance along this
+        // a-segment so "first along a" is well defined even with multiple b
+        // crossings:
         bool found = false;
         F64 bestDistA = 0.0;
 
@@ -559,8 +571,8 @@ auto polyline2_append_slice(Vector<Vec2<T>>& out, const Vector<Vec2<T>>& pts,
     }
 }
 
-// Removes consecutive near-duplicate points (including the wrap-around pair)
-// from a closed polygon point loop.
+// Removes consecutive near-duplicate points (including the wrap-around
+// pair) from a closed polygon point loop.
 template <typename T>
 auto polyline2_dedupe_points(Vector<Vec2<T>>& pts, bool closedLoop = false)
     -> U32 {
