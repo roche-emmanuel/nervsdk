@@ -797,6 +797,32 @@ auto fit_plane_xy(const Vector<Vec3<T>>& points, PlaneFitXY<T>& fit) -> bool {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// fit_plane_xy_local
+//
+// Least-squares plane fit performed in a frame local to `origin`, then shifted
+// back to world XY.
+//
+// The shift back is exact enough: z = a*(x-ox) + b*(y-oy) + c becomes
+// z = a*x + b*y + (c - a*ox - b*oy), and evaluating that in F64 costs ~1e-11 cm
+// of cancellation, which is irrelevant at cm scale.
+// ---------------------------------------------------------------------------
+template <typename T>
+auto fit_plane_xy_local(const Vector<Vec3<T>>& points, const Vec2<T>& origin,
+                        PlaneFitXY<T>& fit) -> bool {
+
+    Vector<Vec3<T>> local;
+    local.reserve(points.size());
+    for (const auto& pt : points) {
+        local.emplace_back(pt.x() - origin.x(), pt.y() - origin.y(), pt.z());
+    }
+
+    bool res = fit_plane_xy(local, fit);
+
+    fit.offsetZ -= fit.slopeX * origin.x() + fit.slopeY * origin.y();
+    return res;
+}
+
 } // namespace nv
 
 #endif
