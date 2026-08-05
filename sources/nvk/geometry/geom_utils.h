@@ -823,6 +823,37 @@ auto fit_plane_xy_local(const Vector<Vec3<T>>& points, const Vec2<T>& origin,
     return res;
 }
 
+// ---------------------------------------------------------------------------
+// point_in_polygon
+//
+// Crossing number test for an arbitrary *simple* polygon (the section strips
+// are strongly non convex, so point_in_convex() cannot be used here). The
+// polygon is implicitly closed. Candidate for promotion to geom_utils.h.
+// ---------------------------------------------------------------------------
+template <typename T>
+auto point_in_polygon(const Vector<Vec2<T>>& poly, const Vec2<T>& pt) -> bool {
+    const U32 num = U32(poly.size());
+    if (num < 3) {
+        return false;
+    }
+
+    bool inside = false;
+    for (U32 i = 0, j = num - 1; i < num; j = i++) {
+        const auto& a = poly[i];
+        const auto& b = poly[j];
+
+        if ((a.y() > pt.y()) != (b.y() > pt.y())) {
+            T xcross =
+                a.x() + (pt.y() - a.y()) / (b.y() - a.y()) * (b.x() - a.x());
+            if (pt.x() < xcross) {
+                inside = !inside;
+            }
+        }
+    }
+
+    return inside;
+}
+
 } // namespace nv
 
 #endif

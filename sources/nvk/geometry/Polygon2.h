@@ -24,6 +24,13 @@ template <typename T> struct Polygon2 {
     auto dedupe_points() -> U32 {
         return polyline2_dedupe_points(coords, true);
     }
+    auto compute_bounds() const -> Box2<T> {
+        Box2<T> box;
+        for (const auto& pt : coords) {
+            box.extendTo(pt);
+        }
+        return box;
+    }
 };
 
 using Polygon2f = Polygon2<F32>;

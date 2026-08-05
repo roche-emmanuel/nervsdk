@@ -397,6 +397,11 @@ template <typename T> struct Box2 {
         return res;
     }
 
+    [[nodiscard]] auto overlaps(const Box2<T>& rhs) const -> bool {
+        return xmin <= rhs.xmax && rhs.xmin <= xmax && ymin <= rhs.ymax &&
+               rhs.ymin <= ymax;
+    }
+
 }; // end of class Box2
 
 using Box2f = Box2<F32>;
