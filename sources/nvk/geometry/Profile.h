@@ -70,6 +70,14 @@ template <typename T, typename V> struct Profile {
         return (t - samples[idx].t) > (samples[idx + 1].t - t) ? idx + 1 : idx;
     }
 
+    auto length() const -> T {
+        if (samples.empty()) {
+            return -1.0;
+        }
+
+        return samples.back().t - samples.front().t;
+    }
+
     void add_sample(T t, V v) {
         const auto pos = std::upper_bound(
             samples.begin(), samples.end(), t,
@@ -324,21 +332,9 @@ template <typename T, typename V> struct Profile {
     //
     // sigmaT       — Gaussian bandwidth for the core smoothing pass, in the
     //                same units as `t` (e.g. cm of arc length).
-    // pinStart     — if true, re-anchor samples.front() to its original
-    //                value with zero slope.
-    // pinEnd       — if true, re-anchor samples.back() to its original
-    //                value with zero slope.
     // cutoffFactor — kernel support radius as a multiple of sigmaT (see
     //                the core pass below).
-    // blendLen     — length (in t units) of the transition zone used to
-    //                ease a pinned end into the freely-smoothed interior.
-    //                <= 0 defaults to cutoffFactor * sigmaT (i.e. tied to
-    //                the smoothing bandwidth). When both ends are pinned
-    //                on a short profile, blendLen is clamped per-side to
-    //                half the total t-span so the two zones can't overlap.
-    [[nodiscard]] auto
-    smoothed_gaussian(T sigmaT, bool pinStart = false, bool pinEnd = false,
-                      T cutoffFactor = T(3), T blendLen = T(-1)) const
+    [[nodiscard]] auto smoothed_gaussian(T sigmaT, T cutoffFactor = T(3)) const
         -> Profile<T, V> {
         const U32 n = U32(samples.size());
         Profile<T, V> out;
@@ -383,70 +379,35 @@ template <typename T, typename V> struct Profile {
             }
         }
 
-        if (!pinStart && !pinEnd)
-            return out;
-
-        // ---- Re-anchor pinned ends via cubic Hermite blend ----
-        const T tMin = samples.front().t;
-        const T tMax = samples.back().t;
-        const T span = tMax - tMin;
-        if (span <= T(0))
-            return out; // degenerate (all samples share one t): nothing to
-                        // blend
-
-        T len = (blendLen > T(0)) ? blendLen : sigmaT * cutoffFactor;
-        len = (pinStart && pinEnd) ? std::min(len, span * T(0.5))
-                                   : std::min(len, span);
-
-        auto hermite = [](const V& p0, const V& m0, const V& p1, const V& m1,
-                          T u, T segLen) -> V {
-            const T u2 = u * u;
-            const T u3 = u2 * u;
-            const T h00 = T(2) * u3 - T(3) * u2 + T(1);
-            const T h10 = u3 - T(2) * u2 + u;
-            const T h01 = -T(2) * u3 + T(3) * u2;
-            const T h11 = u3 - u2;
-            return p0 * h00 + m0 * (segLen * h10) + p1 * h01 +
-                   m1 * (segLen * h11);
-        };
-
-        const T eps = std::max(T(1e-6), len * T(0.01));
-
-        if (pinStart) {
-            const T t0 = tMin;
-            const T tA = t0 + len;
-            const V p0 = samples.front().v; // original, unsmoothed anchor
-            const V m0{0.0};                // flat tangent at the pin
-            const V p1 = out.sample(F64(tA));
-            const V m1 =
-                (out.sample(F64(tA + eps)) - out.sample(F64(tA - eps))) *
-                T(1.0 / (2.0 * eps));
-
-            for (U32 i = 0; i < n && out.samples[i].t <= tA; ++i) {
-                const T u = (out.samples[i].t - t0) / len;
-                out.samples[i].v = hermite(p0, m0, p1, m1, u, len);
-            }
-            out.samples.front().v = p0; // exact at u=0, guards float drift
-        }
-
-        if (pinEnd) {
-            const T t1 = tMax;
-            const T tB = t1 - len;
-            const V p1 = samples.back().v; // original, unsmoothed anchor
-            const V m1{0.0};               // flat tangent at the pin
-            const V p0 = out.sample(F64(tB));
-            const V m0 =
-                (out.sample(F64(tB + eps)) - out.sample(F64(tB - eps))) *
-                T(1.0 / (2.0 * eps));
-
-            for (I32 i = I32(n) - 1; i >= 0 && out.samples[i].t >= tB; --i) {
-                const T u = (out.samples[i].t - tB) / len;
-                out.samples[i].v = hermite(p0, m0, p1, m1, u, len);
-            }
-            out.samples.back().v = p1; // exact at u=1, guards float drift
-        }
-
         return out;
+    }
+
+    void pin_endpoints(const V& v0, const V& v1, T blendLen = T(-1)) {
+        // Iterate on each sample and apply smooth step towards the end points:
+        T len = length();
+        if (blendLen < 0.0 || len <= (blendLen * 2.0)) {
+            // We smmoth directly beween v0 and v1:
+            auto t0 = samples.front().t;
+            for (auto& s : samples) {
+                auto ratio = (s.t - t0) / len;
+                s.v = lerp_sample(v0, v1, smoothstep01(ratio));
+            }
+            return;
+        }
+
+        // smooth step from start:
+        auto t0 = samples.front().t;
+        auto t1 = samples.back().t;
+        for (auto& s : samples) {
+            if ((s.t - t0) <= blendLen) {
+                auto ratio = (s.t - t0) / blendLen;
+                s.v = lerp_sample(v0, s.v, smoothstep01(ratio));
+            }
+            if ((t1 - s.t) <= blendLen) {
+                auto ratio = (t1 - s.t) / blendLen;
+                s.v = lerp_sample(v1, s.v, smoothstep01(ratio));
+            }
+        }
     }
 };
 
