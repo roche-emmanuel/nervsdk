@@ -1129,6 +1129,99 @@ auto seg2_clip_inside_polygon(const Vec2<T>& segA, const Vec2<T>& segB,
                                 keepBoundaryParts, eps);
 }
 
+// ---------------------------------------------------------------------------
+// seg2_clip_endpoint_by_polygon
+//
+// Simplified sibling of seg2_clip_by_polygon: only the segment's own
+// endpoints are classified against the polygon, and at most one endpoint is
+// ever moved. No multi-span output, no boundary-collinear handling.
+//
+// Returns false when both segA and segB are inside the polygon: the whole
+// segment is discarded and segA/segB are left untouched (caller is expected
+// to drop the segment in this case).
+//
+// Returns true otherwise:
+//   - if neither endpoint is inside, segA/segB are left untouched.
+//   - if exactly one endpoint is inside, that endpoint is moved in place to
+//     the first point where the segment crosses the polygon boundary,
+//     walking from the outside endpoint towards the inside one. The other
+//     (outside) endpoint is left untouched.
+//
+// eps is a world-space tolerance (same units as the input coordinates).
+// ---------------------------------------------------------------------------
+template <typename T>
+auto seg2_clip_endpoint_by_polygon(Vec2<T>& segA, Vec2<T>& segB,
+                                   const Vector<Vec2<T>>& poly, T eps = T(1e-6))
+    -> bool {
+    const auto numPts = U32(poly.size());
+    if (numPts < 3) {
+        return true; // no interior, nothing to clip
+    }
+
+    const bool aInside = point_in_polygon(poly, segA);
+    const bool bInside = point_in_polygon(poly, segB);
+
+    if (aInside && bInside) {
+        return false;
+    }
+    if (!aInside && !bInside) {
+        return true;
+    }
+
+    // Exactly one endpoint is inside: walk from the outside endpoint towards
+    // the inside one and stop at the first boundary crossing.
+    const Vec2<T> outsidePt = aInside ? segB : segA;
+    const Vec2<T> insidePt = aInside ? segA : segB;
+
+    const Vec2<T> segDir = insidePt - outsidePt;
+    const T segLen = segDir.length();
+    if (segLen <= eps) {
+        return true; // degenerate segment, nothing sensible to clip
+    }
+
+    const T tEps = eps / segLen;
+    T bestT =
+        T(1); // parameter along outsidePt -> insidePt; defaults to insidePt
+    bool found = false;
+
+    for (U32 i = 0, j = numPts - 1; i < numPts; j = i++) {
+        const Vec2<T>& p0 = poly[j];
+        const Vec2<T>& p1 = poly[i];
+
+        const Vec2<T> edgeDir = p1 - p0;
+        const T edgeLen = edgeDir.length();
+        if (edgeLen <= eps) {
+            continue; // degenerate edge
+        }
+
+        const Vec2<T> rel = p0 - outsidePt;
+        const T det = segDir.cross(edgeDir);
+        if (std::abs(det) <= T(1e-9) * segLen * edgeLen) {
+            continue; // parallel edge, no simple crossing
+        }
+
+        const T t = rel.cross(edgeDir) / det;
+        const T u = rel.cross(segDir) / det;
+        const T uEps = eps / edgeLen;
+
+        if (t > -tEps && t < bestT && u > -uEps && u < T(1) + uEps) {
+            bestT = std::max(t, T(0));
+            found = true;
+        }
+    }
+
+    if (found) {
+        const Vec2<T> clipPoint = outsidePt + segDir * bestT;
+        if (aInside) {
+            segA = clipPoint;
+        } else {
+            segB = clipPoint;
+        }
+    }
+
+    return true;
+}
+
 } // namespace nv
 
 #endif
