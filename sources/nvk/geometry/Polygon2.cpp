@@ -50,6 +50,28 @@ auto polygon2_union(const Vector<Polygon2d>& inputs, I32 fillRule)
         Clipper2Lib::Union(subjectPaths, (Clipper2Lib::FillRule)fillRule);
     return paths_to_polygon2_vector(solution);
 }
+
+auto polygon2_union_inflated(const Vector<Polygon2d>& inputs, F64 offset,
+                             I32 fillRule, I32 joinType) -> Vector<Polygon2d> {
+    Clipper2Lib::PathsD subjectPaths = polygon2_vector_to_paths(inputs);
+    auto jType = (Clipper2Lib::JoinType)joinType;
+    auto eType = Clipper2Lib::EndType::Polygon;
+    F64 miterLimit = 2.0;
+
+    // Grow, merge, shrink. All 3 stages run on the *whole* set: shrinking ring
+    // by ring would offset a hole as if it were an island, and would leave the
+    // self intersections the erosion creates unresolved.
+    auto grown = Clipper2Lib::InflatePaths(subjectPaths, offset, jType, eType,
+                                           miterLimit);
+
+    auto merged = Clipper2Lib::Union(grown, (Clipper2Lib::FillRule)fillRule);
+
+    auto shrunk =
+        Clipper2Lib::InflatePaths(merged, -offset, jType, eType, miterLimit);
+
+    return paths_to_polygon2_vector(shrunk);
+}
+
 auto polygon2_difference(const Vector<Polygon2d>& subjects,
                          const Vector<Polygon2d>& clips, I32 fillRule)
     -> Vector<Polygon2d> {

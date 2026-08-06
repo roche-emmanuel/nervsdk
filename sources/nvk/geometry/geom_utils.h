@@ -598,6 +598,48 @@ auto polyline2_dedupe_points(Vector<Vec2<T>>& pts, bool closedLoop = false)
     return count;
 }
 
+// ---------------------------------------------------------------------------
+// snap_points_to_grid
+//
+// Quantizes every coordinate onto a regular grid of step `gridStep`, rounding
+// half away from zero so the mapping stays symmetric about the origin. Two
+// points falling in the same cell become bit identical afterwards, which is
+// what the boolean ops need in order to see 2 polygons sharing an edge as
+// really sharing it rather than as 2 hairline separated contours.
+//
+// `gridStep` is expressed in the unit of the coordinates (cm in the PCGen
+// pipeline). A non positive step leaves the points untouched.
+//
+// Beware that snapping is *not* a weld: 2 points straddling a cell boundary
+// land on different cells however close they were. It removes accumulated
+// float noise, it does not close a genuine gap, and it does nothing for a
+// vertex sitting in the middle of another polygon's edge.
+//
+// Returns the number of points that were actually moved.
+// ---------------------------------------------------------------------------
+template <typename T>
+auto snap_points_to_grid(Vector<Vec2<T>>& pts, T gridStep) -> U32 {
+    if (gridStep <= T(0)) {
+        return 0;
+    }
+
+    const T invStep = T(1) / gridStep;
+    U32 count = 0;
+
+    for (auto& pt : pts) {
+        T sx = std::round(pt.x() * invStep) * gridStep;
+        T sy = std::round(pt.y() * invStep) * gridStep;
+
+        if (sx != pt.x() || sy != pt.y()) {
+            ++count;
+        }
+
+        pt.set(sx, sy);
+    }
+
+    return count;
+}
+
 template <typename T> inline auto distance(const T& a, const T& b) -> T {
     return std::abs(a - b);
 }
