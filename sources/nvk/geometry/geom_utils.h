@@ -854,6 +854,239 @@ auto point_in_polygon(const Vector<Vec2<T>>& poly, const Vec2<T>& pt) -> bool {
     return inside;
 }
 
+// ---------------------------------------------------------------------------
+// Span2
+//
+// Minimal "pair of endpoints" segment carrying no polyline identity. This is
+// deliberately distinct from Segment2 (nvk/geometry/Segment2.h), which also
+// tracks lineId/index/isLastLoopSeg and lives one layer above this header.
+// Used as the output element of the clipping helpers below.
+// ---------------------------------------------------------------------------
+template <typename T> struct Span2 {
+    Vec2<T> a;
+    Vec2<T> b;
+
+    [[nodiscard]] auto direction() const -> Vec2<T> { return b - a; }
+    [[nodiscard]] auto length() const -> T { return (b - a).length(); }
+    [[nodiscard]] auto midpoint() const -> Vec2<T> { return (a + b) * T(0.5); }
+    [[nodiscard]] auto bounds() const -> Box2<T> { return {a, b}; }
+};
+
+using Span2f = Span2<F32>;
+using Span2d = Span2<F64>;
+
+template <typename T> using Span2Vector = Vector<Span2<T>>;
+
+// ---------------------------------------------------------------------------
+// seg2_clip_by_polygon
+//
+// Clips the segment segA->segB against an arbitrary *simple* polygon (given as
+// an implicitly-closed ring of coords, any winding) and returns the parts of
+// the segment that survive the requested selection, in increasing order along
+// the segment. Adjacent kept parts are merged, so a segment that never changes
+// classification comes back as a single span.
+//
+// Every sub-part of the segment falls into exactly one of three classes:
+//   - strictly inside the polygon,
+//   - strictly outside the polygon,
+//   - on the boundary (i.e. running collinear with one of the polygon edges).
+//
+// keepInside selects between the first two:
+//   false -> keep the outside parts  (the usual "punch a hole in the segment")
+//   true  -> keep the inside parts
+//
+// keepBoundaryParts independently decides whether collinear-with-an-edge parts
+// are emitted, and is what makes the "strictly inside" distinction explicit:
+//   keepInside=false, keepBoundaryParts=true  -> only *strictly interior* parts
+//                                                are removed
+//   keepInside=false, keepBoundaryParts=false -> boundary counts as inside and
+//                                                is removed too
+// Calling the function twice with complementary settings (outside+boundary and
+// inside without boundary, or the reverse) yields an exact partition of the
+// input segment.
+//
+// eps is a world-space tolerance (same units as the input coordinates): it
+// drives the collinearity test, the on-boundary test, degenerate-edge culling
+// and the rejection of zero-length output spans.
+//
+// Complexity is O(numEdges * numCuts): every candidate sub-interval is
+// classified by testing its midpoint, which sidesteps all the enter/exit parity
+// bookkeeping that breaks down on vertex-grazing and collinear cases.
+// ---------------------------------------------------------------------------
+template <typename T>
+auto seg2_clip_by_polygon(const Vec2<T>& segA, const Vec2<T>& segB,
+                          const Vector<Vec2<T>>& poly, bool keepInside,
+                          bool keepBoundaryParts = false, T eps = T(1e-6))
+    -> Span2Vector<T> {
+    Span2Vector<T> result;
+
+    const auto numPts = U32(poly.size());
+
+    // Degenerate polygon: no interior at all, so everything is outside.
+    if (numPts < 3) {
+        if (!keepInside) {
+            result.push_back({segA, segB});
+        }
+        return result;
+    }
+
+    // True when pt sits within eps of the polygon boundary.
+    auto on_boundary = [&](const Vec2<T>& pt) -> bool {
+        for (U32 i = 0, j = numPts - 1; i < numPts; j = i++) {
+            if (seg2_point_distance(poly[j], poly[i], pt, true) <= eps) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Single classification point for the whole function.
+    auto should_keep = [&](const Vec2<T>& pt) -> bool {
+        if (on_boundary(pt)) {
+            return keepBoundaryParts;
+        }
+        return point_in_polygon(poly, pt) == keepInside;
+    };
+
+    const Vec2<T> segDir = segB - segA;
+    const T segLen = segDir.length();
+
+    // Degenerate segment: classify it as a single point.
+    if (segLen <= eps) {
+        if (should_keep(segA)) {
+            result.push_back({segA, segB});
+        }
+        return result;
+    }
+
+    const T invLenSq = T(1) / segDir.dot(segDir);
+    const T tEps = eps / segLen;
+
+    // -- 1. Collect every parameter at which the classification can change.
+    Vector<T> cuts;
+    cuts.reserve(numPts + 2);
+    cuts.push_back(T(0));
+    cuts.push_back(T(1));
+
+    for (U32 i = 0, j = numPts - 1; i < numPts; j = i++) {
+        const Vec2<T>& p0 = poly[j];
+        const Vec2<T>& p1 = poly[i];
+
+        const Vec2<T> edgeDir = p1 - p0;
+        const T edgeLen = edgeDir.length();
+        if (edgeLen <= eps) {
+            continue; // degenerate edge (e.g. explicit closing vertex)
+        }
+
+        const Vec2<T> rel = p0 - segA;
+        const T det = segDir.cross(edgeDir);
+
+        // Relative parallelism test: |det| == |segDir| * |edgeDir| * sin(angle)
+        if (std::abs(det) > T(1e-9) * segLen * edgeLen) {
+            // Proper crossing: solve segA + t * segDir == p0 + u * edgeDir
+            const T t = rel.cross(edgeDir) / det;
+            const T u = rel.cross(segDir) / det;
+            const T uEps = eps / edgeLen;
+
+            // t == 0 and t == 1 are already in the cut list; u is widened by
+            // uEps so a segment passing exactly through a polygon vertex still
+            // produces its cut.
+            if (t > tEps && t < T(1) - tEps && u > -uEps && u < T(1) + uEps) {
+                cuts.push_back(t);
+            }
+            continue;
+        }
+
+        // Parallel edge: only relevant when actually collinear with the segment
+        // line. |rel.cross(segDir)| == perpDistance * segLen.
+        if (std::abs(rel.cross(segDir)) > eps * segLen) {
+            continue;
+        }
+
+        // Collinear overlap: cut where the edge endpoints project onto us.
+        const T t0 = (p0 - segA).dot(segDir) * invLenSq;
+        const T t1 = (p1 - segA).dot(segDir) * invLenSq;
+        for (T tv : {t0, t1}) {
+            if (tv > tEps && tv < T(1) - tEps) {
+                cuts.push_back(tv);
+            }
+        }
+    }
+
+    std::sort(cuts.begin(), cuts.end());
+
+    // -- 2. Classify each sub-interval by its midpoint, keeping the selected
+    //       ones and merging contiguous runs.
+    bool hasPending = false;
+    T pendingStart = T(0);
+    T pendingEnd = T(0);
+
+    auto flush = [&]() {
+        if (!hasPending) {
+            return;
+        }
+        // Reuse the original endpoints verbatim when the span reaches them, so
+        // an unclipped segment round-trips bit-exactly.
+        const Vec2<T> pa =
+            pendingStart <= tEps ? segA : segA + segDir * pendingStart;
+        const Vec2<T> pb =
+            pendingEnd >= T(1) - tEps ? segB : segA + segDir * pendingEnd;
+        result.push_back({pa, pb});
+        hasPending = false;
+    };
+
+    for (U32 i = 0; i + 1 < U32(cuts.size()); ++i) {
+        const T t0 = cuts[i];
+        const T t1 = cuts[i + 1];
+        if (t1 - t0 <= tEps) {
+            continue; // duplicate cut / zero-length slice
+        }
+
+        // A midpoint can only land on the boundary when the whole slice runs
+        // along an edge: any transversal touch would itself be a cut and would
+        // have split this interval further.
+        const Vec2<T> mid = segA + segDir * ((t0 + t1) * T(0.5));
+
+        if (!should_keep(mid)) {
+            flush();
+            continue;
+        }
+
+        if (hasPending && std::abs(t0 - pendingEnd) <= tEps) {
+            pendingEnd = t1;
+        } else {
+            flush();
+            pendingStart = t0;
+            pendingEnd = t1;
+            hasPending = true;
+        }
+    }
+
+    flush();
+
+    return result;
+}
+
+// Convenience wrappers around seg2_clip_by_polygon.
+
+template <typename T>
+auto seg2_clip_outside_polygon(const Vec2<T>& segA, const Vec2<T>& segB,
+                               const Vector<Vec2<T>>& poly,
+                               bool keepBoundaryParts = false, T eps = T(1e-6))
+    -> Span2Vector<T> {
+    return seg2_clip_by_polygon(segA, segB, poly, /*keepInside=*/false,
+                                keepBoundaryParts, eps);
+}
+
+template <typename T>
+auto seg2_clip_inside_polygon(const Vec2<T>& segA, const Vec2<T>& segB,
+                              const Vector<Vec2<T>>& poly,
+                              bool keepBoundaryParts = true, T eps = T(1e-6))
+    -> Span2Vector<T> {
+    return seg2_clip_by_polygon(segA, segB, poly, /*keepInside=*/true,
+                                keepBoundaryParts, eps);
+}
+
 } // namespace nv
 
 #endif
