@@ -145,7 +145,7 @@ template <typename T> auto smoothstep01(T t) -> T {
 }
 
 template <typename T> constexpr auto default_epsilon() -> T {
-    if constexpr (std::is_same_v<T, F64>) {
+    if constexpr (std::is_same_v<T, double>) {
         return static_cast<T>(1e-12);
     } else {
         return static_cast<T>(1e-6); // fallback
