@@ -15,14 +15,6 @@
 
 namespace nv {
 
-template <typename T> constexpr auto default_epsilon() -> T {
-    if constexpr (std::is_same_v<T, F64>) {
-        return static_cast<T>(1e-12);
-    } else {
-        return static_cast<T>(1e-6); // fallback
-    }
-}
-
 #define MAT_RC(row, col) _mat[(col)][(row)]
 
 #define SET_ROW(row, v1, v2, v3, v4)                                           \
@@ -148,11 +140,10 @@ template <typename T> class Mat4 {
         }
     }
 
-    auto almost_equals(const Mat4& rhs,
-                       value_t epsilon = -1.0) -> bool {
+    auto almost_equals(const Mat4& rhs, value_t epsilon = -1.0) -> bool {
         const value_t* p0 = ptr();
         const value_t* p1 = rhs.ptr();
-        if(epsilon<0.0) {
+        if (epsilon < 0.0) {
             epsilon = default_epsilon<value_t>();
         }
         for (int i = 0; i < num_elements; ++i) {

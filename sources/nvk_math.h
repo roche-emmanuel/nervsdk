@@ -144,6 +144,14 @@ template <typename T> auto smoothstep01(T t) -> T {
     return t * t * (3.0 - 2.0 * t);
 }
 
+template <typename T> constexpr auto default_epsilon() -> T {
+    if constexpr (std::is_same_v<T, F64>) {
+        return static_cast<T>(1e-12);
+    } else {
+        return static_cast<T>(1e-6); // fallback
+    }
+}
+
 } // namespace nv
 
 #endif

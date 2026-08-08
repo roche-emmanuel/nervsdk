@@ -107,11 +107,19 @@ template <typename T> struct Vec2 {
         return _v[0] * rhs._v[1] - _v[1] * rhs._v[0];
     }
 
+    [[nodiscard]] auto almostEquals(const Vec2& rhs, value_t eps = -1.0) const
+        -> bool {
+        if (eps < 0.0) {
+            eps = default_epsilon<value_t>();
+        }
+        return (*this - rhs).length() <= eps;
+    }
+
     // Compute the ccw 90deg rotated vector:
-    [[nodiscard]] inline auto ccw90() const -> Vec2 { return {-_v[1], _v[0]}; }
+    [[nodiscard]] auto ccw90() const -> Vec2 { return {-_v[1], _v[0]}; }
 
     // Compute the cw 90deg rotated vector:
-    [[nodiscard]] inline auto cw90() const -> Vec2 { return {_v[1], -_v[0]}; }
+    [[nodiscard]] auto cw90() const -> Vec2 { return {_v[1], -_v[0]}; }
 
     [[nodiscard]] inline auto rotated(value_t angle) const -> Vec2 {
         auto c = std::cos(angle);
