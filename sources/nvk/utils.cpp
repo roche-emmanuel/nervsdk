@@ -216,16 +216,48 @@ auto base64_encode(const Vector<U8>& data) -> String {
     return base64_encode(data.data(), data.size());
 }
 
-std::string WStringToString(const std::wstring& wstr) {
+auto WStringToString(const std::wstring& wstr) -> std::string {
     if (wstr.empty())
         return std::string();
 
-    int size_needed = WideCharToMultiByte(
-        CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0],
-                        size_needed, NULL, NULL);
-    return strTo;
+#if defined(_WIN32)
+    int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(),
+                                         NULL, 0, NULL, NULL);
+    std::string result(sizeNeeded, 0);
+    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0],
+                        sizeNeeded, NULL, NULL);
+    return result;
+#else
+    // On Linux/Emscripten wchar_t is 4 bytes (UTF-32 codepoints),
+    // so decode codepoints directly and encode as UTF-8 by hand.
+    std::string result;
+    result.reserve(wstr.size() * 4);
+
+    for (wchar_t wc : wstr) {
+        auto codepoint = static_cast<U32>(wc);
+
+        if (codepoint <= 0x7F) {
+            result.push_back(static_cast<char>(codepoint));
+        } else if (codepoint <= 0x7FF) {
+            result.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0xFFFF) {
+            result.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+            result.push_back(
+                static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else {
+            result.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+            result.push_back(
+                static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            result.push_back(
+                static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+    }
+
+    return result;
+#endif
 }
 
 void sleep_s(U32 secs) {
