@@ -41,8 +41,8 @@ class TerrainField {
     TerrainField() = default;
     TerrainField(const TerrainField&) = delete;
     auto operator=(const TerrainField&) -> TerrainField& = delete;
-    TerrainField(TerrainField&&) = delete;
-    auto operator=(TerrainField&&) -> TerrainField& = delete;
+    TerrainField(TerrainField&&) = default;
+    auto operator=(TerrainField&&) -> TerrainField& = default;
     virtual ~TerrainField() = default;
 
     /// Height at a point (m MSL). Off-map reads as the map edge, clamped,
