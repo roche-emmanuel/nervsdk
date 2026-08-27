@@ -39,8 +39,8 @@ namespace nv {
 class TerrainField {
   public:
     TerrainField() = default;
-    TerrainField(const TerrainField&) = default;
-    auto operator=(const TerrainField&) -> TerrainField& = default;
+    TerrainField(const TerrainField&) = delete;
+    auto operator=(const TerrainField&) -> TerrainField& = delete;
     TerrainField(TerrainField&&) = default;
     auto operator=(TerrainField&&) -> TerrainField& = default;
     virtual ~TerrainField() = default;
