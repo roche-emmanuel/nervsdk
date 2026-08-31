@@ -12,6 +12,20 @@
 // WGS84 file means (longitude, latitude) in that order, per the spec.
 // Projecting them is the caller's job, and deliberately so: nvk has no
 // business knowing about the world's origin.
+//
+// The third coordinate
+// --------------------
+// RFC 7946 allows a position to carry a third element, and reads it as an
+// altitude above the WGS84 ellipsoid. Almost nobody authoring by hand means
+// that: KML calls the same slot `relativeToGround` or `absolute` depending on
+// an explicit mode property, and hand-drawn route files follow suit. So this
+// reader stores the value without interpreting it, in `ringsZ`, and leaves
+// the meaning entirely to the caller's own `altitude_mode` property.
+//
+// `ringsZ` is either empty (no position in the geometry carried a Z) or
+// exactly parallel to `rings`. Never partially filled: a geometry where only
+// some positions have a third element gets 0.0 for the rest, because a
+// caller indexing in parallel must never have to bounds-check.
 
 #ifndef _NV_GEOJSONDOC_H_
 #define _NV_GEOJSONDOC_H_
@@ -50,6 +64,11 @@ struct GeoGeometry {
 
     Vector<Vector<Vec2d>> rings;
 
+    /// Third coordinate per position, same shape as `rings`. Empty when no
+    /// position in the geometry carried one — which is the overwhelmingly
+    /// common case, so consumers that do not care pay nothing.
+    Vector<Vector<F64>> ringsZ;
+
     /// Index into `rings` of the first ring of each part. Size is the number
     /// of parts + 1, CSR style. For everything except multi_polygon this is
     /// simply {0, rings.size()}.
@@ -62,6 +81,14 @@ struct GeoGeometry {
     [[nodiscard]] auto is_valid() const -> bool {
         return type != GeoGeomType::unknown && !rings.empty();
     }
+
+    [[nodiscard]] auto has_z() const -> bool { return !ringsZ.empty(); }
+
+    /// Third coordinate of one position, or 0.0 when the geometry carries
+    /// none. Out-of-range indices also read 0.0 rather than asserting: a
+    /// caller walking `rings` in parallel should not need a second bounds
+    /// check for the optional channel.
+    [[nodiscard]] auto z_at(U32 ringIdx, U32 ptIdx) const -> F64;
 
     /// Every coordinate, in order. Handy for a bounding box or a centroid.
     [[nodiscard]] auto all_points() const -> Vector<Vec2d>;
