@@ -72,6 +72,55 @@ auto polygon2_union_inflated(const Vector<Polygon2d>& inputs, F64 offset,
     return paths_to_polygon2_vector(shrunk);
 }
 
+auto polygon2_offset(const Polygon2d& poly, F64 offset, I32 joinType)
+    -> Vector<Polygon2d> {
+    if (poly.coords.size() < 3) {
+        return {};
+    }
+
+    Clipper2Lib::PathsD subjectPaths{polygon2_to_path(poly)};
+    auto jType = (Clipper2Lib::JoinType)joinType;
+    F64 miterLimit = 2.0;
+
+    Clipper2Lib::PathsD solution = Clipper2Lib::InflatePaths(
+        subjectPaths, offset, jType, Clipper2Lib::EndType::Polygon, miterLimit);
+
+    return paths_to_polygon2_vector(solution);
+}
+
+auto polygon2_smooth_chaikin(const Polygon2d& poly, U32 iterations,
+                             F64 cutRatio) -> Polygon2d {
+    if (iterations == 0 || poly.coords.size() < 3) {
+        return poly;
+    }
+
+    F64 ratio = std::clamp(cutRatio, 0.0, 0.5);
+
+    Polygon2d current = poly;
+
+    for (U32 it = 0; it < iterations; ++it) {
+        const U32 n = U32(current.coords.size());
+        if (n < 3) {
+            break;
+        }
+
+        Polygon2d next;
+        next.coords.reserve(size_t(n) * 2);
+
+        for (U32 i = 0; i < n; ++i) {
+            const Vec2d& p0 = current.coords[i];
+            const Vec2d& p1 = current.coords[(i + 1) % n];
+
+            next.coords.push_back(p0 + (p1 - p0) * ratio);
+            next.coords.push_back(p0 + (p1 - p0) * (1.0 - ratio));
+        }
+
+        current = std::move(next);
+    }
+
+    return current;
+}
+
 auto polygon2_difference(const Vector<Polygon2d>& subjects,
                          const Vector<Polygon2d>& clips, I32 fillRule)
     -> Vector<Polygon2d> {

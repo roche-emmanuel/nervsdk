@@ -72,6 +72,36 @@ auto polygon2_union_inflated(const Vector<Polygon2d>& inputs, F64 offset,
                              I32 joinType = PATH_JOIN_ROUND)
     -> Vector<Polygon2d>;
 
+// ---------------------------------------------------------------------------
+// polygon2_offset
+//
+// Offsets a single closed polygon by `offset` (positive grows outward,
+// negative shrinks inward), using Clipper2's polygon end type so the ring is
+// treated as closed rather than as an open, capped polyline (cf.
+// Polygon2::inflated(), which defaults to round end caps and is meant for
+// open lines, not for eroding/growing a closed ring). A negative offset
+// larger than the polygon can sustain collapses it down to nothing, in which
+// case an empty vector is returned; a non-convex input can also split into
+// several parts, one per output entry.
+// ---------------------------------------------------------------------------
+auto polygon2_offset(const Polygon2d& poly, F64 offset,
+                     I32 joinType = PATH_JOIN_ROUND) -> Vector<Polygon2d>;
+
+// ---------------------------------------------------------------------------
+// polygon2_smooth_chaikin
+//
+// Smooths a closed polygon's silhouette via Chaikin's corner-cutting
+// subdivision: each edge (p_i, p_i+1) is replaced by 2 points cut in from
+// either end by `cutRatio` (clamped to [0, 0.5]; 0.25 is Chaikin's original
+// value), run for `iterations` rounds. Every cut point lies strictly between
+// its 2 source vertices, so the result never expands past the input's own
+// edges -- it only ever cuts corners inward -- which keeps it safely inside
+// whatever the input itself was already inside (eg. the junction bag polygon
+// it was offset from). iterations == 0 returns the input unchanged.
+// ---------------------------------------------------------------------------
+auto polygon2_smooth_chaikin(const Polygon2d& poly, U32 iterations,
+                             F64 cutRatio = 0.25) -> Polygon2d;
+
 auto polygon2_difference(const Vector<Polygon2d>& subjects,
                          const Vector<Polygon2d>& clips,
                          I32 fillRule = FILL_NONZERO) -> Vector<Polygon2d>;
