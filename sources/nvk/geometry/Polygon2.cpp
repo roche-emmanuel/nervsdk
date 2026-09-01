@@ -121,6 +121,90 @@ auto polygon2_smooth_chaikin(const Polygon2d& poly, U32 iterations,
     return current;
 }
 
+auto polygon2_resample(const Polygon2d& poly, F64 stepCm) -> Polygon2d {
+    const U32 n = U32(poly.coords.size());
+    if (n < 2 || stepCm <= 0.0) {
+        return poly;
+    }
+
+    // Perimeter length, closing the loop from the last vertex back to the
+    // first:
+    F64 perimeter = 0.0;
+    for (U32 i = 0; i < n; ++i) {
+        perimeter += (poly.coords[(i + 1) % n] - poly.coords[i]).length();
+    }
+
+    if (perimeter <= stepCm) {
+        return poly;
+    }
+
+    U32 numSamples = std::max(U32(3), U32(std::round(perimeter / stepCm)));
+    F64 actualStep = perimeter / F64(numSamples);
+
+    Polygon2d out;
+    out.coords.reserve(numSamples);
+
+    U32 seg = 0;
+    F64 segStart = 0.0;
+    F64 segLen = (poly.coords[(seg + 1) % n] - poly.coords[seg]).length();
+
+    for (U32 s = 0; s < numSamples; ++s) {
+        F64 target = F64(s) * actualStep;
+
+        while (seg < n - 1 && segStart + segLen < target) {
+            segStart += segLen;
+            ++seg;
+            segLen = (poly.coords[(seg + 1) % n] - poly.coords[seg]).length();
+        }
+
+        F64 t = segLen > 1e-9 ? (target - segStart) / segLen : 0.0;
+        t = std::clamp(t, 0.0, 1.0);
+
+        const Vec2d& p0 = poly.coords[seg];
+        const Vec2d& p1 = poly.coords[(seg + 1) % n];
+        out.coords.push_back(p0 + (p1 - p0) * t);
+    }
+
+    return out;
+}
+
+auto polygon2_smooth_window_mean(const Polygon2d& poly, F64 stepCm,
+                                 U32 windowRadius, U32 iterations)
+    -> Polygon2d {
+    Polygon2d current = polygon2_resample(poly, stepCm);
+
+    if (iterations == 0 || windowRadius == 0 || current.coords.size() < 3) {
+        return current;
+    }
+
+    for (U32 it = 0; it < iterations; ++it) {
+        const U32 n = U32(current.coords.size());
+        if (n < 3) {
+            break;
+        }
+
+        // Cap the radius so the window never wraps onto itself on a very
+        // sparse ring:
+        U32 radius = std::min(windowRadius, (n - 1) / 2);
+
+        Polygon2d next;
+        next.coords.resize(n);
+
+        for (U32 i = 0; i < n; ++i) {
+            Vec2d sum{0.0, 0.0};
+            for (I32 k = -I32(radius); k <= I32(radius); ++k) {
+                U32 j = U32((I32(i) + k + I32(n)) % I32(n));
+                sum += current.coords[j];
+            }
+            next.coords[i] = sum / F64(2 * radius + 1);
+        }
+
+        current = std::move(next);
+    }
+
+    return current;
+}
+
 auto polygon2_difference(const Vector<Polygon2d>& subjects,
                          const Vector<Polygon2d>& clips, I32 fillRule)
     -> Vector<Polygon2d> {

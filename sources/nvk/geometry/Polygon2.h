@@ -102,6 +102,38 @@ auto polygon2_offset(const Polygon2d& poly, F64 offset,
 auto polygon2_smooth_chaikin(const Polygon2d& poly, U32 iterations,
                              F64 cutRatio = 0.25) -> Polygon2d;
 
+// ---------------------------------------------------------------------------
+// polygon2_resample
+//
+// Resamples a closed polygon at a fixed arc-length step around its full
+// perimeter (the last vertex connects back to the first -- there is no
+// pinned "first"/"last" endpoint the way an open polyline resample has).
+// Degenerate input (fewer than 2 points, or a perimeter shorter than
+// stepCm) is returned unchanged.
+// ---------------------------------------------------------------------------
+auto polygon2_resample(const Polygon2d& poly, F64 stepCm) -> Polygon2d;
+
+// ---------------------------------------------------------------------------
+// polygon2_smooth_window_mean
+//
+// Smooths a closed polygon's silhouette by first resampling it at `stepCm`
+// (a dense, evenly-spaced point set is what makes the windowed mean below
+// behave consistently regardless of the input's original vertex spacing),
+// then running `iterations` rounds of a windowed mean: each round replaces
+// every point with the mean of the `windowRadius` closest points on either
+// side of it along the ring (2*windowRadius + 1 points total, wrapping
+// across the closed loop). Every point in a round is read from the
+// *previous* round's list, so a round is a consistent snapshot rather than
+// a smear that depends on iteration order.
+//
+// Unlike Chaikin corner-cutting, this has no built-in guarantee of staying
+// inside the source polygon -- a tight concave pinch can bulge slightly
+// outward under enough smoothing. Worth checking against the source (eg.
+// via polygon2_difference) if strict containment matters for the caller.
+// ---------------------------------------------------------------------------
+auto polygon2_smooth_window_mean(const Polygon2d& poly, F64 stepCm,
+                                 U32 windowRadius, U32 iterations) -> Polygon2d;
+
 auto polygon2_difference(const Vector<Polygon2d>& subjects,
                          const Vector<Polygon2d>& clips,
                          I32 fillRule = FILL_NONZERO) -> Vector<Polygon2d>;
