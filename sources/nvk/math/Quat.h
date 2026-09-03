@@ -307,6 +307,116 @@ template <typename T> class Quaternion {
         return conj() / length2();
     }
 
+    /** Return the local +X axis (right, WebGPU convention) of this rotation,
+     * expressed in the parent frame. */
+    [[nodiscard]] auto right() const -> Vec3<T> {
+        const value_t x = _v[0];
+        const value_t y = _v[1];
+        const value_t z = _v[2];
+        const value_t w = _v[3];
+
+        return {value_t(1) - value_t(2) * (y * y + z * z),
+                value_t(2) * (x * y + w * z), value_t(2) * (x * z - w * y)};
+    }
+
+    /** Return the local +Y axis (up, WebGPU convention) of this rotation,
+     * expressed in the parent frame. */
+    [[nodiscard]] auto up() const -> Vec3<T> {
+        const value_t x = _v[0];
+        const value_t y = _v[1];
+        const value_t z = _v[2];
+        const value_t w = _v[3];
+
+        return {value_t(2) * (x * y - w * z),
+                value_t(1) - value_t(2) * (x * x + z * z),
+                value_t(2) * (y * z + w * x)};
+    }
+
+    /** Return the local +Z axis (forward, WebGPU convention) of this rotation,
+     * expressed in the parent frame. */
+    [[nodiscard]] auto forward() const -> Vec3<T> {
+        const value_t x = _v[0];
+        const value_t y = _v[1];
+        const value_t z = _v[2];
+        const value_t w = _v[3];
+
+        return {value_t(2) * (x * z + w * y), value_t(2) * (y * z - w * x),
+                value_t(1) - value_t(2) * (x * x + y * y)};
+    }
+
+    /** Build the rotation whose local forward (+Z) and up (+Y) axes match the
+     * given vectors, expressed in the parent frame (WebGPU convention:
+     * X=right, Y=up, Z=forward).
+     *
+     * The inputs need not be normalized nor orthogonal: 'fwd' is honoured
+     * exactly, and 'up' is only used as a hint to resolve the roll around it.
+     *
+     * Degenerate cases are handled without asserting: a null 'fwd' yields the
+     * identity, and an 'up' colinear with 'fwd' falls back to an arbitrary but
+     * stable reference axis. */
+    [[nodiscard]] static auto from_axes(const Vec3<T>& fwd, const Vec3<T>& up)
+        -> Quaternion {
+        const value_t eps = value_t(1e-12);
+
+        Vec3<T> zaxis = fwd;
+        value_t flen = zaxis.length();
+        if (flen < eps) {
+            // Degenerate forward direction: nothing sensible to build.
+            return {};
+        }
+        zaxis /= flen;
+
+        // In this frame X ^ Y = Z, hence right = up ^ forward.
+        Vec3<T> xaxis = up ^ zaxis;
+        if (xaxis.length2() < eps) {
+            // 'up' is colinear with 'fwd': roll is undefined, pick a stable
+            // reference axis instead of failing.
+            Vec3<T> ref = std::abs(zaxis.y()) < value_t(0.9)
+                              ? Vec3<T>(value_t(0), value_t(1), value_t(0))
+                              : Vec3<T>(value_t(1), value_t(0), value_t(0));
+            xaxis = ref ^ zaxis;
+        }
+        xaxis.normalize();
+
+        Vec3<T> yaxis = zaxis ^ xaxis;
+
+        // Rotation matrix columns are the images of X, Y, Z: this matches the
+        // layout produced by Matrix4::set_rotate().
+        const value_t m00 = xaxis.x();
+        const value_t m10 = xaxis.y();
+        const value_t m20 = xaxis.z();
+        const value_t m01 = yaxis.x();
+        const value_t m11 = yaxis.y();
+        const value_t m21 = yaxis.z();
+        const value_t m02 = zaxis.x();
+        const value_t m12 = zaxis.y();
+        const value_t m22 = zaxis.z();
+
+        const value_t trace = m00 + m11 + m22;
+
+        if (trace > value_t(0)) {
+            value_t s = sqrt(trace + value_t(1)) * value_t(2);
+            return {(m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s,
+                    value_t(0.25) * s};
+        }
+
+        if (m00 > m11 && m00 > m22) {
+            value_t s = sqrt(value_t(1) + m00 - m11 - m22) * value_t(2);
+            return {value_t(0.25) * s, (m01 + m10) / s, (m02 + m20) / s,
+                    (m21 - m12) / s};
+        }
+
+        if (m11 > m22) {
+            value_t s = sqrt(value_t(1) + m11 - m00 - m22) * value_t(2);
+            return {(m01 + m10) / s, value_t(0.25) * s, (m12 + m21) / s,
+                    (m02 - m20) / s};
+        }
+
+        value_t s = sqrt(value_t(1) + m22 - m00 - m11) * value_t(2);
+        return {(m02 + m20) / s, (m12 + m21) / s, value_t(0.25) * s,
+                (m10 - m01) / s};
+    }
+
     // Static constructor from yaw-pitch-roll for WebGPU convention
     // Coordinate system: X=right, Y=up, Z=forward (right-handed)
     // Convention: yaw around Y (up), pitch around X (right), roll around Z
