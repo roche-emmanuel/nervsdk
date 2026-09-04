@@ -74,6 +74,22 @@ template <typename T>
     return {ypr.y(), -ypr.x(), -ypr.z()};
 }
 
+/** Build a UE-frame rotation quaternion from forward/up axes expressed in the
+ * UE frame. Equivalent to converting both axes to the native frame, calling
+ * Quaternion::from_axes(), and converting the result back to UE — this just
+ * names that round trip so call sites don't have to spell it out.
+ *
+ * The inputs need not be normalized nor orthogonal: 'ueFwd' is honoured
+ * exactly, and 'ueUp' is only used as a hint to resolve the roll around it.
+ * The result is a Quaternion object holding FQuat components: only hand it
+ * to FQuat, never multiply it with native quaternions. */
+template <typename T>
+[[nodiscard]] inline auto unreal_from_axes(const Vec3<T>& ueFwd,
+                                           const Vec3<T>& ueUp)
+    -> Quaternion<T> {
+    return toUE(Quaternion<T>::from_axes(fromUE(ueFwd), fromUE(ueUp)));
+}
+
 } // namespace nv
 
 #endif
