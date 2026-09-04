@@ -965,4 +965,67 @@ void build_anticipatory_profile(
         adj[i] = std::max(adj[i], ribs[i].z);
 }
 
+void recompute_smooth_normals(Vector<CellVertex>& verts,
+                              const Vector<U32>& indices, U32 rangeBegin,
+                              U32 rangeEnd) {
+    for (U32 i = rangeBegin; i < rangeEnd; ++i) {
+        verts[i].nx = 0.F;
+        verts[i].ny = 0.F;
+        verts[i].nz = 0.F;
+    }
+
+    const U32 numIdx = U32(indices.size());
+    for (U32 t = 0; t + 2 < numIdx; t += 3) {
+        const U32 ia = indices[t];
+        const U32 ib = indices[t + 1];
+        const U32 ic = indices[t + 2];
+        // Only process triangles whose vertices are all in the target range.
+        if (ia < rangeBegin || ia >= rangeEnd)
+            continue;
+        if (ib < rangeBegin || ib >= rangeEnd)
+            continue;
+        if (ic < rangeBegin || ic >= rangeEnd)
+            continue;
+
+        const CellVertex& va = verts[ia];
+        const CellVertex& vb = verts[ib];
+        const CellVertex& vc = verts[ic];
+
+        const F32 e1x = vb.px - va.px;
+        const F32 e1y = vb.py - va.py;
+        const F32 e1z = vb.pz - va.pz;
+        const F32 e2x = vc.px - va.px;
+        const F32 e2y = vc.py - va.py;
+        const F32 e2z = vc.pz - va.pz;
+        const F32 cx = e1y * e2z - e1z * e2y;
+        const F32 cy = e1z * e2x - e1x * e2z;
+        const F32 cz = e1x * e2y - e1y * e2x;
+
+        verts[ia].nx += cx;
+        verts[ia].ny += cy;
+        verts[ia].nz += cz;
+        verts[ib].nx += cx;
+        verts[ib].ny += cy;
+        verts[ib].nz += cz;
+        verts[ic].nx += cx;
+        verts[ic].ny += cy;
+        verts[ic].nz += cz;
+    }
+
+    for (U32 i = rangeBegin; i < rangeEnd; ++i) {
+        const F32 lenSq = verts[i].nx * verts[i].nx +
+                          verts[i].ny * verts[i].ny + verts[i].nz * verts[i].nz;
+        if (lenSq > 1e-6F) {
+            const F32 inv = 1.F / std::sqrt(lenSq);
+            verts[i].nx *= inv;
+            verts[i].ny *= inv;
+            verts[i].nz *= inv;
+        } else {
+            verts[i].nx = 0.F;
+            verts[i].ny = 0.F;
+            verts[i].nz = 1.F;
+        }
+    }
+}
+
 } // namespace nv

@@ -208,6 +208,15 @@ struct TileGeom {
     Vector<U32> indices;
 };
 
+// Recomputes smooth per-vertex normals for the triangles in `indices` whose
+// 3 vertex indices all fall within [rangeBegin, rangeEnd) of `verts`.
+// Vertices outside the range are untouched, and triangles referencing even
+// one vertex outside the range are skipped (so unrelated geometry sharing
+// the same buffers, e.g. a following skirt strip, is left alone).
+void recompute_smooth_normals(Vector<CellVertex>& verts,
+                              const Vector<U32>& indices, U32 rangeBegin,
+                              U32 rangeEnd);
+
 // One road cross-section. left/right are world-XY (cm). z is the shared
 // surface elevation (cm, terrain max under the cross-section, WITHOUT the road
 // Z bias — tessellation adds that). u is cumulative centreline distance (cm).
