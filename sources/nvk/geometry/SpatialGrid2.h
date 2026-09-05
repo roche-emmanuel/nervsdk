@@ -30,6 +30,20 @@ namespace nv {
  * one of them matches; callers that need a unique set should dedupe (e.g.
  * via an UnorderedSet) if that matters for their use case.
  *
+ * This is a *conservative* broad-phase filter, not an exact spatial test:
+ * an entry is bucketed into every cell its box touches, and a query returns
+ * everything bucketed into the cells its own box touches. Two boxes can
+ * each touch a shared cell without their actual extents overlapping — e.g.
+ * one hugging the near corner of a cell and the other hugging the far
+ * corner of that same cell — so a query can report a value whose real box
+ * does not overlap the query's real box. What the grid does guarantee is no
+ * false negatives: anything that genuinely overlaps the query is always
+ * bucketed into at least one cell the query also touches, so it is always
+ * returned. Callers that need an exact answer (as opposed to a shortlist to
+ * narrow down) must follow up with their own precise test on each
+ * candidate — exactly how GroundVehiclePlacer uses this grid to shortlist
+ * nearby vehicles before running the real OBox3::intersects() check.
+ *
  * Not thread-safe, and not rebuilt automatically — every caller of this
  * grid already knows exactly when its point set changes, so insert() is
  * left explicit rather than the grid re-scanning some external container on
