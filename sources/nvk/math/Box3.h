@@ -1,6 +1,7 @@
 #ifndef _NV_BOX3_H_
 #define _NV_BOX3_H_
 
+#include <nvk/math/Box2.h>
 #include <nvk/math/Vec3.h>
 #include <nvk_math.h>
 
@@ -51,7 +52,7 @@ template <typename T> struct Box3 {
      * Creates a new bounding box with the given coordinates.
      */
     Box3(value_t xmin, value_t xmax, value_t ymin, value_t ymax, value_t zmin,
-         value_t zmax)
+        value_t zmax)
         : xmin(xmin), xmax(xmax), ymin(ymin), ymax(ymax), zmin(zmin),
           zmax(zmax) {}
 
@@ -123,6 +124,25 @@ template <typename T> struct Box3 {
 
     /** Max vector */
     [[nodiscard]] auto maximum() const -> Vec3<T> { return {xmax, ymax, zmax}; }
+
+    /** This box's projection onto the XY plane — the X/Y bounds, dropping Z.
+        The usual case: flattening a world-space box down to a ground-plane
+        footprint, e.g. for a 2D broad-phase grid. */
+    [[nodiscard]] auto xy() const -> Box2<T> {
+        return Box2<T>(xmin, xmax, ymin, ymax);
+    }
+
+    /** This box's projection onto the XZ plane — the X bounds paired with
+        the Z bounds as the resulting Box2's second axis. */
+    [[nodiscard]] auto xz() const -> Box2<T> {
+        return Box2<T>(xmin, xmax, zmin, zmax);
+    }
+
+    /** This box's projection onto the YZ plane — the Y bounds paired with
+        the Z bounds as the resulting Box2's second axis. */
+    [[nodiscard]] auto yz() const -> Box2<T> {
+        return Box2<T>(ymin, ymax, zmin, zmax);
+    }
 
     /**
      * Casts this bounding box to another base value_t.
