@@ -57,6 +57,12 @@ void sleep_s(U32 secs);
 void sleep_ms(U32 msecs);
 void sleep_us(U32 usecs);
 
+// Convert a duration in seconds into a canonical human-readable string:
+//   "n days xxh yymin zz.fffs"
+// Negative durations are prefixed with '-'. Non-finite input triggers an
+// assertion failure.
+auto format_duration(F64 totalSeconds) -> String;
+
 auto WStringToString(const std::wstring& wstr) -> std::string;
 
 // Convert a string to upper characters:

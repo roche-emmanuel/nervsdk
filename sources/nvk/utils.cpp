@@ -1636,4 +1636,39 @@ auto build_connected_chains(const Vector<std::pair<I32, I32>>& links)
     return chains;
 }
 
+auto format_duration(F64 totalSeconds) -> String {
+    NVCHK(std::isfinite(totalSeconds),
+          "format_duration: totalSeconds must be finite, got {}", totalSeconds);
+
+    F64 absSeconds = std::abs(totalSeconds);
+
+    // Round to the millisecond first so downstream carries (e.g. 59.9997s ->
+    // 60.000s -> 1min 00.000s) are handled correctly by integer division.
+    U64 totalMillis = (U64)std::llround(absSeconds * 1000.0);
+
+    U64 millis = totalMillis % 1000;
+    U64 totalSecs = totalMillis / 1000;
+
+    U64 secs = totalSecs % 60;
+    U64 totalMins = totalSecs / 60;
+
+    U64 mins = totalMins % 60;
+    U64 totalHours = totalMins / 60;
+
+    U64 hours = totalHours % 24;
+    U64 days = totalHours / 24;
+
+    const char* sign = (totalSeconds < 0.0) ? "-" : "";
+
+    if (days > 0)
+        return fmt::format("{}{} days {:02}h{:02}m{:02}s", sign, days, hours,
+                           mins, secs);
+
+    if (hours > 0)
+        return fmt::format("{}{:02}h{:02}m{:02}s", sign, hours, mins, secs);
+    if (mins > 0)
+        return fmt::format("{}{:02}m{:02}s", sign, mins, secs);
+    return fmt::format("{}{:02}.{:03}s", sign, secs, millis);
+}
+
 } // namespace nv
