@@ -55,6 +55,8 @@ struct BuildingConstructor {
 
     void create_roof(const Vector<Vec2d>& ring);
 
+    void create_simple_facade(const Vec2d& a, const Vec2d& b);
+
   private:
     // ── Unit helpers. uvScale converts cm -> metres (~0.01). ────────────────
     [[nodiscard]] auto m_to_cm(F64 m) const -> F64 { return m / uvScale; }

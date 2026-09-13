@@ -392,4 +392,51 @@ void BuildingConstructor::create_roof(const Vector<Vec2d>& ring) {
     }
 };
 
+// nvk/pcg/BuildingConstructor.cpp
+
+void BuildingConstructor::create_simple_facade(const Vec2d& a, const Vec2d& b) {
+    Vec2d edgeDir = b - a;
+    const F64 edgeLen = edgeDir.length();
+    if (edgeLen < 1.0)
+        return; // degenerate edge < 1 cm
+
+    edgeDir = edgeDir / edgeLen;
+    // Same outward convention as create_facade(): CCW ring -> right-hand
+    // perpendicular of the edge direction points outward.
+    const Vec2d outward{edgeDir.y(), -edgeDir.x()};
+
+    const auto& wall = get_texture("wall");
+
+    const F64 edgeLenM = edgeLen * uvScale;
+    const F64 heightM = (topHeight - bottomHeight) * uvScale;
+
+    const U32 base = U32(geom->verts.size());
+
+    auto pushVert = [&](const Vec2d& p, F64 zAbs, F32 u0, F32 v0) {
+        CellVertex v{};
+        v.px = F32(p.x() - origin.x());
+        v.py = F32(p.y() - origin.y());
+        v.pz = F32(zAbs);
+        v.nx = F32(outward.x());
+        v.ny = F32(outward.y());
+        v.nz = 0.0F;
+        wall.scale_uv(u0, v0, v.u0, v.v0);
+        v.texIdx = F32(wall.index);
+        geom->verts.push_back(v);
+    };
+
+    pushVert(a, bottomHeight, 0.0F, 0.0F);
+    pushVert(a, topHeight, 0.0F, F32(heightM));
+    pushVert(b, bottomHeight, F32(edgeLenM), 0.0F);
+    pushVert(b, topHeight, F32(edgeLenM), F32(heightM));
+
+    // Same CCW winding as create_facade's two triangles.
+    geom->indices.push_back(base + 0);
+    geom->indices.push_back(base + 2);
+    geom->indices.push_back(base + 1);
+    geom->indices.push_back(base + 1);
+    geom->indices.push_back(base + 2);
+    geom->indices.push_back(base + 3);
+}
+
 } // namespace nv
