@@ -123,7 +123,7 @@ auto overture_land_use_class_from_string(const String& name) -> LandUseClass {
     return (it != kLandUseMap.end()) ? it->second : LandUseClass::unknown;
 }
 
-auto overture_land_class_to_string(LandUseClass luClass) -> String {
+auto overture_land_use_class_to_string(LandUseClass luClass) -> String {
     for (const auto& it : kLandUseMap) {
         if (it.second == luClass) {
             return it.first;
