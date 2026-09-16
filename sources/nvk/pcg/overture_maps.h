@@ -208,6 +208,19 @@ struct TileGeom {
     Vector<U32> indices;
 };
 
+struct CanopyVertex {
+    F32 px, py, pz;
+    F32 nx, ny, nz;
+    F32 u0, v0;
+    F32 r, g, b,
+        a; // a = shaped coverage (0 at dropped/skirt edges, 1 closed canopy)
+};
+
+struct CanopyGeom {
+    Vector<CanopyVertex> verts;
+    Vector<U32> indices;
+};
+
 // Recomputes smooth per-vertex normals for the triangles in `indices` whose
 // 3 vertex indices all fall within [rangeBegin, rangeEnd) of `verts`.
 // Vertices outside the range are untouched, and triangles referencing even
