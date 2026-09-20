@@ -277,7 +277,8 @@ inline auto format_msg(fmt::format_string<Args...> msg_format, Args&&... args)
 }
 
 template <typename... Args>
-inline void throw_msg(fmt::format_string<Args...> msg_format, Args&&... args) {
+[[noreturn]] inline void throw_msg(fmt::format_string<Args...> msg_format,
+                                   Args&&... args) {
     // logFATAL(fmt, std::forward<Args>(args)...);
     auto out = fmt::memory_buffer();
     fmt::format_to(std::back_inserter(out), msg_format,
