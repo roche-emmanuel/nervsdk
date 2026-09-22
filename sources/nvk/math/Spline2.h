@@ -29,7 +29,7 @@ template <typename T> struct ControlPoint2 {
     void autoTangent(const Vec2<T>& prev, const Vec2<T>& next,
                      value_t tension = 0.5) {
         Vec2<T> dir = (next - prev) * tension;
-        tangent_in = -dir;
+        tangent_in = dir;
         tangent_out = dir;
     }
 };
@@ -204,19 +204,17 @@ template <typename T> class Spline2 {
             if (!_closed && (i == 0 || i == n - 1)) {
                 // End points: use forward/backward difference
                 if (i == 0) {
-                    _control_points[i].tangent_out =
-                        (_control_points[next].position -
-                         _control_points[i].position) *
-                        tension;
-                    _control_points[i].tangent_in =
-                        -_control_points[i].tangent_out;
+                    point_t dir = (_control_points[next].position -
+                                   _control_points[i].position) *
+                                  tension;
+                    _control_points[i].tangent_out = dir;
+                    _control_points[i].tangent_in = dir;
                 } else {
-                    _control_points[i].tangent_in =
-                        -(_control_points[i].position -
-                          _control_points[prev].position) *
-                        tension;
-                    _control_points[i].tangent_out =
-                        -_control_points[i].tangent_in;
+                    point_t dir = (_control_points[i].position -
+                                   _control_points[prev].position) *
+                                  tension;
+                    _control_points[i].tangent_in = dir;
+                    _control_points[i].tangent_out = dir;
                 }
             } else {
                 _control_points[i].autoTangent(_control_points[prev].position,
