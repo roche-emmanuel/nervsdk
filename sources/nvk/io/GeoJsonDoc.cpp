@@ -65,19 +65,24 @@ auto read_position(const Json& jpos, Vec2d& out) -> bool {
 /// Reads one ring, filling `outZ` in parallel. `outHasZ` is set when *any*
 /// position in the ring carried a third element; positions in that ring
 /// that did not get 0.0, so the two vectors stay the same length either way.
-auto read_ring(const Json& jring, Vector<F64>& outZ, bool& outHasZ)
-    -> Vector<Vec2d> {
+/// `outHasZVec` records that per-position, same length as the ring, so a
+/// caller that cares which positions were actually authored — rather than
+/// defaulted to 0.0 — does not have to guess.
+auto read_ring(const Json& jring, Vector<F64>& outZ, Vector<bool>& outHasZVec,
+               bool& outHasZ) -> Vector<Vec2d> {
     Vector<Vec2d> ring;
     outZ.clear();
+    outHasZVec.clear();
     outHasZ = false;
-
+ 
     if (!jring.is_array()) {
         return ring;
     }
-
+ 
     ring.reserve(jring.size());
     outZ.reserve(jring.size());
-
+    outHasZVec.reserve(jring.size());
+ 
     for (const Json& jpos : jring) {
         Vec2d pos;
         F64 zval = 0.0;
@@ -85,17 +90,19 @@ auto read_ring(const Json& jring, Vector<F64>& outZ, bool& outHasZ)
         if (read_position(jpos, pos, zval, hasZ)) {
             ring.push_back(pos);
             outZ.push_back(zval);
+            outHasZVec.push_back(hasZ);
             outHasZ = outHasZ || hasZ;
         }
     }
-
+ 
     return ring;
 }
 
 auto read_ring(const Json& jring) -> Vector<Vec2d> {
     Vector<F64> zvals;
+    Vector<bool> hasZVec;
     bool hasZ = false;
-    return read_ring(jring, zvals, hasZ);
+    return read_ring(jring, zvals, hasZVec, hasZ);
 }
 
 /// Signed area of a ring; positive counter-clockwise.
@@ -157,6 +164,14 @@ auto GeoGeometry::z_at(U32 ringIdx, U32 ptIdx) const -> F64 {
     }
     const Vector<F64>& zvals = ringsZ[ringIdx];
     return ptIdx < U32(zvals.size()) ? zvals[ptIdx] : 0.0;
+}
+
+auto GeoGeometry::has_z_at(U32 ringIdx, U32 ptIdx) const -> bool {
+    if (ringIdx >= U32(ringsHasZ.size())) {
+        return false;
+    }
+    const Vector<bool>& flags = ringsHasZ[ringIdx];
+    return ptIdx < U32(flags.size()) && flags[ptIdx];
 }
 
 auto GeoGeometry::bounds() const -> Box2d {
@@ -324,68 +339,74 @@ namespace {
 
 auto parse_geometry(const Json& jgeom) -> GeoGeometry {
     GeoGeometry geom;
-
+ 
     if (!jgeom.is_object() || !jgeom.contains("type")) {
         return geom;
     }
-
+ 
     geom.type = type_from_name(jgeom.at("type").get<String>());
     if (geom.type == GeoGeomType::unknown || !jgeom.contains("coordinates")) {
         return geom;
     }
-
+ 
     const Json& coords = jgeom.at("coordinates");
-
+ 
     // Collected unconditionally and discarded at the end when nothing in the
     // geometry actually carried a Z. That keeps the "empty or exactly
-    // parallel" invariant without a pre-pass over the coordinates.
+    // parallel" invariant without a pre-pass over the coordinates — same
+    // pattern as ringsZ, applied to ringsHasZ too.
     Vector<Vector<F64>> ringsZ;
+    Vector<Vector<bool>> ringsHasZ;
     bool anyZ = false;
-
-    const auto pushRing = [&geom, &ringsZ, &anyZ](Vector<Vec2d>&& ring,
-                                                  Vector<F64>&& zvals,
-                                                  bool hasZ) {
+ 
+    const auto pushRing = [&geom, &ringsZ, &ringsHasZ, &anyZ](
+                              Vector<Vec2d>&& ring, Vector<F64>&& zvals,
+                              Vector<bool>&& hasZVec, bool hasZ) {
         if (ring.empty()) {
             return;
         }
         geom.rings.push_back(std::move(ring));
         ringsZ.push_back(std::move(zvals));
+        ringsHasZ.push_back(std::move(hasZVec));
         anyZ = anyZ || hasZ;
     };
-
+ 
     switch (geom.type) {
     case GeoGeomType::point: {
         Vec2d pos;
         F64 zval = 0.0;
         bool hasZ = false;
         if (read_position(coords, pos, zval, hasZ)) {
-            pushRing({pos}, {zval}, hasZ);
+            pushRing({pos}, {zval}, {hasZ}, hasZ);
         }
         break;
     }
-
+ 
     case GeoGeomType::multi_point:
     case GeoGeomType::line_string: {
         Vector<F64> zvals;
+        Vector<bool> hasZVec;
         bool hasZ = false;
-        Vector<Vec2d> ring = read_ring(coords, zvals, hasZ);
-        pushRing(std::move(ring), std::move(zvals), hasZ);
+        Vector<Vec2d> ring = read_ring(coords, zvals, hasZVec, hasZ);
+        pushRing(std::move(ring), std::move(zvals), std::move(hasZVec), hasZ);
         break;
     }
-
+ 
     case GeoGeomType::multi_line_string:
     case GeoGeomType::polygon: {
         if (coords.is_array()) {
             for (const Json& jring : coords) {
                 Vector<F64> zvals;
+                Vector<bool> hasZVec;
                 bool hasZ = false;
-                Vector<Vec2d> ring = read_ring(jring, zvals, hasZ);
-                pushRing(std::move(ring), std::move(zvals), hasZ);
+                Vector<Vec2d> ring = read_ring(jring, zvals, hasZVec, hasZ);
+                pushRing(std::move(ring), std::move(zvals),
+                         std::move(hasZVec), hasZ);
             }
         }
         break;
     }
-
+ 
     case GeoGeomType::multi_polygon: {
         if (coords.is_array()) {
             geom.partFirst.push_back(0);
@@ -395,28 +416,32 @@ auto parse_geometry(const Json& jgeom) -> GeoGeometry {
                 }
                 for (const Json& jring : jpoly) {
                     Vector<F64> zvals;
+                    Vector<bool> hasZVec;
                     bool hasZ = false;
-                    Vector<Vec2d> ring = read_ring(jring, zvals, hasZ);
-                    pushRing(std::move(ring), std::move(zvals), hasZ);
+                    Vector<Vec2d> ring =
+                        read_ring(jring, zvals, hasZVec, hasZ);
+                    pushRing(std::move(ring), std::move(zvals),
+                             std::move(hasZVec), hasZ);
                 }
                 geom.partFirst.push_back(U32(geom.rings.size()));
             }
         }
         break;
     }
-
+ 
     case GeoGeomType::unknown:
         break;
     }
-
+ 
     if (anyZ) {
         geom.ringsZ = std::move(ringsZ);
+        geom.ringsHasZ = std::move(ringsHasZ);
     }
-
+ 
     if (geom.partFirst.empty() && !geom.rings.empty()) {
         geom.partFirst = {0U, U32(geom.rings.size())};
     }
-
+ 
     return geom;
 }
 

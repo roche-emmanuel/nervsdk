@@ -61,47 +61,57 @@ enum class GeoGeomType : U8 {
 ///                              `partFirst` marking where each starts
 struct GeoGeometry {
     GeoGeomType type{GeoGeomType::unknown};
-
+ 
     Vector<Vector<Vec2d>> rings;
-
+ 
     /// Third coordinate per position, same shape as `rings`. Empty when no
     /// position in the geometry carried one — which is the overwhelmingly
     /// common case, so consumers that do not care pay nothing.
     Vector<Vector<F64>> ringsZ;
-
+ 
+    /// Per-position flag: true when that position's source coordinate array
+    /// actually had a third element, false when it was 2D and z_at() reads
+    /// 0.0 as a placeholder. Same shape as ringsZ, and populated under the
+    /// exact same condition (has_z() == true) — a caller building a mixed
+    /// 2D/3D geometry (some vertices authored with altitude, some without)
+    /// is the reason this exists; a caller that only ever wants "the third
+    /// coordinate, or 0" can keep using z_at() and ignore this entirely.
+    Vector<Vector<bool>> ringsHasZ;
+ 
     /// Index into `rings` of the first ring of each part. Size is the number
     /// of parts + 1, CSR style. For everything except multi_polygon this is
     /// simply {0, rings.size()}.
     Vector<U32> partFirst;
-
+ 
     [[nodiscard]] auto num_parts() const -> U32 {
         return partFirst.size() >= 2 ? U32(partFirst.size()) - 1 : 0;
     }
-
+ 
     [[nodiscard]] auto is_valid() const -> bool {
         return type != GeoGeomType::unknown && !rings.empty();
     }
-
+ 
     [[nodiscard]] auto has_z() const -> bool { return !ringsZ.empty(); }
-
+ 
     /// Third coordinate of one position, or 0.0 when the geometry carries
     /// none. Out-of-range indices also read 0.0 rather than asserting: a
     /// caller walking `rings` in parallel should not need a second bounds
     /// check for the optional channel.
     [[nodiscard]] auto z_at(U32 ringIdx, U32 ptIdx) const -> F64;
-
+ 
+    /// Whether the position at (ringIdx, ptIdx) carried its own third
+    /// coordinate, as opposed to z_at() reading 0.0 as a stand-in for "none
+    /// given". False for any out-of-range index and false whenever the
+    /// geometry has no Z channel at all (has_z() == false).
+    [[nodiscard]] auto has_z_at(U32 ringIdx, U32 ptIdx) const -> bool;
+ 
     /// Every coordinate, in order. Handy for a bounding box or a centroid.
     [[nodiscard]] auto all_points() const -> Vector<Vec2d>;
-
+ 
     [[nodiscard]] auto bounds() const -> Box2d;
-
-    /// Area-weighted centroid of the outer ring for a polygon, midpoint of
-    /// the arclength for a line, the point itself for a point. Falls back to
-    /// the vertex mean whenever the shape is degenerate.
+ 
     [[nodiscard]] auto centroid() const -> Vec2d;
-
-    /// Total planar length of every ring (degrees, or whatever the input
-    /// units are — the caller projects before caring).
+ 
     [[nodiscard]] auto length() const -> F64;
 };
 
