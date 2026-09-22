@@ -18,17 +18,17 @@ namespace nv {
 #undef PI_2
 #undef PI_4
 #endif
-const double PI = 3.14159265358979323846;
-const double PI_2 = 1.57079632679489661923;
-const double PI_4 = 0.78539816339744830962;
-const double LN_2 = 0.69314718055994530942;
-const double INVLN_2 = 1.0 / LN_2;
-const double EXP_1 = 2.718281828459045235360;
+constexpr double PI = std::numbers::pi;
+constexpr double PI_2 = 1.57079632679489661923;
+constexpr double PI_4 = 0.78539816339744830962;
+constexpr double LN_2 = std::numbers::ln2;
+constexpr double INVLN_2 = 1.0 / LN_2;
+constexpr double EXP_1 = std::numbers::e;
 
-const float PI_f = 3.14159265358979323846;
-const float PI_2_f = 1.57079632679489661923;
-const float PI_4_f = 0.78539816339744830962;
-const float EXP_1_f = 2.718281828459045235360;
+constexpr float PI_f = static_cast<float>(PI);
+constexpr float PI_2_f = static_cast<float>(PI_2);
+constexpr float PI_4_f = static_cast<float>(PI_4);
+constexpr float EXP_1_f = static_cast<float>(EXP_1);
 
 /**
  * Returns the arccosinus of x clamped to [-1,1].
