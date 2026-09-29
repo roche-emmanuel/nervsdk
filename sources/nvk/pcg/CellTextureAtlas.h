@@ -31,6 +31,7 @@ struct CellTextureEntry {
     String category;
     Set<String> styles;
     Vec2f dimsM;
+    String irClass;
 };
 
 void to_json(Json& j, const CellTextureEntry& e);

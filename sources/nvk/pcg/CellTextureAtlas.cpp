@@ -22,6 +22,9 @@ void to_json(Json& j, const CellTextureEntry& e) {
     if (!e.styles.empty()) {
         j["styles"] = e.styles;
     }
+    if (!e.irClass.empty()) {
+        j["ir_class"] = e.irClass;
+    }
 }
 
 void from_json(const Json& j, CellTextureEntry& e) {
@@ -47,6 +50,7 @@ void from_json(const Json& j, CellTextureEntry& e) {
     get_opt(j, "tiling", e.tiling);
     get_opt(j, "subtypes", e.subtypes);
     get_opt(j, "styles", e.styles);
+    get_opt(j, "ir_class", e.irClass);
 
     if (j.contains("subtype")) {
         String subtype;
