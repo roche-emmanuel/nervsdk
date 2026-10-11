@@ -203,6 +203,8 @@ class PromiseBase : public WeakRefObject {
     void execute_continuations();
 
     std::atomic<PromiseState> _state{PromiseState::PENDING};
+    // Elects the thread allowed to settle the promise (see Promise.cpp).
+    std::atomic<bool> _settling{false};
     Any _value;
     Any _error;
 

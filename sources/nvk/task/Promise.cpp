@@ -31,37 +31,37 @@ void Defer::reject(const Any& error) const {
 PromiseBase::PromiseBase() = default;
 
 void PromiseBase::resolve_internal() {
-    PromiseState expected = PromiseState::PENDING;
-    if (_state.compare_exchange_strong(expected, PromiseState::RESOLVED,
-                                       std::memory_order_acq_rel)) {
-        execute_continuations();
+    if (_settling.exchange(true, std::memory_order_acq_rel)) {
+        return;
     }
+    _state.store(PromiseState::RESOLVED, std::memory_order_release);
+    execute_continuations();
 }
 
 void PromiseBase::resolve_internal(const Any& value) {
-    PromiseState expected = PromiseState::PENDING;
-    if (_state.compare_exchange_strong(expected, PromiseState::RESOLVED,
-                                       std::memory_order_acq_rel)) {
-        _value = value;
-        execute_continuations();
+    if (_settling.exchange(true, std::memory_order_acq_rel)) {
+        return;
     }
+    _value = value;
+    _state.store(PromiseState::RESOLVED, std::memory_order_release);
+    execute_continuations();
 }
 
 void PromiseBase::reject_internal() {
-    PromiseState expected = PromiseState::PENDING;
-    if (_state.compare_exchange_strong(expected, PromiseState::REJECTED,
-                                       std::memory_order_acq_rel)) {
-        execute_continuations();
+    if (_settling.exchange(true, std::memory_order_acq_rel)) {
+        return;
     }
+    _state.store(PromiseState::REJECTED, std::memory_order_release);
+    execute_continuations();
 }
 
 void PromiseBase::reject_internal(const Any& error) {
-    PromiseState expected = PromiseState::PENDING;
-    if (_state.compare_exchange_strong(expected, PromiseState::REJECTED,
-                                       std::memory_order_acq_rel)) {
-        _error = error;
-        execute_continuations();
+    if (_settling.exchange(true, std::memory_order_acq_rel)) {
+        return;
     }
+    _error = error;
+    _state.store(PromiseState::REJECTED, std::memory_order_release);
+    execute_continuations();
 }
 
 void PromiseBase::execute_continuations() {
