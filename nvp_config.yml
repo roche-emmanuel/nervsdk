@@ -17,8 +17,11 @@ cmake_projects:
     version: "22.7"
     prefix: nv
 
-    defs:
+    windows_defs:
       NV_USE_HLA: 1
+
+    emscripten_defs:
+      NV_USE_HLA: 0
 
     dependencies:
       FMT_DIR: fmt
