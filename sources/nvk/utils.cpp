@@ -444,25 +444,24 @@ auto glob_to_regex(const String& pattern) -> String {
         case '*':
             // Check if it's ** (for recursive matching)
             if (i + 1 < pattern.size() && pattern[i + 1] == '*') {
-                // Check if ** is surrounded by path separators or boundaries
-                // Pattern like "/**/file" or "dir/**/*.ext"
-                bool prev_is_sep = (i > 0 && (pattern[i - 1] == '/' ||
-                                              pattern[i - 1] == '\\'));
+                // "**" is a "globstar" when it starts a path segment
+                // (beginning of pattern or after a separator) and is
+                // followed by a separator: "dir/**/file", "**/file".
+                bool prev_ok =
+                    (i == 0 || pattern[i - 1] == '/' || pattern[i - 1] == '\\');
                 bool next_is_sep =
                     (i + 2 < pattern.size() &&
                      (pattern[i + 2] == '/' || pattern[i + 2] == '\\'));
 
-                if (prev_is_sep && next_is_sep) {
-                    // /**/ should match zero or more directories
-                    // Use (|.*/) to match either nothing or any path with
-                    // trailing /
-                    regex_pattern += "(|.*/?)";
-                    ++i; // Skip the second *
-                    ++i; // Skip the separator after **
+                if (prev_ok && next_is_sep) {
+                    // "**/" matches zero or more whole directories:
+                    // either nothing, or any path ending with a '/'.
+                    regex_pattern += "(?:.*/)?";
+                    i += 2; // Skip the second '*' and the separator after it
                 } else {
-                    // Just ** without proper separators, treat as .*
+                    // "**" without proper separators: treat as ".*"
                     regex_pattern += ".*";
-                    ++i; // Skip the second *
+                    ++i; // Skip the second '*'
                 }
             } else {
                 regex_pattern +=
@@ -548,8 +547,17 @@ static auto expand_single_wildcard(const String& sourceDir,
     try {
         // Check if base directory exists
         if (!fs::exists(base_dir)) {
-            logWARN("Directory {} does not exist for pattern {}", base_dir,
-                    pattern);
+            // Walk up to the nearest existing parent to help locating the
+            // problem (typo, missing folder, unreachable drive, ...)
+            fs::path existing(base_dir);
+            while (existing.has_parent_path() &&
+                   existing != existing.parent_path() &&
+                   !fs::exists(existing)) {
+                existing = existing.parent_path();
+            }
+            logWARN("Directory {} does not exist for pattern {} (nearest "
+                    "existing parent: {})",
+                    base_dir, pattern, existing.generic_string());
             return matched_files;
         }
 
@@ -588,10 +596,6 @@ static auto expand_single_wildcard(const String& sourceDir,
         if (matched_files.empty()) {
             logDEBUG("No files matched pattern: {}", pattern);
         }
-        // else {
-        //     logDEBUG("Pattern {} matched {} files", pattern,
-        //              matched_files.size());
-        // }
 
     } catch (const fs::filesystem_error& e) {
         logERROR("Filesystem error while expanding pattern {}: {}", pattern,
