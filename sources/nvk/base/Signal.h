@@ -242,6 +242,9 @@ class SignalHolderBase {
   public:
     virtual ~SignalHolderBase() = default;
 
+    virtual void disconnect_slot(I32 id) = 0;
+    virtual void clear_slots() = 0;
+
     [[nodiscard]] auto get_type_id() const -> TypeIDPtr { return type_id; }
 
     template <typename... Args> [[nodiscard]] auto is_type() const -> bool {
@@ -254,6 +257,9 @@ template <typename... Args> class SignalHolder : public SignalHolderBase {
     Signal<Args...> signal;
     SignalHolder()
         : SignalHolderBase(detail::type_id_generator<Args...>::get_id()) {}
+
+    void disconnect_slot(I32 id) override { signal.disconnect(id); }
+    void clear_slots() override { signal.clear(); }
 };
 
 // ---------------------------------------------------------------------------
@@ -309,6 +315,40 @@ class SignalMap {
     void remove_signal(StringID id) { _signals.erase(id); }
 
     void clear() { _signals.clear(); }
+
+    /** Non-creating lookup (nullptr if absent). */
+    [[nodiscard]] auto find_holder(StringID id) -> SignalHolderBase* {
+        auto it = _signals.find(id);
+        return it == _signals.end() ? nullptr : it->second.get();
+    }
+
+    /** Non-creating typed lookup: nullptr if absent, throws on type mismatch.
+     */
+    template <typename... Args>
+    [[nodiscard]] auto find_signal(StringID id) -> Signal<Args...>* {
+        auto* base = find_holder(id);
+        if (base == nullptr) {
+            return nullptr;
+        }
+        if (!base->template is_type<Args...>()) {
+            throw std::runtime_error("Signal type mismatch");
+        }
+        return &static_cast<SignalHolder<Args...>*>(base)->signal;
+    }
+
+    /** Remove the slots of one signal but keep the signal itself alive
+     *  (safe while that signal is emitting). */
+    void clear_slots(StringID id) {
+        if (auto* h = find_holder(id)) {
+            h->clear_slots();
+        }
+    }
+
+    void clear_all_slots() {
+        for (auto& kv : _signals) {
+            kv.second->clear_slots();
+        }
+    }
 
     [[nodiscard]] auto size() const -> size_t { return _signals.size(); }
 
