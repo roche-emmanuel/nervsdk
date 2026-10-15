@@ -298,8 +298,8 @@ auto seg2_project_point(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& pt,
 }
 
 template <typename T>
-auto polygon_centroid_2d(const Vec2<T>* polygon, U32 size) -> T {
-    Vec2d centroid{0.0, 0.0};
+auto polygon_centroid_2d(const Vec2<T>* polygon, U32 size) -> Vec2<T> {
+    Vec2<T> centroid{0.0, 0.0};
     for (size_t i = 0; i < size; ++i) {
         centroid = centroid + polygon[i];
     }

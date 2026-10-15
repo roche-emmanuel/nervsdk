@@ -38,7 +38,7 @@ template <typename T> struct Polyline2 {
     }
 
     void append_polyline2_slice(const Polyline2<T>& line, T d0, T d1) {
-        append_polyline2_slice(line.points, d0, d1);
+        append_slice(line.points, d0, d1);
     }
 
     // Appends to out the sampled points of an arc around center going from the
@@ -84,7 +84,7 @@ template <typename T> struct Polyline2 {
             F64 ang = a0 + sweep * x;
             F64 r = ra + (rb - ra) * x;
             points.emplace_back(center +
-                                Vec2d{std::cos(ang), std::sin(ang)} * r);
+                                Vec2<T>{std::cos(ang), std::sin(ang)} * r);
         }
     }
 

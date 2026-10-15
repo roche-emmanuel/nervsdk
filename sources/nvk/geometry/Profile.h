@@ -309,7 +309,7 @@ template <typename T, typename V> struct Profile {
                 v = std::max(v0, v1);
             } else {
                 const T frac = (t - t0) / dt;
-                v = v0 + frac * (v1 - v0);
+                v = v0 + (v1 - v0) * frac;
             }
 
             out.samples.push_back(Sample<T, V>{t, v});
