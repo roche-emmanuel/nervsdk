@@ -227,7 +227,7 @@ auto get_current_module_folder(PathSep sep = PATHSEP_LINUX) -> String;
 
 // JSON utils:
 auto get_str(const Json& obj, const String& key, const String& defVal = "")
-    -> std::string;
+    -> String;
 
 auto get_bool(const Json& obj, const String& key, bool defVal) -> bool;
 auto get_i32(const Json& obj, const String& key, I32 defVal) -> I32;

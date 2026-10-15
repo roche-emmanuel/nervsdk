@@ -1496,11 +1496,15 @@ auto get_executable_path() -> String {
 #endif
 }
 auto get_str(const Json& obj, const String& key, const String& defVal)
-    -> std::string {
-    if (!obj.contains(key) || obj[key].is_null())
+    -> String {
+    auto it = obj.find(key);
+    if (it == obj.end() || it->is_null()) {
         return defVal;
-    return obj[key].get<String>();
+    }
+
+    return it->get<String>();
 };
+
 auto get_bool(const Json& obj, const String& key, bool defVal) -> bool {
     if (!obj.contains(key) || obj[key].is_null())
         return defVal;
