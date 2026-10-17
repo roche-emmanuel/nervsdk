@@ -1,3 +1,4 @@
+
 #include <nvk/geometry/geometry2d.h>
 
 #include <clipper2/clipper.h>
@@ -362,4 +363,228 @@ auto polygon2_triangulate(const Vector<Vec2d>& poly, U32 indexOffset, bool ccw)
 
     return raw;
 }
-} // namespace nv
+
+namespace polyline_inflate_detail {
+
+constexpr F64 kMinSegmentLength = 1e-6;
+constexpr F64 kMinTurnAngle = 1e-9;
+constexpr F64 kMinPieceArea = 1e-9;
+// The union snaps the coords on a 0.01 grid, which can leave specks of that
+// size where 2 pieces meet:
+constexpr F64 kMinRingArea = 1e-3;
+
+struct InflateVertex {
+    Vec2d pos;
+    F64 left{0.0};
+    F64 right{0.0};
+};
+
+// Pieces are all stored counter-clockwise so that the non-zero union adds
+// them up whatever the way they were built.
+void add_piece(Vector<Polygon2d>& pieces, Vector<Vec2d> pts) {
+    if (pts.size() < 3) {
+        return;
+    }
+    const F64 area = polygon_signed_area_2d(pts.data(), U32(pts.size()));
+    if (std::abs(area) < kMinPieceArea) {
+        return;
+    }
+    if (area < 0.0) {
+        std::reverse(pts.begin(), pts.end());
+    }
+    pieces.emplace_back(std::move(pts));
+}
+
+// Points strictly inside the arc going from the unit vector `from` rotated by
+// `sweep`, around `center`; the radius goes linearly from r0 to r1.
+void append_arc(Vector<Vec2d>& pts, const Vec2d& center, const Vec2d& from,
+                F64 sweep, F64 r0, F64 r1, F64 sampleDist) {
+    const F64 rmax = std::max(r0, r1);
+    const U32 steps =
+        std::max(2U, U32(std::ceil(std::abs(sweep) * rmax / sampleDist)));
+    for (U32 k = 1; k < steps; ++k) {
+        const F64 t = F64(k) / F64(steps);
+        pts.push_back(center + from.rotated(sweep * t) * (r0 + (r1 - r0) * t));
+    }
+}
+
+// The wedge is not just [v, p0, arc, p1]: its 2 straight edges would lie on
+// the end edges of the 2 trapezoids, where the boolean engine can leave
+// hairline gaps once the coords are snapped. It also covers a small overlap
+// (`overlap` along each centerline) inside the trapezoids, which makes the
+// union robust. The overlap stays inside them as `overlap` <= the segment
+// lengths.
+void add_join_side(Vector<Polygon2d>& pieces, const Vec2d& v, const Vec2d& d0,
+                   const Vec2d& d1, bool left, F64 sideTheta, F64 offset,
+                   F64 overlap, I32 joinType, F64 arcSampleDist,
+                   F64 miterLimit) {
+    if (offset <= kMinSegmentLength) {
+        return;
+    }
+    const Vec2d n0 = left ? d0.ccw90() : d0.cw90();
+    const Vec2d n1 = left ? d1.ccw90() : d1.cw90();
+
+    Vector<Vec2d> pts{v - d0 * overlap, v + n0 * offset};
+    if (joinType == PATH_JOIN_ROUND) {
+        append_arc(pts, v, n0, sideTheta, offset, offset, arcSampleDist);
+    } else if (joinType == PATH_JOIN_MITER &&
+               std::abs(std::abs(sideTheta) - PI) > kMinTurnAngle) {
+        // The apex is at offset / cos(theta / 2) from the vertex:
+        const F64 cosHalf = std::cos(0.5 * sideTheta);
+        if (cosHalf > 1e-9 && 1.0 / cosHalf <= miterLimit) {
+            pts.push_back(v + (n0 + n1) * (offset / (1.0 + n0.dot(n1))));
+        }
+    }
+    pts.push_back(v + n1 * offset);
+    pts.push_back(v + d1 * overlap);
+    pts.push_back(v);
+    add_piece(pieces, std::move(pts));
+}
+
+void add_join(Vector<Polygon2d>& pieces, const InflateVertex& vert,
+              const Vec2d& d0, const Vec2d& d1, F64 len0, F64 len1,
+              I32 joinType, F64 arcSampleDist, F64 miterLimit) {
+    const F64 cross = d0.cross(d1);
+    const F64 dot = d0.dot(d1);
+    const F64 theta = std::atan2(cross, dot);
+    if (std::abs(theta) < kMinTurnAngle) {
+        return;
+    }
+    const F64 overlap = 0.25 * std::min(len0, len1);
+    // A U-turn is an outer turn on both sides:
+    const bool uTurn = std::abs(cross) < kMinTurnAngle && dot < 0.0;
+
+    // Turning left (theta > 0), the outer side is the right one:
+    if (theta < 0.0 || uTurn) {
+        add_join_side(pieces, vert.pos, d0, d1, true, uTurn ? -PI : theta,
+                      vert.left, overlap, joinType, arcSampleDist, miterLimit);
+    }
+    if (theta > 0.0 || uTurn) {
+        add_join_side(pieces, vert.pos, d0, d1, false, uTurn ? PI : theta,
+                      vert.right, overlap, joinType, arcSampleDist, miterLimit);
+    }
+}
+
+// `segDir` is the direction of the end segment (of length `segLen`), `atEnd`
+// tells which end the cap is for. Like the joins, the cap starts a little
+// inside the end trapezoid.
+void add_cap(Vector<Polygon2d>& pieces, const InflateVertex& vert,
+             const Vec2d& segDir, F64 segLen, bool atEnd, I32 endType,
+             F64 arcSampleDist) {
+    const Vec2d& v = vert.pos;
+    const Vec2d n = segDir.ccw90();
+    const Vec2d dir = atEnd ? segDir : segDir * -1.0;
+    const Vec2d leftPt = v + n * vert.left;
+    const Vec2d rightPt = v - n * vert.right;
+    const Vec2d inner = v - dir * (0.25 * segLen);
+
+    if (endType == PATH_END_SQUARE) {
+        const F64 depth = 0.5 * (vert.left + vert.right);
+        add_piece(pieces, {inner, leftPt, leftPt + dir * depth,
+                           rightPt + dir * depth, rightPt});
+    } else if (endType == PATH_END_ROUND) {
+        // Half turn from one side to the other, through `dir`:
+        Vector<Vec2d> pts{inner};
+        if (atEnd) {
+            pts.push_back(rightPt);
+            append_arc(pts, v, n * -1.0, PI, vert.right, vert.left,
+                       arcSampleDist);
+            pts.push_back(leftPt);
+        } else {
+            pts.push_back(leftPt);
+            append_arc(pts, v, n, PI, vert.left, vert.right, arcSampleDist);
+            pts.push_back(rightPt);
+        }
+        add_piece(pieces, std::move(pts));
+    }
+}
+
+} // namespace polyline_inflate_detail
+
+auto polyline2_inflate_variable(const Polyline2d& line,
+                                const Vector<F64>& leftOffsets,
+                                const Vector<F64>& rightOffsets, I32 joinType,
+                                I32 endType, F64 arcSampleDist, F64 miterLimit)
+    -> Vector<Polygon2d> {
+    using namespace polyline_inflate_detail;
+
+    NVCHK(leftOffsets.size() == line.points.size() &&
+              rightOffsets.size() == line.points.size(),
+          "polyline2_inflate_variable: expected {} offsets per side, got {} "
+          "left and {} right.",
+          line.points.size(), leftOffsets.size(), rightOffsets.size());
+    NVCHK(arcSampleDist > 0.0,
+          "polyline2_inflate_variable: invalid arc sample distance.");
+
+    // Merge the duplicated points:
+    Vector<InflateVertex> verts;
+    verts.reserve(line.points.size());
+    for (size_t i = 0; i < line.points.size(); ++i) {
+        const F64 left = std::max(0.0, leftOffsets[i]);
+        const F64 right = std::max(0.0, rightOffsets[i]);
+        if (!verts.empty() &&
+            (line.points[i] - verts.back().pos).length() < kMinSegmentLength) {
+            verts.back().left = std::max(verts.back().left, left);
+            verts.back().right = std::max(verts.back().right, right);
+            continue;
+        }
+        verts.push_back({line.points[i], left, right});
+    }
+    if (line.closedLoop && verts.size() > 1 &&
+        (verts.front().pos - verts.back().pos).length() < kMinSegmentLength) {
+        verts.front().left = std::max(verts.front().left, verts.back().left);
+        verts.front().right = std::max(verts.front().right, verts.back().right);
+        verts.pop_back();
+    }
+    if (verts.size() < 2) {
+        return {};
+    }
+
+    const U32 numVerts = U32(verts.size());
+    const bool closed = line.closedLoop && numVerts >= 3;
+    const U32 numSegs = closed ? numVerts : numVerts - 1;
+
+    Vector<Vec2d> dirs(numSegs);
+    Vector<F64> lens(numSegs);
+    for (U32 i = 0; i < numSegs; ++i) {
+        const Vec2d delta = verts[(i + 1) % numVerts].pos - verts[i].pos;
+        lens[i] = delta.length();
+        dirs[i] = delta * (1.0 / lens[i]);
+    }
+
+    Vector<Polygon2d> pieces;
+    pieces.reserve(size_t(numSegs) * 3);
+
+    // The trapezoid of each segment:
+    for (U32 i = 0; i < numSegs; ++i) {
+        const auto& a = verts[i];
+        const auto& b = verts[(i + 1) % numVerts];
+        const Vec2d n = dirs[i].ccw90();
+        add_piece(pieces, {a.pos + n * a.left, a.pos - n * a.right,
+                           b.pos - n * b.right, b.pos + n * b.left});
+    }
+
+    // The joins:
+    for (U32 k = closed ? 0 : 1; k < (closed ? numVerts : numVerts - 1); ++k) {
+        const U32 prev = (k + numSegs - 1) % numSegs;
+        const U32 next = k % numSegs;
+        add_join(pieces, verts[k], dirs[prev], dirs[next], lens[prev],
+                 lens[next], joinType, arcSampleDist, miterLimit);
+    }
+
+    // The caps:
+    if (!closed) {
+        add_cap(pieces, verts.front(), dirs.front(), lens.front(), false,
+                endType, arcSampleDist);
+        add_cap(pieces, verts.back(), dirs.back(), lens.back(), true, endType,
+                arcSampleDist);
+    }
+
+    auto result = polygon2_union(pieces, FILL_NONZERO);
+    std::erase_if(result, [](const Polygon2d& poly) {
+        return std::abs(polygon2_area(poly)) < kMinRingArea;
+    });
+    return result;
+}
+
+} // namespace nv

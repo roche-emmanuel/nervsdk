@@ -1,3 +1,4 @@
+
 #ifndef _POLYGON2_H_
 #define _POLYGON2_H_
 
@@ -158,6 +159,48 @@ auto inflate_polyline2(const Polyline2d& centerLine, F64 offset,
                        I32 joinType = PATH_JOIN_ROUND,
                        I32 endType = PATH_END_ROUND) -> Vector<Polygon2d>;
 
+// ---------------------------------------------------------------------------
+// polyline2_inflate_variable
+//
+// Inflates a polyline by an offset that changes from point to point: the
+// point i of `line` comes with its own left offset leftOffsets[i] and right
+// offset rightOffsets[i] (left = the side of dir.ccw90(), offsets >= 0, in
+// the coord unit; negative values are clamped to 0).
+//
+// The result is the exact non-uniform inflation model, built as the union of:
+//   - for each segment, the trapezoid swept by the perpendicular to the
+//     segment while the offsets vary linearly between its 2 end points;
+//   - for each vertex, the join wedge filling the gap left on the *outer* side
+//     of the turn (the inner side needs nothing: the trapezoids overlap);
+//   - for an open line, the end caps (endType: PATH_END_BUTT = flat,
+//     PATH_END_SQUARE, PATH_END_ROUND; any other value is flat). A closed
+//     loop (line.closedLoop) has joins everywhere and no caps.
+// Every piece is oriented the same way and the union is a non-zero one, so
+// the parts where the side points would move backward or cross each other
+// (tight turns, offsets larger than the curvature radius, abrupt offset
+// changes) are absorbed instead of producing a self-intersecting outline.
+// With constant offsets it matches inflate_polyline2() on an open path.
+//
+// joinType: PATH_JOIN_ROUND, PATH_JOIN_MITER (falls back to a bevel when the
+// apex would be further than miterLimit * offset from the vertex) or
+// PATH_JOIN_BEVEL; PATH_JOIN_SQUARE is treated as a bevel.
+// arcSampleDist: max length of the chords approximating the round joins and
+// caps.
+//
+// Returns the outer rings (positive area) and, for a closed loop, its holes
+// (negative area), as the other polygon2 boolean operations do. Consecutive
+// duplicated points are merged (keeping the largest offsets), and the rings
+// smaller than 1e-3 (the specks left by the coords snapping) are dropped.
+// Empty when the line has fewer than 2 distinct points.
+// ---------------------------------------------------------------------------
+auto polyline2_inflate_variable(const Polyline2d& line,
+                                const Vector<F64>& leftOffsets,
+                                const Vector<F64>& rightOffsets,
+                                I32 joinType = PATH_JOIN_ROUND,
+                                I32 endType = PATH_END_BUTT,
+                                F64 arcSampleDist = 25.0,
+                                F64 miterLimit = 2.0) -> Vector<Polygon2d>;
+
 auto polygon2_triangulate(const Vector<Vec2d>& poly, U32 indexOffset, bool ccw)
     -> Vector<U32>;
 
@@ -173,3 +216,4 @@ auto build_convex_hull(Vector<Vec2d> pts) -> Polygon2d;
 } // namespace nv
 
 #endif
+
