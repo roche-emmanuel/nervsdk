@@ -302,9 +302,11 @@ class SignalMap {
         }
 
         auto* base = it->second.get();
-        if (!base->template is_type<Args...>())
-            throw std::runtime_error("Signal type mismatch");
-
+        NVCHK(base->template is_type<Args...>(), "Signal type mismatch");
+        // if (!base->template is_type<Args...>()) {
+        //     logERROR("Signal type mismatch");
+        //     throw std::runtime_error("Signal type mismatch");
+        // }
         return static_cast<SignalHolder<Args...>*>(base)->signal;
     }
 
@@ -330,9 +332,11 @@ class SignalMap {
         if (base == nullptr) {
             return nullptr;
         }
-        if (!base->template is_type<Args...>()) {
-            throw std::runtime_error("Signal type mismatch");
-        }
+        NVCHK(base->template is_type<Args...>(), "Signal type mismatch");
+        // if (!base->template is_type<Args...>()) {
+        //     logERROR("Signal type mismatch");
+        //     throw std::runtime_error("Signal type mismatch");
+        // }
         return &static_cast<SignalHolder<Args...>*>(base)->signal;
     }
 
