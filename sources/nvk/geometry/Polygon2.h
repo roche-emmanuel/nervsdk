@@ -32,6 +32,18 @@ template <typename T> struct Polygon2 {
         }
         return box;
     }
+
+    auto subdivide(T maxEdgeLen) -> U32 {
+        const auto before = coords.size();
+        coords = polyline2_subdivide(coords, maxEdgeLen, true);
+        return U32(coords.size() - before);
+    }
+    [[nodiscard]] auto subdivided(T maxEdgeLen) const -> Polygon2<T> {
+        Polygon2<T> res;
+        res.coords = polyline2_subdivide(coords, maxEdgeLen, true);
+        return res;
+    }
+
     // Quantizes the coords onto a regular grid of step `gridStep` and drops
     // the points that the snapping collapsed onto their neighbour. Call this
     // on every input of a boolean op that is meant to share edges with the
@@ -198,8 +210,8 @@ auto polyline2_inflate_variable(const Polyline2d& line,
                                 const Vector<F64>& rightOffsets,
                                 I32 joinType = PATH_JOIN_ROUND,
                                 I32 endType = PATH_END_BUTT,
-                                F64 arcSampleDist = 25.0,
-                                F64 miterLimit = 2.0) -> Vector<Polygon2d>;
+                                F64 arcSampleDist = 25.0, F64 miterLimit = 2.0)
+    -> Vector<Polygon2d>;
 
 auto polygon2_triangulate(const Vector<Vec2d>& poly, U32 indexOffset, bool ccw)
     -> Vector<U32>;
@@ -216,4 +228,3 @@ auto build_convex_hull(Vector<Vec2d> pts) -> Polygon2d;
 } // namespace nv
 
 #endif
-

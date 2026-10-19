@@ -598,6 +598,62 @@ auto polyline2_dedupe_points(Vector<Vec2<T>>& pts, bool closedLoop = false)
     return count;
 }
 
+template <typename T>
+auto polyline2_subdivide(const Vector<Vec2<T>>& pts, T maxEdgeLen,
+                         bool closedLoop = false) -> Vector<Vec2<T>> {
+    if (pts.size() < 2 || !(maxEdgeLen > T(0))) {
+        return pts;
+    }
+
+    const size_t count = pts.size();
+    const size_t numEdges = closedLoop ? count : count - 1;
+
+    Vector<Vec2<T>> out;
+    out.reserve(count);
+
+    for (size_t i = 0; i < numEdges; ++i) {
+        const auto& a = pts[i];
+        const auto& b = pts[(i + 1) % count];
+        out.push_back(a);
+
+        const F64 len = F64((b - a).length());
+        // The small tolerance avoids an extra split on an edge that is
+        // exactly k * maxEdgeLen long up to rounding noise:
+        const F64 ratio = len / F64(maxEdgeLen);
+        const I64 numPieces =
+            ratio > 1.0 + 1e-9 ? I64(std::ceil(ratio - 1e-9)) : 1;
+        for (I64 k = 1; k < numPieces; ++k) {
+            const T t = T(F64(k) / F64(numPieces));
+            out.push_back(a * (T(1) - t) + b * t);
+        }
+    }
+    if (!closedLoop) {
+        out.push_back(pts.back());
+    }
+    return out;
+}
+
+// Number of points polyline2_subdivide() would add (without building them).
+template <typename T>
+auto polyline2_count_subdivision_points(const Vector<Vec2<T>>& pts,
+                                        T maxEdgeLen, bool closedLoop = false)
+    -> U32 {
+    if (pts.size() < 2 || !(maxEdgeLen > T(0))) {
+        return 0;
+    }
+    const size_t count = pts.size();
+    const size_t numEdges = closedLoop ? count : count - 1;
+    U32 added = 0;
+    for (size_t i = 0; i < numEdges; ++i) {
+        const F64 ratio =
+            F64((pts[(i + 1) % count] - pts[i]).length()) / F64(maxEdgeLen);
+        if (ratio > 1.0 + 1e-9) {
+            added += U32(std::ceil(ratio - 1e-9)) - 1;
+        }
+    }
+    return added;
+}
+
 // ---------------------------------------------------------------------------
 // snap_points_to_grid
 //

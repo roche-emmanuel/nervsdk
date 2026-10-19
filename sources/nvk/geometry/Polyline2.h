@@ -28,6 +28,14 @@ template <typename T> struct Polyline2 {
         return polyline2_dedupe_points(points, closedLoop);
     }
 
+    // Splits the edges longer than maxEdgeLen (also the closing one when
+    // closedLoop); returns the number of points added.
+    auto subdivide(T maxEdgeLen) -> U32 {
+        const auto before = points.size();
+        points = polyline2_subdivide(points, maxEdgeLen, closedLoop);
+        return U32(points.size() - before);
+    }
+
     // Appends to out the polyline vertices whose arc-length lies strictly
     // inside (min(d0,d1)+eps, max(d0,d1)-eps), ordered from d0 towards d1 (i.e.
     // the output is reversed when d0 > d1). The 1 cm eps guard band avoids
