@@ -10,6 +10,21 @@ void to_json(Json& j, const CellTextureEntry& e) {
         {"type", e.type},     {"category", e.category},
         {"dimsM", e.dimsM},   {"tiling", e.tiling},
     };
+    if (!e.arm.empty()) {
+        j["arm"] = e.arm;
+    }
+    if (!e.ao.empty()) {
+        j["ao"] = e.ao;
+    }
+    if (!e.rough.empty()) {
+        j["rough"] = e.rough;
+    }
+    if (!e.metal.empty()) {
+        j["metal"] = e.metal;
+    }
+    if (!e.reflect.empty()) {
+        j["reflect"] = e.reflect;
+    }
     if (e.pad >= 0) {
         j["pad"] = e.pad;
     }
@@ -35,6 +50,12 @@ void from_json(const Json& j, CellTextureEntry& e) {
     }
 
     get_opt(j, "normal", e.normal);
+    get_opt(j, "arm", e.arm);
+    get_opt(j, "ao", e.ao);
+    get_opt(j, "rough", e.rough);
+    get_opt(j, "metal", e.metal);
+    get_opt(j, "reflect", e.reflect);
+
     get_opt(j, "id", e.id);
     if (j.contains("size") && j.at("size").is_array() &&
         j.at("size").size() >= 2) {
