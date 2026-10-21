@@ -5,13 +5,10 @@ namespace nv {
 
 void to_json(Json& j, const CellTextureEntry& e) {
     j = {
-        {"id", e.id},
-        {"file", e.file},
-        {"size", Json::array({e.xsize, e.ysize})},
-        {"type", e.type},
-        {"category", e.category},
-        {"dimsM", e.dimsM},
-        {"tiling", e.tiling},
+        {"id", e.id},         {"file", e.file},
+        {"normal", e.normal}, {"size", Json::array({e.xsize, e.ysize})},
+        {"type", e.type},     {"category", e.category},
+        {"dimsM", e.dimsM},   {"tiling", e.tiling},
     };
     if (e.pad >= 0) {
         j["pad"] = e.pad;
@@ -37,6 +34,7 @@ void from_json(const Json& j, CellTextureEntry& e) {
         e.id = get_filename(e.file, false);
     }
 
+    get_opt(j, "normal", e.normal);
     get_opt(j, "id", e.id);
     if (j.contains("size") && j.at("size").is_array() &&
         j.at("size").size() >= 2) {

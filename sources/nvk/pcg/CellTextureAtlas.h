@@ -10,6 +10,7 @@ namespace nv {
 struct CellTextureEntry {
     String id;
     String file;
+    String normal;
     I32 xsize = -1;
     I32 ysize = -1;
     // Per-entry gutter width in pixels on each side of the content rect.
