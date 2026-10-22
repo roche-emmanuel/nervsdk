@@ -16,6 +16,8 @@ struct CellTextureEntry {
     String rough;
     String metal;
     String reflect;
+    String disp;
+    F32 dispScale = 1.0F;
     I32 xsize = -1;
     I32 ysize = -1;
     // Per-entry gutter width in pixels on each side of the content rect.

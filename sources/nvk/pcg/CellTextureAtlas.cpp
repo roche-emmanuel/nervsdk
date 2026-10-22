@@ -25,6 +25,10 @@ void to_json(Json& j, const CellTextureEntry& e) {
     if (!e.reflect.empty()) {
         j["reflect"] = e.reflect;
     }
+    if (!e.disp.empty()) {
+        j["disp"] = e.disp;
+        j["disp_scale"] = e.dispScale;
+    }
     if (e.pad >= 0) {
         j["pad"] = e.pad;
     }
@@ -55,6 +59,8 @@ void from_json(const Json& j, CellTextureEntry& e) {
     get_opt(j, "rough", e.rough);
     get_opt(j, "metal", e.metal);
     get_opt(j, "reflect", e.reflect);
+    get_opt(j, "disp", e.disp);
+    get_opt(j, "disp_scale", e.dispScale);
 
     get_opt(j, "id", e.id);
     if (j.contains("size") && j.at("size").is_array() &&
