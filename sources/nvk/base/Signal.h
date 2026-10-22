@@ -22,6 +22,13 @@ using String = std::string;
 #include <atomic>
 #include <nvk/base/string_id.h>
 
+#ifndef NVCHK
+#define NVCHK(cond, msg)                                                       \
+    if (!cond) {                                                               \
+        throw std::runtime_error(msg);                                         \
+    }
+#endif
+
 namespace nv {
 
 // ---------------------------------------------------------------------------
