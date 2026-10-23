@@ -73,6 +73,41 @@ auto polygon2_union_inflated(const Vector<Polygon2d>& inputs, F64 offset,
     return paths_to_polygon2_vector(shrunk);
 }
 
+auto polygon2_open(const Vector<Polygon2d>& inputs, F64 radius, I32 fillRule,
+                   I32 joinType) -> Vector<Polygon2d> {
+    NVCHK(radius >= 0.0, "polygon2_open: negative radius {}", radius);
+    Clipper2Lib::PathsD subjectPaths = polygon2_vector_to_paths(inputs);
+    if (radius <= 0.0) {
+        return paths_to_polygon2_vector(
+            Clipper2Lib::Union(subjectPaths, (Clipper2Lib::FillRule)fillRule));
+    }
+    auto jType = (Clipper2Lib::JoinType)joinType;
+    auto eType = Clipper2Lib::EndType::Polygon;
+    F64 miterLimit = 2.0;
+
+    // Merge first, then shrink, then grow: all stages on the whole set so that
+    // overlapping inputs behave as one shape (same reasoning as the closing).
+    auto merged =
+        Clipper2Lib::Union(subjectPaths, (Clipper2Lib::FillRule)fillRule);
+    auto shrunk =
+        Clipper2Lib::InflatePaths(merged, -radius, jType, eType, miterLimit);
+    auto regrown =
+        Clipper2Lib::InflatePaths(shrunk, radius, jType, eType, miterLimit);
+    return paths_to_polygon2_vector(regrown);
+}
+
+auto polygon2_close(const Vector<Polygon2d>& inputs, F64 radius, I32 fillRule,
+                    I32 joinType) -> Vector<Polygon2d> {
+    return polygon2_union_inflated(inputs, radius, fillRule, joinType);
+}
+
+auto polygon2_closing_fill(const Vector<Polygon2d>& inputs, F64 radius,
+                           I32 fillRule, I32 joinType) -> Vector<Polygon2d> {
+    auto closed = polygon2_close(inputs, radius, fillRule, joinType);
+    auto base = polygon2_union(inputs, fillRule);
+    return polygon2_difference(closed, base, fillRule);
+}
+
 auto polygon2_offset(const Polygon2d& poly, F64 offset, I32 joinType)
     -> Vector<Polygon2d> {
     if (poly.coords.size() < 3) {
@@ -587,4 +622,4 @@ auto polyline2_inflate_variable(const Polyline2d& line,
     return result;
 }
 
-} // namespace nv
+} // namespace nv

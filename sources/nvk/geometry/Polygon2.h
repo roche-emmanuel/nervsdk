@@ -85,6 +85,36 @@ auto polygon2_union_inflated(const Vector<Polygon2d>& inputs, F64 offset,
                              I32 joinType = PATH_JOIN_ROUND)
     -> Vector<Polygon2d>;
 
+// Morphological opening and closing of a set of polygons by a disc of the
+// given `radius` (same unit as the coords), i.e. rounded corners:
+//
+//   polygon2_close:  grow by r, merge, shrink by r. Concave (reflex) corners
+//     get a tangent arc of radius r, gaps narrower than 2r are bridged, and
+//     convex corners are left untouched. Identical to
+//     polygon2_union_inflated(inputs, radius, ...).
+//   polygon2_open:  shrink by r, grow by r. Convex corners get a tangent arc
+//     of radius r, parts thinner than 2r vanish, concave corners are left
+//     untouched.
+//   polygon2_closing_fill:  only what the closing adds, ie
+//     close(inputs) - union(inputs). Each piece sits in one concave corner or
+//     in one bridged gap. A right-angle corner adds exactly r^2 * (1 - pi/4)
+//     (before the arc discretisation).
+//
+// All 3 work on the whole set (holes are kept as holes, overlapping inputs
+// merge first). A radius <= 0 returns the plain union.
+// ---------------------------------------------------------------------------
+auto polygon2_open(const Vector<Polygon2d>& inputs, F64 radius,
+                   I32 fillRule = FILL_NONZERO, I32 joinType = PATH_JOIN_ROUND)
+    -> Vector<Polygon2d>;
+
+auto polygon2_close(const Vector<Polygon2d>& inputs, F64 radius,
+                    I32 fillRule = FILL_NONZERO, I32 joinType = PATH_JOIN_ROUND)
+    -> Vector<Polygon2d>;
+
+auto polygon2_closing_fill(const Vector<Polygon2d>& inputs, F64 radius,
+                           I32 fillRule = FILL_NONZERO,
+                           I32 joinType = PATH_JOIN_ROUND) -> Vector<Polygon2d>;
+
 // ---------------------------------------------------------------------------
 // polygon2_offset
 //
