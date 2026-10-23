@@ -622,4 +622,210 @@ auto polyline2_inflate_variable(const Polyline2d& line,
     return result;
 }
 
+namespace polygon2_fillets_detail {
+
+// Positive for the orientation Clipper gives to outer rings.
+auto shoelace(const Vector<Vec2d>& pts) -> F64 {
+    F64 sum = 0.0;
+    const size_t count = pts.size();
+    for (size_t i = 0; i < count; ++i) {
+        const Vec2d& a = pts[i];
+        const Vec2d& b = pts[(i + 1) % count];
+        sum += a.x() * b.y() - b.x() * a.y();
+    }
+    return 0.5 * sum;
+}
+
+auto oriented(const Polygon2d& poly) -> Polygon2d {
+    Polygon2d res = poly;
+    if (shoelace(res.coords) < 0.0) {
+        std::reverse(res.coords.begin(), res.coords.end());
+    }
+    return res;
+}
+
+void ring_box(const Vector<Vec2d>& pts, Vec2d& lo, Vec2d& hi) {
+    lo = hi = pts[0];
+    for (const auto& pt : pts) {
+        lo = {std::min(lo.x(), pt.x()), std::min(lo.y(), pt.y())};
+        hi = {std::max(hi.x(), pt.x()), std::max(hi.y(), pt.y())};
+    }
+}
+
+// Largest distance between 2 vertices: the same for any rotation of the piece
+// (a bounding box diagonal is not).
+auto diameter(const Vector<Vec2d>& pts) -> F64 {
+    F64 best = 0.0;
+    for (size_t i = 0; i < pts.size(); ++i) {
+        for (size_t j = i + 1; j < pts.size(); ++j) {
+            best = std::max(best, (pts[i] - pts[j]).length());
+        }
+    }
+    return best;
+}
+
+auto sum_area(const Vector<Polygon2d>& polys) -> F64 {
+    F64 sum = 0.0;
+    for (const auto& poly : polys) {
+        sum += shoelace(poly.coords);
+    }
+    return sum;
+}
+
+} // namespace polygon2_fillets_detail
+
+using namespace polygon2_fillets_detail;
+
+auto polygon2_corner_fillets(const Vector<Polygon2d>& footprint,
+                             const Vector<Polygon2d>& seeds,
+                             const CornerFilletParams& params,
+                             CornerFilletStats* stats) -> Vector<Polygon2d> {
+    Vector<Polygon2d> result;
+    CornerFilletStats localStats;
+    CornerFilletStats& st = stats != nullptr ? *stats : localStats;
+
+    if (params.radius <= 0.0 || seeds.empty()) {
+        return result;
+    }
+
+    U32 numSteps = 0;
+    for (F64 r = params.radius; r >= params.minRadius - 1e-9; r *= 0.5) {
+        ++numSteps;
+    }
+    numSteps = std::max(1U, numSteps);
+    if (st.perStep.size() < numSteps) {
+        st.perStep.resize(numSteps, 0);
+    }
+
+    // Window around the seeds:
+    Vec2d winLo;
+    Vec2d winHi;
+    bool first = true;
+    Vector<Polygon2d> seedRings;
+    for (const auto& seed : seeds) {
+        if (seed.coords.size() < 3) {
+            continue;
+        }
+        Vec2d lo;
+        Vec2d hi;
+        ring_box(seed.coords, lo, hi);
+        if (first) {
+            winLo = lo;
+            winHi = hi;
+            first = false;
+        } else {
+            winLo = {std::min(winLo.x(), lo.x()), std::min(winLo.y(), lo.y())};
+            winHi = {std::max(winHi.x(), hi.x()), std::max(winHi.y(), hi.y())};
+        }
+        seedRings.push_back(oriented(seed));
+    }
+    if (seedRings.empty()) {
+        return result;
+    }
+    const F64 margin = params.windowRadii * params.radius;
+    winLo = {winLo.x() - margin, winLo.y() - margin};
+    winHi = {winHi.x() + margin, winHi.y() + margin};
+    const Vector<Polygon2d> window{
+        Polygon2d{Vector<Vec2d>{{winLo.x(), winLo.y()},
+                                {winHi.x(), winLo.y()},
+                                {winHi.x(), winHi.y()},
+                                {winLo.x(), winHi.y()}}}};
+
+    // What is cut by the window only makes flat ends, which are convex: no
+    // fill there.
+    Vector<Polygon2d> inputs;
+    inputs.reserve(footprint.size());
+    for (const auto& poly : footprint) {
+        if (poly.coords.size() < 3) {
+            continue;
+        }
+        Vec2d lo;
+        Vec2d hi;
+        ring_box(poly.coords, lo, hi);
+        if (hi.x() < winLo.x() || lo.x() > winHi.x() || hi.y() < winLo.y() ||
+            lo.y() > winHi.y()) {
+            continue;
+        }
+        Polygon2d ring = oriented(poly);
+        if (lo.x() >= winLo.x() && lo.y() >= winLo.y() && hi.x() <= winHi.x() &&
+            hi.y() <= winHi.y()) {
+            inputs.push_back(std::move(ring));
+        } else {
+            for (auto& piece : polygon2_intersection({ring}, window)) {
+                inputs.push_back(std::move(piece));
+            }
+        }
+    }
+    // The seeds are part of the footprint whatever the caller passed:
+    for (const auto& seed : seedRings) {
+        inputs.push_back(seed);
+    }
+
+    Vector<Polygon2d> touchZone;
+    for (const auto& seed : seedRings) {
+        for (auto& grown : polygon2_offset(seed, params.touchEps)) {
+            touchZone.push_back(std::move(grown));
+        }
+    }
+
+    U32 step = 0;
+    Vector<Polygon2d> accepted;
+    for (F64 radius = params.radius; radius >= params.minRadius - 1e-9;
+         radius *= 0.5, ++step) {
+        // Straight edges that are not axis aligned come back from the
+        // inflate / deflate with a residue of the clipping precision, which
+        // the difference turns into hairline slivers running along the road
+        // edges and glued to the fillets. An opening removes them (the tips
+        // of a fillet are as thin, which only costs a few cm of its ends).
+        auto fills = polygon2_closing_fill(inputs, radius);
+        if (!accepted.empty()) {
+            // The fill of a smaller radius is inside the one of a bigger one:
+            // what is left around an accepted fillet is residue.
+            fills = polygon2_difference(fills, accepted);
+        }
+        fills = polygon2_open(fills, params.sliverEps);
+
+        for (const auto& fill : fills) {
+            const F64 area = shoelace(fill.coords);
+            if (area <= 0.0) {
+                continue; // a hole of a piece
+            }
+            if (area < params.minArea) {
+                ++st.refusedSmall;
+                continue;
+            }
+            // Absolute budget, not relative to the radius of the step: the
+            // reach of a fillet is radius / tan(angle / 2), so with a limit
+            // that scales with the radius a sharp corner would be refused at
+            // every step of the ladder.
+            if (diameter(fill.coords) > params.maxReach * params.radius) {
+                ++st.refusedReach;
+                if (params.keepRefused) {
+                    st.refused.push_back({fill, FilletRefusal::reach});
+                }
+                continue;
+            }
+            if (!polygon2_open({fill}, params.maxThickness * radius).empty()) {
+                ++st.refusedThick;
+                if (params.keepRefused) {
+                    st.refused.push_back({fill, FilletRefusal::thick});
+                }
+                continue;
+            }
+            if (sum_area(polygon2_intersection({fill}, touchZone)) < 1.0) {
+                ++st.refusedTouch;
+                if (params.keepRefused) {
+                    st.refused.push_back({fill, FilletRefusal::touch});
+                }
+                continue;
+            }
+            result.push_back(fill);
+            accepted.push_back(fill);
+            st.radii.push_back(radius);
+            ++st.perStep[std::min<U32>(step, numSteps - 1)];
+        }
+    }
+    return result;
+}
+
 } // namespace nv

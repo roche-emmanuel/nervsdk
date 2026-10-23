@@ -255,6 +255,72 @@ auto polygon2_triangulate(const Vector<Vec2d>& poly, U32 indexOffset, bool ccw)
 // ---------------------------------------------------------------------------
 auto build_convex_hull(Vector<Vec2d> pts) -> Polygon2d;
 
+// ---------------------------------------------------------------------------
+// polygon2_corner_fillets
+//
+// Rounded concave corners ("fillets") around some seed shapes, inside a
+// bigger footprint. Typical use: the footprint is the union of the roads
+// around a junction and the seed is the junction core: the result is the set
+// of small pieces to add to the core so that the outline of the whole
+// footprint gets a tangent arc at each concave corner next to the core.
+//
+// Per radius of the ladder r, r/2, r/4... (down to minRadius) it takes
+// polygon2_closing_fill(footprint, radius) and keeps a piece only when:
+//   - it touches a seed (seeds are grown by touchEps first, a fillet at the
+//     corner of a square seed only touches it at a vertex);
+//   - its diameter is at most maxReach * params.radius (an absolute budget,
+//     the same at every step): a fillet at an angle theta spans
+//     radius / tan(theta / 2) along each edge, so a sharp corner is refused at
+//     the big radii and gets a smaller fillet further down the ladder, instead
+//     of a long wedge;
+//   - it is thin: opening it by maxThickness * radius leaves nothing. A
+//     fillet is thinner than (1 - sin(theta/2)) / (1 + sin(theta/2)) * radius,
+//     ie 0.17 for a right angle, 0.33 for 60 deg, 0.45 for 45 deg, while a
+//     slab bridging 2 close roads (median, parallel carriageways) is.
+// What an accepted piece covers is removed from the following radii.
+//
+// The footprint rings may come with any orientation (normalised here, the
+// non zero union would cancel opposite windings), must contain the seeds, and
+// are clipped to a window around the seeds (seed bbox + windowRadii * radius)
+// to keep the boolean ops local. Pieces are returned as outer rings only
+// (holes of a piece are ignored), with the same orientation as the clipping
+// backend gives to outer rings (positive shoelace area).
+// ---------------------------------------------------------------------------
+struct CornerFilletParams {
+    F64 radius{600.0};       // preferred radius (coord unit, cm for PCGen)
+    F64 minRadius{150.0};    // last step of the ladder
+    F64 maxReach{1.5};       // x radius (the biggest one), diameter of a fillet
+    F64 maxThickness{0.5};   // x radius, see above (a corner of 50 deg is 0.5)
+    F64 minArea{500.0};      // pieces smaller than this are dropped
+    F64 touchEps{20.0};      // contact tolerance with the seeds
+    F64 sliverEps{0.2};      // opening that removes the hairline residues
+    F64 windowRadii{3.0};    // window margin around the seeds, in radii
+    bool keepRefused{false}; // fill stats.refused (debug drawing)
+};
+
+enum class FilletRefusal : U8 { reach, thick, touch };
+
+struct RefusedFillet {
+    Polygon2d poly;
+    FilletRefusal reason{FilletRefusal::reach};
+};
+
+struct CornerFilletStats {
+    U32 refusedReach{0};
+    U32 refusedThick{0};
+    U32 refusedTouch{0};
+    U32 refusedSmall{0};
+    Vector<U32> perStep;           // accepted pieces per radius of the ladder
+    Vector<F64> radii;             // radius each returned piece was accepted at
+    Vector<RefusedFillet> refused; // only filled when params.keepRefused
+};
+
+auto polygon2_corner_fillets(const Vector<Polygon2d>& footprint,
+                             const Vector<Polygon2d>& seeds,
+                             const CornerFilletParams& params,
+                             CornerFilletStats* stats = nullptr)
+    -> Vector<Polygon2d>;
+
 } // namespace nv
 
 #endif
