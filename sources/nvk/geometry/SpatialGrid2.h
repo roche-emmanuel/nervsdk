@@ -7,6 +7,7 @@
 #include <nvk_common.h>
 
 #include <cmath>
+#include <optional>
 
 namespace nv {
 
@@ -126,6 +127,47 @@ template <typename T> class SpatialGrid2 {
         query(Box2d(center.x() - radiusCm, center.x() + radiusCm,
                     center.y() - radiusCm, center.y() + radiusCm),
               out);
+    }
+
+
+    /** Closest stored value to `pos` within `maxDistCm` (strictly closer than
+        the radius; the first one found wins a tie), or nullopt.
+
+        The grid only buckets values, it does not know where they are, so the
+        caller says: `posOf(value)` returns the Vec2d of a value (the point it
+        was inserted at). Only the cells within maxDistCm of pos are visited. */
+    template <typename PosFn>
+    [[nodiscard]] auto find_nearest(const Vec2d& pos, F64 maxDistCm,
+                                    PosFn&& posOf) const -> std::optional<T> {
+        if (_size == 0) {
+            return std::nullopt;
+        }
+        I64 cellX = 0;
+        I64 cellY = 0;
+        cell_of(pos.x(), pos.y(), cellX, cellY);
+        const I64 cellRadius = I64(std::ceil(maxDistCm / _cellSizeCm));
+
+        std::optional<T> best;
+        F64 bestDistSq = maxDistCm * maxDistCm;
+        for (I64 cy = cellY - cellRadius; cy <= cellY + cellRadius; ++cy) {
+            for (I64 cx = cellX - cellRadius; cx <= cellX + cellRadius; ++cx) {
+                const auto found = _cells.find(cell_key(cx, cy));
+                if (found == _cells.end()) {
+                    continue;
+                }
+                for (const T& value : found->second) {
+                    const Vec2d where = posOf(value);
+                    const F64 dx = where.x() - pos.x();
+                    const F64 dy = where.y() - pos.y();
+                    const F64 distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        best = value;
+                    }
+                }
+            }
+        }
+        return best;
     }
 
   private:

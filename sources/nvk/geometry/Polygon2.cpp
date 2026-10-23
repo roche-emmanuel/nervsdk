@@ -828,4 +828,47 @@ auto polygon2_corner_fillets(const Vector<Polygon2d>& footprint,
     return result;
 }
 
+auto polygon2_positive(Polygon2d poly) -> Polygon2d {
+    if (poly.area() < 0.0) {
+        std::reverse(poly.coords.begin(), poly.coords.end());
+    }
+    return poly;
+}
+
+auto polygon2_union_positive(const Vector<Polygon2d>& inputs)
+    -> Vector<Polygon2d> {
+    Vector<Polygon2d> oriented;
+    oriented.reserve(inputs.size());
+    for (const auto& poly : inputs) {
+        oriented.push_back(polygon2_positive(poly));
+    }
+    return polygon2_union(oriented);
+}
+
+auto polygon2_largest(const Vector<Polygon2d>& rings) -> I32 {
+    I32 best = -1;
+    F64 bestArea = 0.0;
+    for (I32 ri = 0; ri < I32(rings.size()); ++ri) {
+        const F64 ringArea = std::abs(rings[ri].area());
+        if (best < 0 || ringArea > bestArea) {
+            best = ri;
+            bestArea = ringArea;
+        }
+    }
+    return best;
+}
+
+auto polygon2_total_area(const Vector<Polygon2d>& rings) -> F64 {
+    F64 sum = 0.0;
+    for (const auto& ring : rings) {
+        sum += std::abs(ring.area());
+    }
+    return sum;
+}
+
+auto polygon2_shared_area(const Polygon2d& poly,
+                          const Vector<Polygon2d>& others) -> F64 {
+    return polygon2_total_area(polygon2_intersection({poly}, others));
+}
+
 } // namespace nv

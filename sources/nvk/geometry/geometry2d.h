@@ -1,6 +1,8 @@
 #ifndef _NV_GEOMETRY2_H_
 #define _NV_GEOMETRY2_H_
 
+#include <nvk/geometry/geom_utils.h>
+
 #include <nvk/geometry/Polygon2.h>
 #include <nvk/geometry/Polyline2.h>
 #include <nvk/geometry/Profile.h>

@@ -1278,6 +1278,73 @@ auto seg2_clip_endpoint_by_polygon(Vec2<T>& segA, Vec2<T>& segB,
     return true;
 }
 
+/**
+Smallest distance between any two of `points` (Vec2<F32> or Vec2<F64>, the
+result has the same type), or +infinity when there are fewer than two. O(n log
+n): the points are swept by x while the ones still within the best distance so
+far are kept ordered by y, so only the few points inside the y band around the
+current one are compared.
+
+Coincident points give 0.
+*/
+template <typename T>
+[[nodiscard]] auto closest_pair_distance(const Vector<Vec2<T>>& points) -> T {
+    const U32 count = U32(points.size());
+    if (count < 2) {
+        return std::numeric_limits<T>::infinity();
+    }
+
+    struct PointRef {
+        Vec2<T> coords;
+        U32 index;
+    };
+
+    Vector<PointRef> byX;
+    byX.reserve(count);
+    for (U32 i = 0; i < count; ++i) {
+        byX.push_back({points[i], i});
+    }
+    std::sort(byX.begin(), byX.end(), [](const PointRef& a, const PointRef& b) {
+        return a.coords.x() < b.coords.x();
+    });
+
+    // Active window ordered by y; the index breaks ties since y can repeat.
+    const auto yLess = [](const PointRef& a, const PointRef& b) {
+        if (a.coords.y() != b.coords.y()) {
+            return a.coords.y() < b.coords.y();
+        }
+        return a.index < b.index;
+    };
+    std::set<PointRef, decltype(yLess)> active(yLess);
+
+    T bestDistSq = std::numeric_limits<T>::infinity();
+    U32 windowStart = 0;
+    for (U32 i = 0; i < count; ++i) {
+        const PointRef& cur = byX[i];
+        const T bestDist = std::sqrt(bestDistSq);
+
+        // Points now further than bestDist behind in x cannot win any more:
+        while (windowStart < i &&
+               (cur.coords.x() - byX[windowStart].coords.x()) > bestDist) {
+            active.erase(byX[windowStart]);
+            ++windowStart;
+        }
+
+        // Only y in [cur.y - bestDist, cur.y + bestDist] can beat bestDist:
+        const PointRef loBound{Vec2<T>(T(0), cur.coords.y() - bestDist), 0};
+        const PointRef hiBound{Vec2<T>(T(0), cur.coords.y() + bestDist),
+                               std::numeric_limits<U32>::max()};
+        for (auto it = active.lower_bound(loBound);
+             it != active.end() && yLess(*it, hiBound); ++it) {
+            const T dx = it->coords.x() - cur.coords.x();
+            const T dy = it->coords.y() - cur.coords.y();
+            bestDistSq = std::min(bestDistSq, dx * dx + dy * dy);
+        }
+        active.insert(cur);
+    }
+    return std::sqrt(bestDistSq);
+}
+
 } // namespace nv
 
 #endif

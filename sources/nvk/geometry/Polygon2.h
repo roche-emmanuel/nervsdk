@@ -321,6 +321,28 @@ auto polygon2_corner_fillets(const Vector<Polygon2d>& footprint,
                              CornerFilletStats* stats = nullptr)
     -> Vector<Polygon2d>;
 
+// `poly` wound so that its area() is >= 0 (the winding polygon2_union gives its
+// outer rings).
+[[nodiscard]] auto polygon2_positive(Polygon2d poly) -> Polygon2d;
+
+// polygon2_union of inputs that are first all wound the same way, so that
+// overlapping rings add up instead of cancelling. Inputs are expected to be
+// outer rings (no holes).
+[[nodiscard]] auto polygon2_union_positive(const Vector<Polygon2d>& inputs)
+    -> Vector<Polygon2d>;
+
+// Index of the ring with the biggest |area|, -1 when rings is empty. The
+// biggest ring of a union is its outer boundary; the other ones are holes or
+// separate parts.
+[[nodiscard]] auto polygon2_largest(const Vector<Polygon2d>& rings) -> I32;
+
+// Sum of |area| of the rings, in the unit of the coordinates squared.
+[[nodiscard]] auto polygon2_total_area(const Vector<Polygon2d>& rings) -> F64;
+
+// Total area shared by `poly` and the polygons of `others`.
+[[nodiscard]] auto polygon2_shared_area(const Polygon2d& poly,
+                                        const Vector<Polygon2d>& others) -> F64;
+
 } // namespace nv
 
 #endif
