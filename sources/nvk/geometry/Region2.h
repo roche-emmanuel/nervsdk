@@ -186,6 +186,34 @@ template <typename T> struct Region2 {
 using Region2f = Region2<F32>;
 using Region2d = Region2<F64>;
 
+enum class Polygon2Op : U8 { Union, Intersection, Difference, Xor };
+
+// ---------------------------------------------------------------------------
+// polygon2_regions
+//
+// Same booleans as polygon2_union/intersection/difference/xor, but the result
+// comes as regions (an outer ring and the holes it directly contains) instead
+// of a flat list of rings: the nesting is the one Clipper2 computes in its
+// polygon tree, so an island inside a hole is a region of its own and no
+// orientation guess is needed to pair holes with outers.
+//
+// Output convention (Region2): outer rings have a positive area, holes a
+// negative one. Rings with fewer than 3 points are dropped. `clips` is ignored
+// by Union. Use FILL_EVENODD to feed back rings of regions (outer + holes in
+// any winding) as subjects.
+// ---------------------------------------------------------------------------
+[[nodiscard]] auto polygon2_regions(Polygon2Op op,
+                                    const Vector<Polygon2d>& subjects,
+                                    const Vector<Polygon2d>& clips = {},
+                                    I32 fillRule = FILL_NONZERO)
+    -> Vector<Region2d>;
+
+// The rings of a region as a flat list: the outer one first, then the holes.
+[[nodiscard]] auto region2_rings(const Region2d& region) -> Vector<Polygon2d>;
+
+// |outer| - sum |holes|, in the coord unit squared.
+[[nodiscard]] auto region2_area(const Region2d& region) -> F64;
+
 } // namespace nv
 
 #endif
