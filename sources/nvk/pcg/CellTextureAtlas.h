@@ -40,6 +40,11 @@ struct CellTextureEntry {
     Set<String> styles;
     Vec2f dimsM;
     String irClass;
+    // Natural surfaces (grass, soil...): Argus samples the texture twice, once
+    // as is and once rescaled/rotated, and blends them with a world-space
+    // warped noise, so the tiling is not noticeable. Costs a second set of
+    // fetches on those pixels; leave it off for pavements and the like.
+    bool stochastic = false;
 };
 
 void to_json(Json& j, const CellTextureEntry& e);

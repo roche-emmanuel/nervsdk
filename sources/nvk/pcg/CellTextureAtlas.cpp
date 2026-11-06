@@ -41,6 +41,9 @@ void to_json(Json& j, const CellTextureEntry& e) {
     if (!e.irClass.empty()) {
         j["ir_class"] = e.irClass;
     }
+    if (e.stochastic) {
+        j["stochastic"] = true;
+    }
 }
 
 void from_json(const Json& j, CellTextureEntry& e) {
@@ -76,6 +79,7 @@ void from_json(const Json& j, CellTextureEntry& e) {
     get_opt(j, "subtypes", e.subtypes);
     get_opt(j, "styles", e.styles);
     get_opt(j, "ir_class", e.irClass);
+    get_opt(j, "stochastic", e.stochastic);
 
     if (j.contains("subtype")) {
         String subtype;
