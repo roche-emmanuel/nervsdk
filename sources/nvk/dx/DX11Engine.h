@@ -328,6 +328,7 @@ class DX11Engine {
     /** Shader include dir */
     std::string _shaderIncludeDir;
 
+    UINT _featureLevel{0};
     mutable std::mt19937 _gen;
 
     auto convertAndSaveImage(const D3D11_MAPPED_SUBRESOURCE& mappedResource,

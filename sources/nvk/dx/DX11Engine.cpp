@@ -99,10 +99,19 @@ DX11Engine::DX11Engine(ID3D11Device* device) : _device(device) {
 #ifndef NDEBUG
         createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
-        D3D_FEATURE_LEVEL featureLevels[] = {D3D_FEATURE_LEVEL_11_1};
-        D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
-                          createDeviceFlags, featureLevels, 1,
-                          D3D11_SDK_VERSION, &_device, nullptr, &_context);
+        const D3D_FEATURE_LEVEL featureLevels[] = {
+            D3D_FEATURE_LEVEL_11_1,
+            D3D_FEATURE_LEVEL_11_0,
+        };
+        D3D_FEATURE_LEVEL obtained{};
+        HRESULT hr = D3D11CreateDevice(
+            nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
+            featureLevels, _countof(featureLevels), D3D11_SDK_VERSION, &_device,
+            &obtained, &_context);
+        NVCHK(SUCCEEDED(hr), "Cannot create DX11 device, hr=0x{:08X}",
+              (unsigned)hr);
+        _featureLevel = obtained;
+        logDEBUG("DX11 feature level: 0x{:x}", (unsigned)obtained);
     } else {
         _device->GetImmediateContext(&_context);
     }
