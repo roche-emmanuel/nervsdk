@@ -1,11 +1,13 @@
-
 #include <nvk/resource/ResourceManager.h>
 #include <nvk/utils.h>
 
 #include <yaml-cpp/yaml.h>
 
+#include <cerrno>
 #include <charconv>
+#include <cmath>
 #include <codecvt>
+#include <limits>
 
 #include <external/stb/stb_image.h>
 
@@ -947,6 +949,109 @@ auto get_home_dir() -> String {
 
     NVCHK(var != nullptr, "Invalid home directory");
     return var;
+}
+
+auto has_env_var(const char* varname) -> bool {
+    return varname != nullptr && std::getenv(varname) != nullptr;
+}
+
+auto get_env_str(const char* varname, const String& defVal) -> String {
+    const char* val = varname != nullptr ? std::getenv(varname) : nullptr;
+    return val != nullptr ? String(val) : defVal;
+}
+
+namespace {
+// Return the trimmed value of an env var, or an empty string if it is not
+// defined or only contains whitespace.
+auto get_env_trimmed(const char* varname) -> String {
+    const char* val = varname != nullptr ? std::getenv(varname) : nullptr;
+    if (val == nullptr) {
+        return {};
+    }
+    return trimmed(String(val));
+}
+} // namespace
+
+auto get_env_bool(const char* varname, bool defVal) -> bool {
+    auto val = to_lower(get_env_trimmed(varname));
+    if (val.empty()) {
+        return defVal;
+    }
+
+    if (val == "1" || val == "true" || val == "yes" || val == "on" ||
+        val == "y" || val == "t") {
+        return true;
+    }
+
+    if (val == "0" || val == "false" || val == "no" || val == "off" ||
+        val == "n" || val == "f") {
+        return false;
+    }
+
+    logWARN("Invalid boolean value '{}' for environment variable {}, using "
+            "default {}",
+            val, varname, defVal);
+    return defVal;
+}
+
+auto get_env_i64(const char* varname, I64 defVal) -> I64 {
+    auto val = get_env_trimmed(varname);
+    if (val.empty()) {
+        return defVal;
+    }
+
+    errno = 0;
+    char* end = nullptr;
+    long long res = std::strtoll(val.c_str(), &end, 10);
+    if (end == val.c_str() || *end != '\0' || errno == ERANGE) {
+        logWARN("Invalid integer value '{}' for environment variable {}, "
+                "using default {}",
+                val, varname, defVal);
+        return defVal;
+    }
+
+    return (I64)res;
+}
+
+auto get_env_i32(const char* varname, I32 defVal) -> I32 {
+    auto val = get_env_trimmed(varname);
+    if (val.empty()) {
+        return defVal;
+    }
+
+    errno = 0;
+    char* end = nullptr;
+    long long res = std::strtoll(val.c_str(), &end, 10);
+    if (end == val.c_str() || *end != '\0' || errno == ERANGE ||
+        res < std::numeric_limits<I32>::min() ||
+        res > std::numeric_limits<I32>::max()) {
+        logWARN("Invalid 32bit integer value '{}' for environment variable "
+                "{}, using default {}",
+                val, varname, defVal);
+        return defVal;
+    }
+
+    return (I32)res;
+}
+
+auto get_env_f64(const char* varname, F64 defVal) -> F64 {
+    auto val = get_env_trimmed(varname);
+    if (val.empty()) {
+        return defVal;
+    }
+
+    errno = 0;
+    char* end = nullptr;
+    F64 res = std::strtod(val.c_str(), &end);
+    if (end == val.c_str() || *end != '\0' || errno == ERANGE ||
+        !std::isfinite(res)) {
+        logWARN("Invalid floating point value '{}' for environment variable "
+                "{}, using default {}",
+                val, varname, defVal);
+        return defVal;
+    }
+
+    return res;
 }
 
 auto copy_file(const char* source_path, const char* dest_path, U32 buffer_size,

@@ -191,6 +191,48 @@ auto get_cwd() -> String;
 // Get the user home directory
 auto get_home_dir() -> String;
 
+// Environment variable helpers:
+
+// Return true if the environment variable is defined (even if empty).
+auto has_env_var(const char* varname) -> bool;
+inline auto has_env_var(const String& varname) -> bool {
+    return has_env_var(varname.c_str());
+}
+
+// Return the value of the environment variable, or defVal if it is not defined.
+// A variable defined as an empty string yields an empty string.
+auto get_env_str(const char* varname, const String& defVal = "") -> String;
+inline auto get_env_str(const String& varname, const String& defVal = "")
+    -> String {
+    return get_env_str(varname.c_str(), defVal);
+}
+
+// The typed getters below return defVal if the variable is not defined, is
+// empty, or cannot be parsed (a warning is logged in the last case).
+//
+// Bool accepted values (case-insensitive, surrounding whitespace ignored):
+//   true:  1, true, yes, on, y, t
+//   false: 0, false, no, off, n, f
+auto get_env_bool(const char* varname, bool defVal) -> bool;
+inline auto get_env_bool(const String& varname, bool defVal) -> bool {
+    return get_env_bool(varname.c_str(), defVal);
+}
+
+auto get_env_i32(const char* varname, I32 defVal) -> I32;
+inline auto get_env_i32(const String& varname, I32 defVal) -> I32 {
+    return get_env_i32(varname.c_str(), defVal);
+}
+
+auto get_env_i64(const char* varname, I64 defVal) -> I64;
+inline auto get_env_i64(const String& varname, I64 defVal) -> I64 {
+    return get_env_i64(varname.c_str(), defVal);
+}
+
+auto get_env_f64(const char* varname, F64 defVal) -> F64;
+inline auto get_env_f64(const String& varname, F64 defVal) -> F64 {
+    return get_env_f64(varname.c_str(), defVal);
+}
+
 auto copy_file(const char* source_path, const char* dest_path,
                U32 buffer_size = 64 * 1024, bool createFolders = true) -> bool;
 
